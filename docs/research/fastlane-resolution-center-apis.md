@@ -17,7 +17,30 @@ The Resolution Center is **not exposed in Apple's official public App Store Conn
 | Get threads | GET | `ra/apps/{app_id}/platforms/{platform}/resolutionCenter?v=latest` |
 | Reply to thread | POST | `ra/apps/{app_id}/platforms/{platform}/resolutionCenter` |
 
-Supported both reading and replying. Apple retired these endpoints around July 2022.
+Supported both **reading and replying**. Apple retired these endpoints around July 2022.
+
+**Reply POST body format:**
+```json
+{
+  "appNotes": {
+    "threads": [{
+      "id": "THREAD_ID",
+      "versionId": "VERSION_ID",
+      "version": "1.0",
+      "messages": [{
+        "from": "developer",
+        "date": "timestamp_ms",
+        "body": "reply text",
+        "tokens": []
+      }]
+    }]
+  }
+}
+```
+
+**Fastlane methods (still in codebase, likely non-functional):**
+- `spaceship/lib/spaceship/tunes/application.rb` → `reply_resolution_center(app_id, platform, thread_id, version_id, version_number, from, message_body)`
+- `spaceship/lib/spaceship/tunes/tunes_client.rb` → `post_resolution_center(...)`
 
 ### 2. Current "iris/v1" API (undocumented, reverse-engineered)
 
@@ -53,6 +76,8 @@ But **not** reading rejection reasons or replying to App Review.
 | `spaceship/lib/spaceship/connect_api/models/resolution_center_message.rb` | Message model |
 | `spaceship/lib/spaceship/connect_api/models/review_rejection.rb` | Rejection model |
 | `spaceship/lib/spaceship/connect_api/models/actor.rb` | Actor model (message sender) |
+| `spaceship/lib/spaceship/tunes/tunes_client.rb` | Legacy API client with `post_resolution_center` (reply method) |
+| `spaceship/lib/spaceship/tunes/application.rb` | Legacy app model with `reply_resolution_center` |
 
 ## Data Models
 
@@ -86,12 +111,12 @@ But **not** reading rejection reasons or replying to App Review.
 | Apple ID auth only | iris/v1 endpoints require cookie-based session auth, not JWT |
 | Undocumented API | Reverse-engineered from web UI network traffic; can break at any time |
 | 2FA required | Apple ID auth requires two-factor authentication |
-| Read-only (current) | The iris/v1 implementation in fastlane is read-only; reply capability only existed in the legacy API |
+| Reply support | Legacy Tunes API had full reply support (`post_resolution_center`); the code still exists in fastlane but targets deprecated endpoints. The iris/v1 implementation is read-only — no POST/reply methods were added |
 | 4,000 char limit | Replies to App Review are capped at 4,000 characters |
 
 ## Implications for ASC CLI
 
 1. **Cannot use JWT API key auth** — Resolution Center requires Apple ID session cookies, which is a fundamentally different auth model than what the ASC CLI uses.
 2. **Undocumented and fragile** — Any implementation would depend on reverse-engineered endpoints that Apple can change without notice.
-3. **Read-only** — Even fastlane only supports reading threads/messages in the current implementation, not replying.
+3. **Reply was once supported** — Fastlane's legacy `Spaceship::Tunes` had `reply_resolution_center` / `post_resolution_center` methods that POSTed to the old `ra/apps` endpoint. The code still exists but the endpoint is deprecated. The newer iris/v1 implementation is read-only. An iris/v1 POST endpoint for messages may exist but has not been reverse-engineered.
 4. **Not feasible for CI/CD** — The 2FA + cookie session requirement makes automation difficult.
