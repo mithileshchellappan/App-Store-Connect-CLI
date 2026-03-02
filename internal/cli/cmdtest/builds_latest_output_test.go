@@ -1646,12 +1646,18 @@ func TestBuildsLatestDoesNotExhaustivelyPaginateWhenOrderingIsStable(t *testing.
 		Data struct {
 			ID string `json:"id"`
 		} `json:"data"`
+		Links struct {
+			Next string `json:"next"`
+		} `json:"links"`
 	}
 	if err := json.Unmarshal([]byte(stdout), &out); err != nil {
 		t.Fatalf("unmarshal output: %v\nstdout: %s", err, stdout)
 	}
 	if out.Data.ID != "build-newest" {
 		t.Fatalf("expected latest build id build-newest, got %q", out.Data.ID)
+	}
+	if out.Links.Next != secondBuildsURL {
+		t.Fatalf("expected links.next=%q, got %q", secondBuildsURL, out.Links.Next)
 	}
 	if requestCount != 2 {
 		t.Fatalf("expected exactly 2 build page requests, got %d", requestCount)

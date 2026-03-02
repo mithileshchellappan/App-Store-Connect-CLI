@@ -368,13 +368,20 @@ func findMostRecentlyUploadedBuild(
 	}
 
 	var latest *asc.Resource[asc.BuildAttributes]
+	latestLinks := asc.Links{}
 	consumePage := func(page *asc.BuildsResponse) bool {
 		pageHadNewer := false
+		pageLinks := page.GetLinks()
 		for i := range page.Data {
 			candidate := page.Data[i]
 			if latest == nil || isMoreRecentUploadedBuild(candidate, *latest) {
 				selected := candidate
 				latest = &selected
+				if pageLinks != nil {
+					latestLinks = *pageLinks
+				} else {
+					latestLinks = asc.Links{}
+				}
 				pageHadNewer = true
 			}
 		}
@@ -388,7 +395,10 @@ func findMostRecentlyUploadedBuild(
 
 	links := firstPage.GetLinks()
 	if links == nil || links.Next == "" {
-		return &asc.BuildResponse{Data: *latest}, nil
+		return &asc.BuildResponse{
+			Data:  *latest,
+			Links: latestLinks,
+		}, nil
 	}
 
 	nextURL := links.Next
@@ -425,7 +435,8 @@ func findMostRecentlyUploadedBuild(
 	}
 
 	return &asc.BuildResponse{
-		Data: *latest,
+		Data:  *latest,
+		Links: latestLinks,
 	}, nil
 }
 

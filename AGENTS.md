@@ -54,7 +54,8 @@ Canonical test rule: all test runs must use `ASC_BYPASS_KEYCHAIN=1` to avoid hos
 
 ## PR Guardrails
 
-- Before opening or merging a PR, run `make format`, `make lint`, and `ASC_BYPASS_KEYCHAIN=1 make test`.
+- Before opening or merging a PR, run `make format`, `make check-command-docs`, `make lint`, and `ASC_BYPASS_KEYCHAIN=1 make test`.
+- If command/help text changed, run `make generate-command-docs` and commit `docs/COMMANDS.md` before running checks.
 - Use `make install-hooks` once per clone to enforce local pre-commit checks.
 - CI must enforce formatting + lint + tests on both PR and `main` workflows.
 - Remove unused shared wrappers/helpers when commands are refactored.
@@ -110,6 +111,7 @@ Canonical test rule: all test runs must use `ASC_BYPASS_KEYCHAIN=1` to avoid hos
     - Prefer read-only commands first; for write operations, use a throwaway app/resource and clean up (create-then-delete).
 - Before opening/updating a PR, always run:
   - `make format`
+  - `make check-command-docs`
   - `make lint`
   - `ASC_BYPASS_KEYCHAIN=1 make test`
 - In the PR description or handoff, include:
