@@ -1346,6 +1346,11 @@ func TestPricingValidationErrors(t *testing.T) {
 			args:    []string{"pricing", "availability", "get", "--app", "APP_ID", "--id", "AVAILABILITY_ID"},
 			wantErr: "Error: --id and --app are mutually exclusive",
 		},
+		{
+			name:    "pricing availability set missing available in new territories",
+			args:    []string{"pricing", "availability", "set", "--app", "APP_ID", "--territory", "USA", "--available", "true"},
+			wantErr: "Error: --available-in-new-territories is required",
+		},
 	}
 
 	for _, test := range tests {

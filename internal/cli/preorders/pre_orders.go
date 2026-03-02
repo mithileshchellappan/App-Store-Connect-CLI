@@ -202,18 +202,6 @@ Examples:
 			if availabilityID == "" {
 				return fmt.Errorf("pre-orders enable: app availability ID missing from response")
 			}
-			availableInNew := availableInNewTerritories.Value()
-			createResp, err := client.CreateAppAvailabilityV2(requestCtx, resolvedAppID, asc.AppAvailabilityV2CreateAttributes{
-				AvailableInNewTerritories: &availableInNew,
-			})
-			if err != nil {
-				return fmt.Errorf("pre-orders enable: %w", err)
-			}
-			availabilityID = strings.TrimSpace(createResp.Data.ID)
-			if availabilityID == "" {
-				return fmt.Errorf("pre-orders enable: app availability ID missing from response")
-			}
-
 			firstPage, err := client.GetTerritoryAvailabilities(requestCtx, availabilityID, asc.WithTerritoryAvailabilitiesLimit(200))
 			if err != nil {
 				return fmt.Errorf("pre-orders enable: %w", err)
@@ -227,6 +215,22 @@ Examples:
 			territoryResp, ok := paginated.(*asc.TerritoryAvailabilitiesResponse)
 			if !ok {
 				return fmt.Errorf("pre-orders enable: unexpected territory availabilities response")
+			}
+			allTerritoryAvailabilityIDs := make([]string, 0, len(territoryResp.Data))
+			for _, item := range territoryResp.Data {
+				trimmedID := strings.TrimSpace(item.ID)
+				if trimmedID == "" {
+					return fmt.Errorf("pre-orders enable: territory availability ID is empty")
+				}
+				allTerritoryAvailabilityIDs = append(allTerritoryAvailabilityIDs, trimmedID)
+			}
+
+			availableInNew := availableInNewTerritories.Value()
+			if _, err := client.CreateAppAvailabilityV2(requestCtx, resolvedAppID, asc.AppAvailabilityV2CreateAttributes{
+				AvailableInNewTerritories: &availableInNew,
+				TerritoryAvailabilityIDs:  allTerritoryAvailabilityIDs,
+			}); err != nil {
+				return fmt.Errorf("pre-orders enable: %w", err)
 			}
 
 			territoryMap, err := mapTerritoryAvailabilityIDs(territoryResp)
