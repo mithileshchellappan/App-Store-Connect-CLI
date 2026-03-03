@@ -429,6 +429,13 @@ func findMostRecentlyUploadedBuild(
 		pagesScanned++
 
 		pageHadNewer := consumePage(nextPage)
+		pageLinks := nextPage.GetLinks()
+		if pageLinks != nil && pageLinks.Next != "" {
+			if _, seen := seenProbeURLs[pageLinks.Next]; seen {
+				return nil, fmt.Errorf("failed to paginate builds: %w: %s", asc.ErrRepeatedPaginationURL, pageLinks.Next)
+			}
+		}
+
 		if !anomalyDetected {
 			// Normal case: page 1 already contains the latest item.
 			// Stop immediately once a later page fails to produce a newer build.
@@ -441,7 +448,6 @@ func findMostRecentlyUploadedBuild(
 			anomalyDetected = true
 		}
 
-		pageLinks := nextPage.GetLinks()
 		if pageLinks == nil || pageLinks.Next == "" {
 			nextURL = ""
 			break
