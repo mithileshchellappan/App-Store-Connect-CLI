@@ -327,13 +327,13 @@ Examples:
 				if !found {
 					return fmt.Errorf("app-info set: --copy-from-locale %q was not found for this app version", copyFromLocaleValue)
 				}
-				if descriptionValue == "" {
+				if shouldBackfillAppInfoSetField(descriptionValue, targetExists, targetLocalization.Attributes.Description) {
 					descriptionValue = strings.TrimSpace(sourceLocalization.Attributes.Description)
 				}
-				if keywordsValue == "" {
+				if shouldBackfillAppInfoSetField(keywordsValue, targetExists, targetLocalization.Attributes.Keywords) {
 					keywordsValue = strings.TrimSpace(sourceLocalization.Attributes.Keywords)
 				}
-				if supportURLValue == "" {
+				if shouldBackfillAppInfoSetField(supportURLValue, targetExists, targetLocalization.Attributes.SupportURL) {
 					supportURLValue = strings.TrimSpace(sourceLocalization.Attributes.SupportURL)
 				}
 			}
@@ -445,6 +445,16 @@ func applyAppInfoSetValues(
 		attrs.WhatsNew = strings.TrimSpace(whatsNew)
 	}
 	return attrs
+}
+
+func shouldBackfillAppInfoSetField(explicitValue string, targetExists bool, targetValue string) bool {
+	if strings.TrimSpace(explicitValue) != "" {
+		return false
+	}
+	if !targetExists {
+		return true
+	}
+	return strings.TrimSpace(targetValue) == ""
 }
 
 func warnAppInfoSetSubmitIncompleteLocale(locale string, attrs asc.AppStoreVersionLocalizationAttributes) {

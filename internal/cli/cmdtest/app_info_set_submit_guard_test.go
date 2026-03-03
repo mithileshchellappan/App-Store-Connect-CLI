@@ -187,3 +187,62 @@ func TestAppInfoSetWarnsWhenLocaleRemainsSubmitIncomplete(t *testing.T) {
 		t.Fatalf("expected missing field list in warning, got: %q", stderr)
 	}
 }
+
+func TestAppInfoSetCopyFromLocaleDoesNotOverwriteExistingTargetFields(t *testing.T) {
+	setupAppInfoSetAuth(t)
+
+	originalTransport := http.DefaultTransport
+	t.Cleanup(func() {
+		http.DefaultTransport = originalTransport
+	})
+
+	var updateBody string
+	http.DefaultTransport = appInfoSetRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+		switch {
+		case req.Method == http.MethodGet && req.URL.Path == "/v1/appStoreVersions/version-1":
+			return appInfoSetJSONResponse(http.StatusOK, `{"data":{"type":"appStoreVersions","id":"version-1","attributes":{"versionString":"2.0","platform":"IOS"}}}`)
+		case req.Method == http.MethodGet && req.URL.Path == "/v1/appStoreVersions/version-1/appStoreVersionLocalizations":
+			return appInfoSetJSONResponse(http.StatusOK, `{"data":[{"type":"appStoreVersionLocalizations","id":"loc-fr","attributes":{"locale":"fr-FR","description":"Description FR","keywords":"mots,cles","supportUrl":"https://example.com/support-fr"}},{"type":"appStoreVersionLocalizations","id":"loc-en","attributes":{"locale":"en-US","description":"Description EN","keywords":"english,keywords","supportUrl":"https://example.com/support-en"}}]}`)
+		case req.Method == http.MethodPatch && req.URL.Path == "/v1/appStoreVersionLocalizations/loc-fr":
+			body, _ := io.ReadAll(req.Body)
+			updateBody = string(body)
+			return appInfoSetJSONResponse(http.StatusOK, `{"data":{"type":"appStoreVersionLocalizations","id":"loc-fr","attributes":{"locale":"fr-FR","description":"Description FR","keywords":"mots,cles","supportUrl":"https://example.com/support-fr","whatsNew":"Nouveautes"}}}`)
+		default:
+			return nil, fmt.Errorf("unexpected request: %s %s", req.Method, req.URL.Path)
+		}
+	})
+
+	root := RootCommand("1.2.3")
+	root.FlagSet.SetOutput(io.Discard)
+
+	_, stderr := captureOutput(t, func() {
+		if err := root.Parse([]string{
+			"app-info", "set",
+			"--version-id", "version-1",
+			"--locale", "fr-FR",
+			"--copy-from-locale", "en-US",
+			"--whats-new", "Nouveautes",
+		}); err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+		if err := root.Run(context.Background()); err != nil {
+			t.Fatalf("run error: %v", err)
+		}
+	})
+
+	if strings.Contains(updateBody, `"description":"Description EN"`) {
+		t.Fatalf("expected target description to be preserved, got update body: %s", updateBody)
+	}
+	if strings.Contains(updateBody, `"keywords":"english,keywords"`) {
+		t.Fatalf("expected target keywords to be preserved, got update body: %s", updateBody)
+	}
+	if strings.Contains(updateBody, `"supportUrl":"https://example.com/support-en"`) {
+		t.Fatalf("expected target supportUrl to be preserved, got update body: %s", updateBody)
+	}
+	if !strings.Contains(updateBody, `"whatsNew":"Nouveautes"`) {
+		t.Fatalf("expected whatsNew update to be present, got update body: %s", updateBody)
+	}
+	if strings.Contains(stderr, "submit-required fields") {
+		t.Fatalf("did not expect submit-required warning when target locale is complete, got: %q", stderr)
+	}
+}
