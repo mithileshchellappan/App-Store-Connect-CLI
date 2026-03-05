@@ -620,6 +620,10 @@ func validateAPIPath(path string) error {
 		return fmt.Errorf("API path contains unsafe character (#, %%, or \\): %q", path)
 	}
 
+	if strings.Contains(pathOnly, "//") {
+		return fmt.Errorf("API path contains empty segment (//): %q", path)
+	}
+
 	for _, segment := range strings.Split(pathOnly, "/") {
 		if segment == ".." {
 			return fmt.Errorf("API path contains traversal segment: %q", path)

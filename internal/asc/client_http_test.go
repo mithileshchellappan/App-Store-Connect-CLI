@@ -9776,6 +9776,19 @@ func TestValidateAPIPath_RejectsPathTraversal(t *testing.T) {
 	}
 }
 
+func TestValidateAPIPath_RejectsEmptySegments(t *testing.T) {
+	cases := []string{
+		"/v1//apps",
+		"/v1/apps//builds",
+		"/v1/apps/id//relationships/build",
+	}
+	for _, path := range cases {
+		if err := validateAPIPath(path); err == nil {
+			t.Errorf("validateAPIPath(%q) = nil, want error for empty segment", path)
+		}
+	}
+}
+
 func TestValidateAPIPath_RejectsEmbeddedQueryInID(t *testing.T) {
 	path := "/v1/apps/fileId?fields=name"
 	if err := validateAPIPath(path); err != nil {
@@ -9803,6 +9816,7 @@ func TestNewRequest_RejectsUnsafePath(t *testing.T) {
 		"/v1/apps/\x00injected",
 		"/v1/apps/%2e%2e/builds",
 		"/v1/apps/../secrets",
+		"/v1/apps//builds",
 		"/v1/apps/id#fragment",
 		"/v1/apps\\builds",
 	}
