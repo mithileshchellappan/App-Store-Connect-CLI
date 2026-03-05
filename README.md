@@ -150,6 +150,19 @@ asc bundle-ids list
 asc workflow run release
 ```
 
+### Xcode Cloud workflows and build runs
+
+```bash
+# Trigger from a pull request
+asc xcode-cloud run --workflow-id "WORKFLOW_ID" --pull-request-id "PR_ID"
+
+# Rerun from an existing build run with a clean build
+asc xcode-cloud run --source-run-id "BUILD_RUN_ID" --clean
+
+# Fetch a single build run by ID
+asc xcode-cloud build-runs get --id "BUILD_RUN_ID"
+```
+
 ## Commands and Reference
 
 Use built-in help as the source of truth:

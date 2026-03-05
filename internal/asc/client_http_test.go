@@ -4937,6 +4937,35 @@ func TestGetCiBuildRun(t *testing.T) {
 	}
 }
 
+func TestGetCiBuildRun_WithIncludeAndFields(t *testing.T) {
+	response := jsonResponse(http.StatusOK, `{"data":{"type":"ciBuildRuns","id":"run-1","attributes":{"number":1}}}`)
+	client := newTestClient(t, func(req *http.Request) {
+		if req.Method != http.MethodGet {
+			t.Fatalf("expected GET, got %s", req.Method)
+		}
+		if req.URL.Path != "/v1/ciBuildRuns/run-1" {
+			t.Fatalf("expected path /v1/ciBuildRuns/run-1, got %s", req.URL.Path)
+		}
+		values := req.URL.Query()
+		if values.Get("include") != "workflow,pullRequest" {
+			t.Fatalf("expected include=workflow,pullRequest, got %q", values.Get("include"))
+		}
+		if values.Get("fields[ciBuildRuns]") != "workflow,pullRequest" {
+			t.Fatalf("expected fields[ciBuildRuns]=workflow,pullRequest, got %q", values.Get("fields[ciBuildRuns]"))
+		}
+		assertAuthorized(t, req)
+	}, response)
+
+	if _, err := client.GetCiBuildRun(
+		context.Background(),
+		"run-1",
+		WithCiBuildRunInclude("workflow", "pullRequest"),
+		WithCiBuildRunFields("workflow", "pullRequest"),
+	); err != nil {
+		t.Fatalf("GetCiBuildRun() error: %v", err)
+	}
+}
+
 func TestGetCiBuildRunBuilds_WithLimit(t *testing.T) {
 	response := jsonResponse(http.StatusOK, `{"data":[{"type":"builds","id":"build-1"}]}`)
 	client := newTestClient(t, func(req *http.Request) {
@@ -4993,6 +5022,133 @@ func TestCreateCiBuildRun(t *testing.T) {
 			},
 		},
 	}
+	if _, err := client.CreateCiBuildRun(context.Background(), req); err != nil {
+		t.Fatalf("CreateCiBuildRun() error: %v", err)
+	}
+}
+
+func TestCreateCiBuildRun_WithPullRequestAndClean(t *testing.T) {
+	response := jsonResponse(http.StatusCreated, `{"data":{"type":"ciBuildRuns","id":"run-pr-1","attributes":{"number":2}}}`)
+	client := newTestClient(t, func(req *http.Request) {
+		if req.Method != http.MethodPost {
+			t.Fatalf("expected POST, got %s", req.Method)
+		}
+		if req.URL.Path != "/v1/ciBuildRuns" {
+			t.Fatalf("expected path /v1/ciBuildRuns, got %s", req.URL.Path)
+		}
+
+		var payload map[string]any
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			t.Fatalf("failed to decode request: %v", err)
+		}
+
+		data, ok := payload["data"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected data object in payload, got %#v", payload["data"])
+		}
+		attrs, ok := data["attributes"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected attributes object in payload, got %#v", data["attributes"])
+		}
+		if clean, ok := attrs["clean"].(bool); !ok || !clean {
+			t.Fatalf("expected attributes.clean=true, got %#v", attrs["clean"])
+		}
+
+		relationships, ok := data["relationships"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected relationships object in payload, got %#v", data["relationships"])
+		}
+		if _, ok := relationships["workflow"]; !ok {
+			t.Fatalf("expected workflow relationship, got %#v", relationships)
+		}
+		if _, ok := relationships["pullRequest"]; !ok {
+			t.Fatalf("expected pullRequest relationship, got %#v", relationships)
+		}
+		if _, ok := relationships["sourceBranchOrTag"]; ok {
+			t.Fatalf("did not expect sourceBranchOrTag relationship, got %#v", relationships)
+		}
+		if _, ok := relationships["buildRun"]; ok {
+			t.Fatalf("did not expect buildRun relationship, got %#v", relationships)
+		}
+
+		assertAuthorized(t, req)
+	}, response)
+
+	clean := true
+	req := CiBuildRunCreateRequest{
+		Data: CiBuildRunCreateData{
+			Type:       ResourceTypeCiBuildRuns,
+			Attributes: &CiBuildRunCreateAttributes{Clean: &clean},
+			Relationships: &CiBuildRunCreateRelationships{
+				Workflow: &Relationship{
+					Data: ResourceData{Type: ResourceTypeCiWorkflows, ID: "wf-1"},
+				},
+				PullRequest: &Relationship{
+					Data: ResourceData{Type: ResourceTypeScmPullRequests, ID: "pr-1"},
+				},
+			},
+		},
+	}
+
+	if _, err := client.CreateCiBuildRun(context.Background(), req); err != nil {
+		t.Fatalf("CreateCiBuildRun() error: %v", err)
+	}
+}
+
+func TestCreateCiBuildRun_WithSourceBuildRunOnly(t *testing.T) {
+	response := jsonResponse(http.StatusCreated, `{"data":{"type":"ciBuildRuns","id":"run-rerun-1","attributes":{"number":3}}}`)
+	client := newTestClient(t, func(req *http.Request) {
+		if req.Method != http.MethodPost {
+			t.Fatalf("expected POST, got %s", req.Method)
+		}
+		if req.URL.Path != "/v1/ciBuildRuns" {
+			t.Fatalf("expected path /v1/ciBuildRuns, got %s", req.URL.Path)
+		}
+
+		var payload map[string]any
+		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+			t.Fatalf("failed to decode request: %v", err)
+		}
+
+		data, ok := payload["data"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected data object in payload, got %#v", payload["data"])
+		}
+		if _, ok := data["attributes"]; ok {
+			t.Fatalf("did not expect attributes in payload, got %#v", data["attributes"])
+		}
+
+		relationships, ok := data["relationships"].(map[string]any)
+		if !ok {
+			t.Fatalf("expected relationships object in payload, got %#v", data["relationships"])
+		}
+		if _, ok := relationships["buildRun"]; !ok {
+			t.Fatalf("expected buildRun relationship, got %#v", relationships)
+		}
+		if _, ok := relationships["workflow"]; ok {
+			t.Fatalf("did not expect workflow relationship, got %#v", relationships)
+		}
+		if _, ok := relationships["sourceBranchOrTag"]; ok {
+			t.Fatalf("did not expect sourceBranchOrTag relationship, got %#v", relationships)
+		}
+		if _, ok := relationships["pullRequest"]; ok {
+			t.Fatalf("did not expect pullRequest relationship, got %#v", relationships)
+		}
+
+		assertAuthorized(t, req)
+	}, response)
+
+	req := CiBuildRunCreateRequest{
+		Data: CiBuildRunCreateData{
+			Type: ResourceTypeCiBuildRuns,
+			Relationships: &CiBuildRunCreateRelationships{
+				BuildRun: &Relationship{
+					Data: ResourceData{Type: ResourceTypeCiBuildRuns, ID: "run-1"},
+				},
+			},
+		},
+	}
+
 	if _, err := client.CreateCiBuildRun(context.Background(), req); err != nil {
 		t.Fatalf("CreateCiBuildRun() error: %v", err)
 	}
