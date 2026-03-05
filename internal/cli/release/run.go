@@ -25,6 +25,7 @@ const (
 	stepAttachBuild       = "attach_build"
 	stepValidateReadiness = "validate_readiness"
 	stepSubmitReview      = "submit_review"
+	releaseRunTimeout     = 30 * time.Minute
 )
 
 var (
@@ -39,6 +40,7 @@ type runOptions struct {
 	BuildID        string
 	MetadataDir    string
 	Platform       string
+	Timeout        time.Duration
 	DryRun         bool
 	Confirm        bool
 	StrictValidate bool
@@ -102,6 +104,7 @@ func ReleaseRunCommand() *ffcli.Command {
 	buildID := fs.String("build", "", "Build ID to attach (required)")
 	metadataDir := fs.String("metadata-dir", "", "Metadata directory to apply (required)")
 	platform := fs.String("platform", "IOS", "Platform: IOS, MAC_OS, TV_OS, VISION_OS")
+	timeout := fs.Duration("timeout", releaseRunTimeout, "Maximum time to run the release pipeline")
 	dryRun := fs.Bool("dry-run", false, "Preview deterministic plan without mutations")
 	confirm := fs.Bool("confirm", false, "Confirm release mutations (required unless --dry-run)")
 	strictValidate := fs.Bool("strict-validate", false, "Treat readiness warnings as blocking")
@@ -155,6 +158,9 @@ Examples:
 			if err != nil {
 				return shared.UsageError(err.Error())
 			}
+			if *timeout <= 0 {
+				return shared.UsageError("--timeout must be greater than 0")
+			}
 
 			checkpointPath := strings.TrimSpace(*checkpointFile)
 			if checkpointPath == "" {
@@ -171,6 +177,7 @@ Examples:
 				BuildID:        trimmedBuildID,
 				MetadataDir:    trimmedMetadataDir,
 				Platform:       normalizedPlatform,
+				Timeout:        *timeout,
 				DryRun:         *dryRun,
 				Confirm:        *confirm,
 				StrictValidate: *strictValidate,
@@ -249,7 +256,7 @@ func executeRun(ctx context.Context, opts runOptions) (runResult, error) {
 		return result, err
 	}
 
-	requestCtx, cancel := shared.ContextWithTimeout(ctx)
+	requestCtx, cancel := shared.ContextWithTimeoutDuration(ctx, opts.Timeout)
 	defer cancel()
 
 	versionID := strings.TrimSpace(checkpoint.VersionID)
@@ -520,9 +527,15 @@ func executeRun(ctx context.Context, opts runOptions) (runResult, error) {
 			}, fmt.Errorf("validate readiness: found %d blocking issue(s)", report.Summary.Blocking)
 		}
 
+		status := "ok"
+		message := "readiness checks passed"
+		if opts.DryRun {
+			status = "dry-run"
+			message = "readiness checks passed (dry-run)"
+		}
 		return stepOutcome{
-			Status:  "ok",
-			Message: "readiness checks passed",
+			Status:  status,
+			Message: message,
 			Details: map[string]any{"report": report},
 			Persist: !opts.DryRun,
 		}, nil

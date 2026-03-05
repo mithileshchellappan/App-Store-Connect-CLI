@@ -104,3 +104,30 @@ func TestReleaseRun_InvalidPlatform(t *testing.T) {
 		t.Fatalf("expected unsupported platform error, got %q", stderr)
 	}
 }
+
+func TestReleaseRun_InvalidTimeout(t *testing.T) {
+	root := RootCommand("1.2.3")
+	root.FlagSet.SetOutput(io.Discard)
+
+	_, stderr := captureOutput(t, func() {
+		if err := root.Parse([]string{
+			"release", "run",
+			"--app", "APP_123",
+			"--version", "1.2.3",
+			"--build", "BUILD_123",
+			"--metadata-dir", "./metadata/version/1.2.3",
+			"--dry-run",
+			"--timeout", "0s",
+		}); err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+		err := root.Run(context.Background())
+		if !errors.Is(err, flag.ErrHelp) {
+			t.Fatalf("expected ErrHelp, got %v", err)
+		}
+	})
+
+	if !strings.Contains(stderr, "--timeout must be greater than 0") {
+		t.Fatalf("expected invalid timeout error, got %q", stderr)
+	}
+}

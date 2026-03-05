@@ -102,6 +102,7 @@ asc <subcommand> [flags]
 - `submit` - Submit builds for App Store review.
 - `validate` - Validate App Store version readiness before submission.
 - `publish` - End-to-end publish workflows for TestFlight and App Store.
+- `release` - Run high-level App Store release workflows.
 
 ### Monetization
 
