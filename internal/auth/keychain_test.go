@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -18,6 +19,34 @@ import (
 
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/config"
 )
+
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+
+	oldStderr := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create stderr pipe: %v", err)
+	}
+
+	os.Stderr = w
+	defer func() {
+		os.Stderr = oldStderr
+	}()
+
+	outputC := make(chan string, 1)
+	go func() {
+		var buf bytes.Buffer
+		_, _ = io.Copy(&buf, r)
+		_ = r.Close()
+		outputC <- buf.String()
+	}()
+
+	fn()
+
+	_ = w.Close()
+	return <-outputC
+}
 
 func TestShouldBypassKeychainEnvSemantics(t *testing.T) {
 	originalValue, originalPresent := os.LookupEnv("ASC_BYPASS_KEYCHAIN")
@@ -46,7 +75,7 @@ func TestShouldBypassKeychainEnvSemantics(t *testing.T) {
 		{name: "falsey false", value: ptrTo("false"), expect: false},
 		{name: "falsey no", value: ptrTo("no"), expect: false},
 		{name: "falsey off", value: ptrTo("off"), expect: false},
-		{name: "invalid value", value: ptrTo("banana"), expect: true},
+		{name: "invalid value", value: ptrTo("banana"), expect: false},
 	}
 
 	for _, tt := range tests {
@@ -60,6 +89,23 @@ func TestShouldBypassKeychainEnvSemantics(t *testing.T) {
 				t.Fatalf("shouldBypassKeychain() = %v, want %v (value=%v)", got, tt.expect, tt.value)
 			}
 		})
+	}
+}
+
+func TestShouldBypassKeychain_InvalidValueWarnsAndDisables(t *testing.T) {
+	t.Setenv("ASC_BYPASS_KEYCHAIN", "banana")
+
+	stderr := captureStderr(t, func() {
+		if shouldBypassKeychain() {
+			t.Fatal("expected invalid value to keep keychain enabled")
+		}
+	})
+
+	if !strings.Contains(stderr, `Warning: invalid ASC_BYPASS_KEYCHAIN value "banana"`) {
+		t.Fatalf("expected invalid value warning, got %q", stderr)
+	}
+	if !strings.Contains(stderr, "keychain bypass disabled") {
+		t.Fatalf("expected warning to explain conservative behavior, got %q", stderr)
 	}
 }
 

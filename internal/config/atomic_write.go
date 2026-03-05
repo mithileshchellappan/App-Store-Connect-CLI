@@ -7,15 +7,23 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/secureopen"
 )
 
+var syncDirFn = syncDir
+
 func writeConfigFile(path string, data []byte) error {
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+	if parentDir := filepath.Dir(dir); parentDir != dir {
+		if err := syncDirFn(parentDir); err != nil {
+			return fmt.Errorf("failed to sync config parent directory: %w", err)
+		}
 	}
 
 	if info, err := os.Lstat(path); err == nil {
@@ -52,6 +60,9 @@ func writeConfigFile(path string, data []byte) error {
 	}
 	if err := tempFile.Close(); err != nil {
 		return err
+	}
+	if err := syncDirFn(dir); err != nil {
+		return fmt.Errorf("failed to sync config directory: %w", err)
 	}
 
 	if err := replaceConfigFile(tempPath, path); err != nil {
@@ -91,14 +102,34 @@ func createTempConfigFile(dir, pattern string, perm os.FileMode) (*os.File, erro
 	return nil, fmt.Errorf("failed to create temporary config file in %q", dir)
 }
 
+func syncDir(path string) error {
+	dir, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer dir.Close()
+
+	if err := dir.Sync(); err != nil {
+		if runtime.GOOS == "windows" {
+			return nil
+		}
+		return err
+	}
+	return nil
+}
+
 func replaceConfigFile(tempPath, path string) error {
+	dir := filepath.Dir(path)
 	if err := os.Rename(tempPath, path); err == nil {
+		if err := syncDirFn(dir); err != nil {
+			return fmt.Errorf("failed to sync config directory: %w", err)
+		}
 		return nil
 	} else if errors.Is(err, os.ErrNotExist) {
 		return err
 	}
 
-	backupFile, err := createTempConfigFile(filepath.Dir(path), ".asc-config-backup-*", 0o600)
+	backupFile, err := createTempConfigFile(dir, ".asc-config-backup-*", 0o600)
 	if err != nil {
 		return err
 	}
@@ -119,5 +150,8 @@ func replaceConfigFile(tempPath, path string) error {
 		return err
 	}
 	_ = os.Remove(backupPath)
+	if err := syncDirFn(dir); err != nil {
+		return fmt.Errorf("failed to sync config directory: %w", err)
+	}
 	return nil
 }

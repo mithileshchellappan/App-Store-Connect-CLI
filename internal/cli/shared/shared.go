@@ -606,11 +606,11 @@ func strictAuthEnabled() bool {
 	default:
 		fmt.Fprintf(
 			os.Stderr,
-			"Warning: invalid %s value %q (expected true/false, 1/0, yes/no, y/n, or on/off); strict auth enabled\n",
+			"Warning: invalid %s value %q (expected true/false, 1/0, yes/no, y/n, or on/off); strict auth disabled\n",
 			strictAuthEnvVar,
 			value,
 		)
-		return true
+		return false
 	}
 }
 
@@ -859,15 +859,32 @@ func ValidateBoundOutputFlags(fs *flag.FlagSet) error {
 	return validationErr
 }
 
+func validateCommandOutputPath(commands []*ffcli.Command) error {
+	for _, cmd := range commands {
+		if cmd == nil {
+			continue
+		}
+		if err := ValidateBoundOutputFlags(cmd.FlagSet); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // WrapCommandOutputValidation ensures shared output flags are validated before
 // command execution so invalid format combinations fail before side effects.
 func WrapCommandOutputValidation(cmd *ffcli.Command) {
+	wrapCommandOutputValidation(cmd, nil)
+}
+
+func wrapCommandOutputValidation(cmd *ffcli.Command, parents []*ffcli.Command) {
 	if cmd == nil {
 		return
 	}
 
+	path := append(append([]*ffcli.Command(nil), parents...), cmd)
 	for _, sub := range cmd.Subcommands {
-		WrapCommandOutputValidation(sub)
+		wrapCommandOutputValidation(sub, path)
 	}
 
 	if cmd.Exec == nil {
@@ -876,7 +893,7 @@ func WrapCommandOutputValidation(cmd *ffcli.Command) {
 
 	originalExec := cmd.Exec
 	cmd.Exec = func(ctx context.Context, args []string) error {
-		if err := ValidateBoundOutputFlags(cmd.FlagSet); err != nil {
+		if err := validateCommandOutputPath(path); err != nil {
 			return UsageError(err.Error())
 		}
 		return originalExec(ctx, args)

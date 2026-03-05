@@ -105,7 +105,13 @@ func shouldBypassKeychain() bool {
 	case "0", "false", "no", "off":
 		return false
 	default:
-		return true
+		fmt.Fprintf(
+			os.Stderr,
+			"Warning: invalid %s value %q (expected true/false, 1/0, yes/no, or on/off); keychain bypass disabled\n",
+			bypassKeychainEnv,
+			trimmed,
+		)
+		return false
 	}
 }
 
