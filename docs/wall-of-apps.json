@@ -28,6 +28,13 @@
     "platform": ["iOS"]
   },
   {
+    "app": "Cat on Chair",
+    "link": "https://apps.apple.com/ca/app/cat-on-chair-focus-timer/id6746562271",
+    "creator": "Ryan Yao",
+    "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/db/f5/df/dbf5dfa9-9f01-90d2-fce9-69e1c387c024/AppIcon-0-0-1x_U007epad-0-1-0-85-220.jpeg/512x512bb.jpg",
+    "platform": ["iOS"]
+  },
+  {
     "app": "CodexMonitor",
     "link": "https://github.com/Dimillian/CodexMonitor",
     "creator": "Dimillian",
