@@ -14,6 +14,13 @@
     "platform": ["iOS"]
   },
   {
+    "app": "Bibliostats",
+    "link": "https://apps.apple.com/app/id6759411516",
+    "creator": "ckirst",
+    "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/06/d8/48/06d84871-63f1-8c85-ceb5-e6a140b2831c/AppIcon-0-0-1x_U007epad-0-1-85-220.png/512x512bb.jpg",
+    "platform": ["iOS"]
+  },
+  {
     "app": "bijou.fm",
     "link": "https://apps.apple.com/us/app/bijou-fm-for-last-fm/id6450460066",
     "creator": "zchwyng",
@@ -406,7 +413,7 @@
     "app": "ToMe: Save to Self",
     "link": "https://apps.apple.com/app/id6755589008",
     "creator": "framara",
-    "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/2e/96/7b/2e967b9e-e7a3-c9aa-03b3-4ffb69f435af/ToMe_Liquid-0-0-1x_U007epad-0-1-sRGB-85-220.png/512x512bb.jpg",
+    "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/ea/39/63/ea3963e1-524c-7402-fe36-f930ddedcc36/ToMe_Liquid-0-0-1x_U007epad-0-1-sRGB-85-220.png/512x512bb.jpg",
     "platform": ["iOS", "macOS"]
   },
   {
