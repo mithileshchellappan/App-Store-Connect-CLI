@@ -60,16 +60,18 @@ func SnitchCommand(version string) *ffcli.Command {
 
 	return &ffcli.Command{
 		Name:       "snitch",
-		ShortUsage: `asc snitch "description" [flags]`,
+		ShortUsage: `asc snitch [flags] "description"`,
 		ShortHelp:  "Report CLI friction as a GitHub issue.",
 		LongHelp: `Report CLI friction directly from the terminal.
 
 Searches for duplicate issues when GITHUB_TOKEN or GH_TOKEN is available.
 Without --confirm, snitch prints a preview only. Use --local to log friction
 offline for later review with "asc snitch flush".
+Place flags before the description. If the description itself contains text
+that looks like a flag (for example, "--app"), wrap the full description in quotes.
 
 Examples:
-  asc snitch "crashes --app doesn't support bundle ID" --repro 'asc crashes --app "com.example"' --expected "Should resolve bundle ID" --actual "Error: AppId is invalid" --confirm
+  asc snitch --repro 'asc crashes --app "com.example"' --expected "Should resolve bundle ID" --actual "Error: AppId is invalid" --confirm "crashes --app doesn't support bundle ID"
   asc snitch --dry-run "group name ambiguity"
   asc snitch --local "status command needs bundle ID support"
   asc snitch flush
@@ -84,9 +86,9 @@ Examples:
 				return shared.UsageError("description is required")
 			}
 
-			description := strings.TrimSpace(strings.Join(args, " "))
-			if description == "" {
-				return shared.UsageError("description must not be empty")
+			description, err := descriptionFromArgs(args, fs)
+			if err != nil {
+				return err
 			}
 
 			sev := strings.TrimSpace(strings.ToLower(*severity))
@@ -149,6 +151,63 @@ Examples:
 			return json.NewEncoder(os.Stdout).Encode(result)
 		},
 	}
+}
+
+func descriptionFromArgs(args []string, fs *flag.FlagSet) (string, error) {
+	parts := make([]string, 0, len(args))
+	for i, raw := range args {
+		part := strings.TrimSpace(raw)
+		if part == "" {
+			continue
+		}
+
+		if i > 0 {
+			if misplacedFlag := trailingSnitchFlag(part, fs); misplacedFlag != "" {
+				return "", shared.UsageErrorf(
+					"flags must appear before the description; move %s before the description or quote it if it is part of the report text",
+					misplacedFlag,
+				)
+			}
+		}
+
+		parts = append(parts, part)
+	}
+
+	description := strings.TrimSpace(strings.Join(parts, " "))
+	if description == "" {
+		return "", shared.UsageError("description must not be empty")
+	}
+
+	return description, nil
+}
+
+func trailingSnitchFlag(token string, fs *flag.FlagSet) string {
+	if token == "" || token == "--" {
+		return ""
+	}
+
+	if strings.HasPrefix(token, "--") {
+		name := token[2:]
+		if idx := strings.IndexByte(name, '='); idx >= 0 {
+			name = name[:idx]
+		}
+		if fs.Lookup(name) != nil {
+			return "--" + name
+		}
+		return ""
+	}
+
+	if strings.HasPrefix(token, "-") {
+		name := token[1:]
+		if idx := strings.IndexByte(name, '='); idx >= 0 {
+			name = name[:idx]
+		}
+		if fs.Lookup(name) != nil {
+			return "-" + name
+		}
+	}
+
+	return ""
 }
 
 func flushCommand() *ffcli.Command {
