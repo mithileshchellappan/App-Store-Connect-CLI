@@ -1,7 +1,7 @@
 # Subscriptions V2 Taxonomy
 
-This note captures the canonical v2 subscriptions command matrix and the
-migration mapping from the older flat `asc subscriptions` surface.
+This note captures the canonical V2 subscriptions command matrix after the
+full removal of the legacy flat `asc subscriptions` surface.
 
 ## Canonical Families
 
@@ -26,24 +26,29 @@ migration mapping from the older flat `asc subscriptions` surface.
 
 ## Old To New Mapping
 
-| Old path | Canonical v2 path | Compatibility behavior |
-| --- | --- | --- |
-| `asc subscriptions pricing` | `asc subscriptions pricing summary` | Legacy shortcut stays runnable and warns on stderr |
-| `asc subscriptions prices ...` | `asc subscriptions pricing prices ...` | Hidden deprecated shim |
-| `asc subscriptions price-points ...` | `asc subscriptions pricing price-points ...` | Hidden deprecated shim |
-| `asc subscriptions availability ...` | `asc subscriptions pricing availability ...` | Hidden deprecated shim |
-| `asc subscriptions introductory-offers ...` | `asc subscriptions offers introductory ...` | Hidden deprecated shim |
-| `asc subscriptions promotional-offers ...` | `asc subscriptions offers promotional ...` | Hidden deprecated shim |
-| `asc subscriptions offer-codes ...` | `asc subscriptions offers offer-codes ...` | Hidden deprecated shim |
-| `asc subscriptions win-back-offers ...` | `asc subscriptions offers win-back ...` | Hidden deprecated shim |
-| `asc subscriptions review-screenshots ...` | `asc subscriptions review screenshots ...` | Hidden deprecated shim |
-| `asc subscriptions app-store-review-screenshot ...` | `asc subscriptions review app-store-screenshot ...` | Hidden deprecated shim |
-| `asc subscriptions submit ...` | `asc subscriptions review submit ...` | Hidden deprecated shim |
-| `asc subscriptions groups submit ...` | `asc subscriptions review submit-group ...` | Hidden deprecated shim |
+All legacy paths have been removed. Only the canonical V2 paths are supported.
+
+| Old path | Canonical V2 path |
+| --- | --- |
+| `asc subscriptions pricing` (flat) | `asc subscriptions pricing summary` |
+| `asc subscriptions prices ...` | `asc subscriptions pricing prices ...` |
+| `asc subscriptions price-points ...` | `asc subscriptions pricing price-points ...` |
+| `asc subscriptions availability ...` | `asc subscriptions pricing availability ...` |
+| `asc subscriptions introductory-offers ...` | `asc subscriptions offers introductory ...` |
+| `asc subscriptions promotional-offers ...` | `asc subscriptions offers promotional ...` |
+| `asc subscriptions offer-codes ...` | `asc subscriptions offers offer-codes ...` |
+| `asc subscriptions win-back-offers ...` | `asc subscriptions offers win-back ...` |
+| `asc subscriptions review-screenshots ...` | `asc subscriptions review screenshots ...` |
+| `asc subscriptions app-store-review-screenshot ...` | `asc subscriptions review app-store-screenshot ...` |
+| `asc subscriptions submit ...` | `asc subscriptions review submit ...` |
+| `asc subscriptions groups submit ...` | `asc subscriptions review submit-group ...` |
+| `asc offer-codes ...` (root) | `asc subscriptions offers offer-codes ...` |
+| `asc win-back-offers ...` (root) | `asc subscriptions offers win-back ...` |
+| `asc promoted-purchases ...` (root) | `asc subscriptions promoted-purchases ...` or `asc iap promoted-purchases ...` |
 
 ## Canonical Flag Direction
 
-Canonical visible paths prefer typed selectors:
+Canonical V2 paths use typed selectors:
 
 - `--group-id`
 - `--reference-name`
@@ -52,19 +57,16 @@ Canonical visible paths prefer typed selectors:
 - `--price-point-id`
 - `--screenshot-id`
 - `--availability-id`
+- `--territories` (comma-separated territory list)
 
-Older flags stay accepted on compatibility paths during migration where needed:
-
-- `--group`
-- `--ref-name`
-- generic `--id` where older commands already used it
-- `--subscription` on older win-back flows
+Leaf commands under wrapped families (introductory, promotional, win-back)
+still use `--id` for their own resource IDs. These are correct for the
+underlying API resources but may be normalized to typed selectors in a
+future pass.
 
 ## Compatibility Rules
 
-- Deprecated paths remain executable.
-- Deprecated paths are hidden from primary discovery surfaces when a canonical
-  v2 path exists.
-- Deprecation warnings go to `stderr` only.
-- Canonical wrappers should rewrite runtime error prefixes so user-facing errors
-  match the new command path rather than the legacy implementation path.
+- Legacy paths are **not** registered and will fail as unknown commands.
+- There are no hidden deprecated shims or compatibility wrappers.
+- The canonical V2 paths are the only supported invocation surface.
+- Error prefixes in canonical wrappers reflect the V2 command path.
