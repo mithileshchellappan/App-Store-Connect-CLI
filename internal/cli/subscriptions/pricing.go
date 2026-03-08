@@ -72,7 +72,7 @@ func buildSubscriptionsPricingSummaryCommand(
 	shortHelp string,
 	longHelp string,
 ) *ffcli.Command {
-	fs := flag.NewFlagSet("pricing", flag.ExitOnError)
+	fs := flag.NewFlagSet(name, flag.ExitOnError)
 
 	appID := fs.String("app", "", "App Store Connect app ID (or ASC_APP_ID env)")
 	subscriptionID := fs.String("subscription-id", "", "Subscription ID")
