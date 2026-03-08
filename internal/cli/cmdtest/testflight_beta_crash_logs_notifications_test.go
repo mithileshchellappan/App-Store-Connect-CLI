@@ -45,9 +45,7 @@ func TestTestFlightBetaCrashLogsGetOutput(t *testing.T) {
 		}
 	})
 
-	if stderr != "" {
-		t.Fatalf("expected empty stderr, got %q", stderr)
-	}
+	requireStderrContainsWarning(t, stderr, betaCrashLogsDeprecationWarning)
 	if !strings.Contains(stdout, `"id":"log-1"`) {
 		t.Fatalf("expected crash log id in output, got %q", stdout)
 	}

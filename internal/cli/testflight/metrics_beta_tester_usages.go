@@ -20,6 +20,70 @@ type betaTesterUsagesPage struct {
 	Meta  json.RawMessage   `json:"meta,omitempty"`
 }
 
+func TestFlightMetricsAppTestersCommand() *ffcli.Command {
+	cmd := rewriteCommandTree(
+		TestFlightMetricsBetaTesterUsagesCommand(),
+		"asc testflight metrics beta-tester-usages",
+		"asc testflight metrics app-testers",
+		map[string]string{
+			"beta-tester-usages": "app-testers",
+		},
+		[]textReplacement{
+			{old: "beta tester usage metrics for an app", new: "app tester usage metrics"},
+			{old: "Beta tester usage metrics for an app", new: "App tester usage metrics"},
+			{old: "beta tester", new: "tester"},
+			{old: "Beta tester", new: "Tester"},
+		},
+	)
+	cmd.ShortHelp = "Fetch TestFlight app tester usage metrics."
+	cmd.LongHelp = `Fetch TestFlight app tester usage metrics.
+
+Requires either --group-by or --filter-tester (or both).
+
+Examples:
+  asc testflight metrics app-testers --app "APP_ID"
+  asc testflight metrics app-testers --app "APP_ID" --period "P30D"
+  asc testflight metrics app-testers --app "APP_ID" --filter-tester "TESTER_ID"`
+	cmd.UsageFunc = shared.DefaultUsageFunc
+	return cmd
+}
+
+func TestFlightMetricsGroupTestersCommand() *ffcli.Command {
+	cmd := rewriteCommandTree(
+		TestFlightMetricsTestersCommand(),
+		"asc testflight metrics testers",
+		"asc testflight metrics group-testers",
+		map[string]string{
+			"testers": "group-testers",
+		},
+		[]textReplacement{
+			{old: "Fetch TestFlight beta tester usage metrics.", new: "Fetch TestFlight group tester usage metrics."},
+			{old: "Fetch TestFlight beta tester usage metrics", new: "Fetch TestFlight group tester usage metrics"},
+			{old: "metrics testers", new: "metrics group-testers"},
+		},
+	)
+	cmd.UsageFunc = shared.DefaultUsageFunc
+	return cmd
+}
+
+func DeprecatedMetricsTestersAliasCommand() *ffcli.Command {
+	cmd := TestFlightMetricsTestersCommand()
+	cmd.ShortUsage = "asc testflight metrics group-testers --group \"GROUP_ID\""
+	cmd.ShortHelp = "DEPRECATED: use `asc testflight metrics group-testers`."
+	cmd.LongHelp = "DEPRECATED: use `asc testflight metrics group-testers --group GROUP_ID`."
+	cmd.UsageFunc = shared.DeprecatedUsageFunc
+	return hideTestFlightCommand(cmd)
+}
+
+func DeprecatedMetricsBetaTesterUsagesAliasCommand() *ffcli.Command {
+	cmd := TestFlightMetricsBetaTesterUsagesCommand()
+	cmd.ShortUsage = "asc testflight metrics app-testers --app \"APP_ID\" [flags]"
+	cmd.ShortHelp = "DEPRECATED: use `asc testflight metrics app-testers`."
+	cmd.LongHelp = "DEPRECATED: use `asc testflight metrics app-testers --app APP_ID`."
+	cmd.UsageFunc = shared.DeprecatedUsageFunc
+	return hideTestFlightCommand(cmd)
+}
+
 // TestFlightMetricsBetaTesterUsagesCommand fetches app-level beta tester usage metrics.
 func TestFlightMetricsBetaTesterUsagesCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("metrics beta-tester-usages", flag.ExitOnError)

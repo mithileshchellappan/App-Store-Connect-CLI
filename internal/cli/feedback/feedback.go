@@ -34,21 +34,19 @@ func FeedbackCommand() *ffcli.Command {
 
 	return &ffcli.Command{
 		Name:       "feedback",
-		ShortUsage: "asc feedback [flags]",
-		ShortHelp:  "List TestFlight feedback from beta testers.",
-		LongHelp: `List TestFlight feedback from beta testers.
+		ShortUsage: "asc testflight feedback list [flags]",
+		ShortHelp:  "DEPRECATED: use `asc testflight feedback list`.",
+		LongHelp: `DEPRECATED: use ` + "`asc testflight feedback list`" + `.
 
-This command fetches beta feedback screenshot submissions and comments.
+This compatibility shim preserves the legacy root feedback list behavior while
+the canonical TestFlight surface moves under ` + "`asc testflight feedback ...`" + `.
 
 Examples:
-  asc feedback --app "123456789"
-  asc feedback --app "123456789" --include-screenshots
-  asc feedback --app "123456789" --device-model "iPhone15,3" --os-version "17.2"
-  asc feedback --app "123456789" --sort -createdDate --limit 5
-  asc feedback --next "<links.next>"
-  asc feedback --app "123456789" --paginate`,
+  asc testflight feedback list --app "123456789"
+  asc testflight feedback list --app "123456789" --include-screenshots
+  asc testflight feedback list --next "<links.next>"`,
 		FlagSet:   fs,
-		UsageFunc: shared.DefaultUsageFunc,
+		UsageFunc: shared.DeprecatedUsageFunc,
 		Exec: func(ctx context.Context, args []string) error {
 			if *limit != 0 && (*limit < 1 || *limit > 200) {
 				return fmt.Errorf("feedback: --limit must be between 1 and 200")
@@ -70,6 +68,8 @@ Examples:
 			if err != nil {
 				return fmt.Errorf("feedback: %w", err)
 			}
+
+			fmt.Fprintln(os.Stderr, "Warning: `asc feedback` is deprecated. Use `asc testflight feedback list`.")
 
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()

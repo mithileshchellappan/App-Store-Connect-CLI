@@ -45,9 +45,7 @@ func TestTestFlightBetaFeedbackCrashSubmissionsGetOutput(t *testing.T) {
 		}
 	})
 
-	if stderr != "" {
-		t.Fatalf("expected empty stderr, got %q", stderr)
-	}
+	requireStderrContainsWarning(t, stderr, betaFeedbackDeprecationWarning)
 	if !strings.Contains(stdout, `"id":"sub-1"`) {
 		t.Fatalf("expected submission id in output, got %q", stdout)
 	}
@@ -89,9 +87,7 @@ func TestTestFlightBetaFeedbackScreenshotSubmissionsGetOutput(t *testing.T) {
 		}
 	})
 
-	if stderr != "" {
-		t.Fatalf("expected empty stderr, got %q", stderr)
-	}
+	requireStderrContainsWarning(t, stderr, betaFeedbackDeprecationWarning)
 	if !strings.Contains(stdout, `"id":"sub-2"`) {
 		t.Fatalf("expected submission id in output, got %q", stdout)
 	}
@@ -133,9 +129,7 @@ func TestTestFlightBetaFeedbackCrashLogGetOutput(t *testing.T) {
 		}
 	})
 
-	if stderr != "" {
-		t.Fatalf("expected empty stderr, got %q", stderr)
-	}
+	requireStderrContainsWarning(t, stderr, betaFeedbackDeprecationWarning)
 	if !strings.Contains(stdout, `"id":"log-1"`) {
 		t.Fatalf("expected crash log id in output, got %q", stdout)
 	}

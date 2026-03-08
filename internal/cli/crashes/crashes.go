@@ -33,23 +33,19 @@ func CrashesCommand() *ffcli.Command {
 
 	return &ffcli.Command{
 		Name:       "crashes",
-		ShortUsage: "asc crashes [flags]",
-		ShortHelp:  "List and export TestFlight crash reports.",
-		LongHelp: `List and export TestFlight crash reports.
+		ShortUsage: "asc testflight crashes list [flags]",
+		ShortHelp:  "DEPRECATED: use `asc testflight crashes list`.",
+		LongHelp: `DEPRECATED: use ` + "`asc testflight crashes list`" + `.
 
-This command fetches crash reports submitted by TestFlight beta testers,
-helping you identify and fix issues in your app.
+This compatibility shim preserves the legacy root crash list behavior while
+the canonical TestFlight surface moves under ` + "`asc testflight crashes ...`" + `.
 
 Examples:
-  asc crashes --app "123456789"
-  asc crashes --app "com.example.app"
-  asc crashes --app "My App" > crashes.json
-  asc crashes --app "123456789" --device-model "iPhone15,3" --os-version "17.2"
-  asc crashes --app "123456789" --sort -createdDate --limit 5
-  asc crashes --next "<links.next>"
-  asc crashes --app "123456789" --paginate`,
+  asc testflight crashes list --app "123456789"
+  asc testflight crashes list --app "123456789" --device-model "iPhone15,3" --os-version "17.2"
+  asc testflight crashes list --next "<links.next>"`,
 		FlagSet:   fs,
-		UsageFunc: shared.DefaultUsageFunc,
+		UsageFunc: shared.DeprecatedUsageFunc,
 		Exec: func(ctx context.Context, args []string) error {
 			if *limit != 0 && (*limit < 1 || *limit > 200) {
 				return fmt.Errorf("crashes: --limit must be between 1 and 200")
@@ -71,6 +67,8 @@ Examples:
 			if err != nil {
 				return fmt.Errorf("crashes: %w", err)
 			}
+
+			fmt.Fprintln(os.Stderr, "Warning: `asc crashes` is deprecated. Use `asc testflight crashes list`.")
 
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()

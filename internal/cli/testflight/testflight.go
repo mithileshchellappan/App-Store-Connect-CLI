@@ -20,33 +20,47 @@ func TestFlightCommand() *ffcli.Command {
 	return &ffcli.Command{
 		Name:       "testflight",
 		ShortUsage: "asc testflight <subcommand> [flags]",
-		ShortHelp:  "Manage TestFlight resources.",
-		LongHelp: `Manage TestFlight resources.
+		ShortHelp:  "Manage TestFlight workflows.",
+		LongHelp: `Manage TestFlight workflows.
 
 Examples:
   asc testflight apps list
-  asc testflight apps get --app "APP_ID"
-  asc testflight beta-groups list --app "APP_ID"
-  asc testflight beta-groups app get --group-id "GROUP_ID"
-  asc testflight beta-testers list --app "APP_ID"
-  asc testflight beta-feedback crash-submissions get --id "SUBMISSION_ID"
-  asc testflight metrics beta-tester-usages --app "APP_ID"
-  asc testflight beta-crash-logs get --id "CRASH_LOG_ID"`,
+  asc testflight apps view --app "APP_ID"
+  asc testflight groups list --app "APP_ID"
+  asc testflight testers list --app "APP_ID"
+  asc testflight feedback list --app "APP_ID"
+  asc testflight crashes view --submission-id "SUBMISSION_ID"
+  asc testflight crashes log --submission-id "SUBMISSION_ID"
+  asc testflight review view --app "APP_ID"
+  asc testflight distribution view --build "BUILD_ID"
+  asc testflight metrics group-testers --group "GROUP_ID"
+  asc testflight metrics app-testers --app "APP_ID"
+  asc testflight agreements view --app "APP_ID"
+  asc testflight notifications send --build "BUILD_ID"
+  asc testflight config export --app "APP_ID" --output "./testflight.yaml"`,
 		FlagSet:   fs,
-		UsageFunc: shared.DefaultUsageFunc,
+		UsageFunc: testflightVisibleUsageFunc,
 		Subcommands: []*ffcli.Command{
-			TestFlightAppsCommand(),
-			BetaGroupsCommand(),
-			BetaTestersCommand(),
-			BetaFeedbackCommand(),
-			BetaCrashLogsCommand(),
-			BetaLicenseAgreementsCommand(),
-			BetaNotificationsCommand(),
-			TestFlightReviewCommand(),
-			TestFlightBetaDetailsCommand(),
+			TestFlightAppsSurfaceCommand(),
+			TestFlightGroupsCommand(),
+			TestFlightTestersCommand(),
+			TestFlightFeedbackCommand(),
+			TestFlightCrashesCommand(),
+			TestFlightAgreementsCommand(),
+			TestFlightNotificationsCommand(),
+			TestFlightReviewSurfaceCommand(),
+			TestFlightDistributionCommand(),
 			TestFlightRecruitmentCommand(),
-			TestFlightMetricsCommand(),
-			TestFlightSyncCommand(),
+			TestFlightMetricsSurfaceCommand(),
+			TestFlightConfigCommand(),
+			DeprecatedBetaGroupsAliasCommand(),
+			DeprecatedBetaTestersAliasCommand(),
+			DeprecatedBetaFeedbackAliasCommand(),
+			DeprecatedBetaCrashLogsAliasCommand(),
+			DeprecatedBetaDetailsAliasCommand(),
+			DeprecatedBetaLicenseAgreementsAliasCommand(),
+			DeprecatedBetaNotificationsAliasCommand(),
+			DeprecatedTestFlightSyncAliasCommand(),
 		},
 		Exec: func(ctx context.Context, args []string) error {
 			return flag.ErrHelp
