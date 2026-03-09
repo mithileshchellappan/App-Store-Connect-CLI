@@ -99,7 +99,7 @@
     "app": "Dash: Widgets for Workouts",
     "link": "https://apps.apple.com/us/app/dash-widgets-for-workouts/id1556281712",
     "creator": "peres",
-    "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/6e/5f/10/6e5f10ee-fb13-c5b6-406b-7a7fdd2d3619/AppIcon-0-0-1x_U007ephone-0-1-P3-85-220.png/512x512bb.jpg",
+    "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/cf/14/8f/cf148fbc-2902-8a67-35a7-350b1ec57971/AppIcon-0-0-1x_U007epad-0-1-P3-85-220.png/512x512bb.jpg",
     "platform": ["iOS"]
   },
   {
@@ -127,7 +127,7 @@
     "app": "Finny: AI Money Tracker",
     "link": "https://apps.apple.com/vn/app/finny-finance-tracker-app/id6736472735",
     "creator": "dmeows",
-    "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/8d/26/50/8d26504f-b393-b855-7c14-205f556b29fe/AppIcon-0-0-1x_U007ephone-0-1-85-220.png/512x512bb.jpg",
+    "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/04/e2/b6/04e2b6e5-d5b6-9e1b-dc3a-fbb65b2ddd84/AppIcon-0-0-1x_U007ephone-0-1-85-220.png/512x512bb.jpg",
     "platform": ["iOS"]
   },
   {
@@ -360,6 +360,13 @@
     "platform": ["iOS", "watchOS"]
   },
   {
+    "app": "Ryform Golf",
+    "link": "https://apps.apple.com/us/app/id6746525972",
+    "creator": "ajxbit",
+    "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/63/a9/01/63a90152-943b-ba07-d666-402df1f9694e/AppIcon-0-0-1x_U007epad-0-1-85-220.jpeg/512x512bb.jpg",
+    "platform": ["iOS"]
+  },
+  {
     "app": "Siraj — Your Ramadan Light",
     "link": "https://apps.apple.com/app/id6759178047",
     "creator": "SwifAI",
@@ -398,7 +405,7 @@
     "app": "Steps: Workout & Pedometer",
     "link": "https://apps.apple.com/us/app/steps-workout-pedometer/id6746096378",
     "creator": "Hieu Dinh",
-    "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/a8/f6/03/a8f603df-fb71-44bc-103a-2be095229316/StepsIcon-0-1x_U007ephone-0-1-85-220-0.png/512x512bb.jpg",
+    "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/db/43/04/db430406-c791-e82a-1b4a-4283cca28b78/StepsIcon-0-1x_U007ephone-0-1-85-220-0.png/512x512bb.jpg",
     "platform": ["iOS"]
   },
   {
