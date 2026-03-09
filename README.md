@@ -95,20 +95,16 @@ And explicit flags always win:
 asc apps list --output json
 ```
 
-<!-- WALL-OF-APPS:START -->
 ## Wall of Apps
 
-**79 apps ship with asc.** [See the Wall of Apps →](https://asccli.sh/#wall-of-apps)
+[See the Wall of Apps →](https://asccli.sh/#wall-of-apps)
 
-Want to add yours? [Open a PR](https://github.com/rudrankriyam/App-Store-Connect-CLI/pulls).
-<!-- WALL-OF-APPS:END -->
+Want to add yours?
+`asc apps wall submit --app "1234567890" --platform "iOS,macOS" --confirm`
 
-### Add Your App to the Wall
-
-Use:
-`make generate app APP="Your App Name" LINK="https://apps.apple.com/app/id1234567890" CREATOR="your-github-handle" PLATFORM="iOS,macOS"`
-
-This updates `docs/wall-of-apps.json` and re-syncs the Wall snippet in `README.md`.
+The command uses your authenticated `gh` session to fork the repo and open a pull request that updates `docs/wall-of-apps.json`.
+It resolves the public App Store name, URL, and icon from the app ID automatically.
+Use `asc apps wall submit --dry-run` to preview the fork, branch, and PR plan before creating anything.
 
 ## Common Workflows
 
