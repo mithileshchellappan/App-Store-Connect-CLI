@@ -360,6 +360,13 @@
     "platform": ["iOS", "watchOS"]
   },
   {
+    "app": "Ripple News - AI Personal News",
+    "link": "https://apps.apple.com/us/app/ripple-news-ai-personal-news/id6758356024?uo=4",
+    "creator": "jimripple",
+    "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/19/33/17/193317c5-5112-6151-9fd9-5b98ac41b52d/AppIcon-0-0-1x_U007ephone-0-1-85-220.png/512x512bb.jpg",
+    "platform": ["iOS"]
+  },
+  {
     "app": "Ryform Golf",
     "link": "https://apps.apple.com/us/app/id6746525972",
     "creator": "ajxbit",
