@@ -44,8 +44,9 @@ type SubscriptionGroupLocalizationInfo struct {
 
 // SubscriptionsInput collects subscription validation inputs.
 type SubscriptionsInput struct {
-	AppID         string
-	Subscriptions []Subscription
+	AppID                string
+	Subscriptions        []Subscription
+	AvailableTerritories int
 }
 
 // SubscriptionsReport is the top-level validate subscriptions output.
@@ -62,7 +63,9 @@ func ValidateSubscriptions(input SubscriptionsInput, strict bool) SubscriptionsR
 	checks := make([]CheckResult, 0)
 	checks = append(checks, subscriptionImageChecks(input.Subscriptions)...)
 	checks = append(checks, subscriptionReviewReadinessChecks(input.Subscriptions)...)
+	checks = append(checks, subscriptionPricingVerificationChecks(input.Subscriptions)...)
 	checks = append(checks, subscriptionMetadataDiagnostics(input.Subscriptions)...)
+	checks = append(checks, subscriptionPricingCoverageChecks(input.Subscriptions, input.AvailableTerritories)...)
 	summary := summarize(checks, strict)
 
 	return SubscriptionsReport{
@@ -205,6 +208,83 @@ func remediationForSubscriptionState(state string) string {
 	default:
 		return "Review this subscription in App Store Connect and submit it for review if needed"
 	}
+}
+
+func subscriptionPricingVerificationChecks(subs []Subscription) []CheckResult {
+	ignoreStates := map[string]struct{}{
+		"DEVELOPER_REMOVED_FROM_SALE": {},
+		"MISSING_METADATA":            {},
+		"REMOVED_FROM_SALE":           {},
+	}
+
+	var checks []CheckResult
+	for _, sub := range subs {
+		state := strings.ToUpper(strings.TrimSpace(sub.State))
+		if _, ok := ignoreStates[state]; ok {
+			continue
+		}
+		if !sub.PriceCheckSkipped {
+			continue
+		}
+
+		label := formatSubscriptionLabel(sub)
+		remediation := strings.TrimSpace(sub.PriceCheckSkipReason)
+		if remediation == "" {
+			remediation = "Review this subscription's pricing in App Store Connect; validation could not verify it automatically"
+		}
+		checks = append(checks, CheckResult{
+			ID:           "subscriptions.pricing.unverified",
+			Severity:     SeverityInfo,
+			Field:        "pricing",
+			ResourceType: "subscription",
+			ResourceID:   strings.TrimSpace(sub.ID),
+			Message:      fmt.Sprintf("Could not verify whether %s has territory prices configured", label),
+			Remediation:  remediation,
+		})
+	}
+
+	return checks
+}
+
+// subscriptionPricingCoverageChecks warns when a subscription has prices configured
+// but doesn't cover all territories the app is available in. This catches the common
+// submission failure where only a single territory (e.g., US) has pricing set.
+func subscriptionPricingCoverageChecks(subs []Subscription, availableTerritories int) []CheckResult {
+	if availableTerritories <= 0 {
+		return nil
+	}
+
+	ignoreStates := map[string]struct{}{
+		"DEVELOPER_REMOVED_FROM_SALE": {},
+		"REMOVED_FROM_SALE":           {},
+	}
+
+	var checks []CheckResult
+	for _, sub := range subs {
+		state := strings.ToUpper(strings.TrimSpace(sub.State))
+		if _, ok := ignoreStates[state]; ok {
+			continue
+		}
+		if sub.PriceCheckSkipped || sub.PriceCount == 0 {
+			continue
+		}
+		if sub.PriceCount >= availableTerritories {
+			continue
+		}
+
+		label := formatSubscriptionLabel(sub)
+		checks = append(checks, CheckResult{
+			ID:           "subscriptions.pricing.partial_territory_coverage",
+			Severity:     SeverityWarning,
+			Field:        "pricing",
+			ResourceType: "subscription",
+			ResourceID:   strings.TrimSpace(sub.ID),
+			Message:      fmt.Sprintf("%s has pricing for %d of %d available territories", label, sub.PriceCount, availableTerritories),
+			Remediation:  "Set prices for all available territories using `asc subscriptions pricing equalize` or `asc subscriptions pricing prices set`; missing territory pricing blocks App Store submission",
+		})
+	}
+
+	return checks
 }
 
 // subscriptionMetadataDiagnostics produces specific diagnostic checks for subscriptions

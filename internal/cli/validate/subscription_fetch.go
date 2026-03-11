@@ -2,6 +2,7 @@ package validate
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -105,8 +106,21 @@ func fetchSubscriptions(ctx context.Context, client *asc.Client, appID string) (
 				ImageCheckSkipReason: imageStatus.SkipReason,
 			}
 
+			// Fetch price count for all active subscriptions (used for both
+			// MISSING_METADATA diagnostics and territory coverage checks).
+			state := strings.ToUpper(strings.TrimSpace(attrs.State))
+			if state != "REMOVED_FROM_SALE" && state != "DEVELOPER_REMOVED_FROM_SALE" {
+				priceCount, priceStatus, err := fetchSubscriptionPriceCount(ctx, client, sub.ID)
+				if err != nil {
+					return nil, fmt.Errorf("fetch subscription prices for %s: %w", strings.TrimSpace(sub.ID), err)
+				}
+				valSub.PriceCount = priceCount
+				valSub.PriceCheckSkipped = !priceStatus.Verified
+				valSub.PriceCheckSkipReason = priceStatus.SkipReason
+			}
+
 			// Fetch deep diagnostics only for subscriptions in MISSING_METADATA.
-			if strings.EqualFold(strings.TrimSpace(attrs.State), "MISSING_METADATA") {
+			if strings.EqualFold(state, "MISSING_METADATA") {
 				if _, ok := groupLocalizationStatuses[groupID]; !ok {
 					locs, status, err := fetchGroupLocalizations(ctx, client, groupID)
 					if err != nil {
@@ -127,13 +141,6 @@ func fetchSubscriptions(ctx context.Context, client *asc.Client, appID string) (
 				valSub.Localizations = localizations
 				valSub.LocalizationCheckSkipped = !localizationStatus.Verified
 				valSub.LocalizationCheckSkipReason = localizationStatus.SkipReason
-				priceCount, priceStatus, err := fetchSubscriptionPriceCount(ctx, client, sub.ID)
-				if err != nil {
-					return nil, fmt.Errorf("fetch subscription prices for %s: %w", strings.TrimSpace(sub.ID), err)
-				}
-				valSub.PriceCount = priceCount
-				valSub.PriceCheckSkipped = !priceStatus.Verified
-				valSub.PriceCheckSkipReason = priceStatus.SkipReason
 			}
 
 			subscriptions = append(subscriptions, valSub)
@@ -233,12 +240,18 @@ func fetchSubscriptionLocalizations(ctx context.Context, client *asc.Client, sub
 	return locs, metadataCheckStatus{Verified: true}, nil
 }
 
-// fetchSubscriptionPriceCount checks whether a subscription has any prices set.
+// fetchSubscriptionPriceCount returns the number of unique territories with
+// prices configured for a subscription. It paginates all price resources so
+// scheduled price changes for the same territory don't inflate coverage.
 func fetchSubscriptionPriceCount(ctx context.Context, client *asc.Client, subscriptionID string) (int, metadataCheckStatus, error) {
 	reqCtx, cancel := shared.ContextWithTimeout(ctx)
-	defer cancel()
-
-	resp, err := client.GetSubscriptionPrices(reqCtx, strings.TrimSpace(subscriptionID), asc.WithSubscriptionPricesLimit(1))
+	resp, err := client.GetSubscriptionPrices(
+		reqCtx,
+		strings.TrimSpace(subscriptionID),
+		asc.WithSubscriptionPricesInclude([]string{"territory"}),
+		asc.WithSubscriptionPricesLimit(200),
+	)
+	cancel()
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			return 0, metadataCheckStatus{}, err
@@ -248,7 +261,56 @@ func fetchSubscriptionPriceCount(ctx context.Context, client *asc.Client, subscr
 		}
 		return 0, metadataCheckStatus{SkipReason: "Validation skipped subscription prices because the App Store Connect endpoint returned an unexpected error"}, nil
 	}
-	return len(resp.Data), metadataCheckStatus{Verified: true}, nil
+
+	paginated, err := asc.PaginateAll(ctx, resp, func(_ context.Context, nextURL string) (asc.PaginatedResponse, error) {
+		pageCtx, pageCancel := shared.ContextWithTimeout(ctx)
+		defer pageCancel()
+		return client.GetSubscriptionPrices(pageCtx, strings.TrimSpace(subscriptionID), asc.WithSubscriptionPricesNextURL(nextURL))
+	})
+	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			return 0, metadataCheckStatus{}, err
+		}
+		if reason, ok := metadataCheckSkipReason(err, "subscription prices"); ok {
+			return 0, metadataCheckStatus{SkipReason: reason}, nil
+		}
+		return 0, metadataCheckStatus{SkipReason: "Validation skipped subscription prices because the App Store Connect endpoint returned an unexpected error"}, nil
+	}
+
+	typed, ok := paginated.(*asc.SubscriptionPricesResponse)
+	if !ok {
+		return 0, metadataCheckStatus{}, fmt.Errorf("unexpected subscription prices response type %T", paginated)
+	}
+
+	territories := make(map[string]struct{}, len(typed.Data))
+	for _, price := range typed.Data {
+		territoryID, err := subscriptionPriceTerritoryID(price.Relationships)
+		if err != nil {
+			return 0, metadataCheckStatus{SkipReason: "Validation could not determine unique subscription pricing territories because the API response relationships could not be decoded"}, nil
+		}
+		territoryID = strings.TrimSpace(territoryID)
+		if territoryID == "" {
+			return 0, metadataCheckStatus{SkipReason: "Validation could not determine unique subscription pricing territories because the API response omitted territory relationships"}, nil
+		}
+		territories[territoryID] = struct{}{}
+	}
+
+	return len(territories), metadataCheckStatus{Verified: true}, nil
+}
+
+func subscriptionPriceTerritoryID(raw json.RawMessage) (string, error) {
+	if len(raw) == 0 {
+		return "", nil
+	}
+
+	var relationships asc.SubscriptionPriceRelationships
+	if err := json.Unmarshal(raw, &relationships); err != nil {
+		return "", fmt.Errorf("decode subscription price relationships: %w", err)
+	}
+	if relationships.Territory == nil {
+		return "", nil
+	}
+	return strings.TrimSpace(relationships.Territory.Data.ID), nil
 }
 
 func subscriptionHasImage(ctx context.Context, client *asc.Client, subscriptionID string) (subscriptionImageStatus, error) {

@@ -107,6 +107,103 @@ func TestSubscriptionImageChecks_AddsInfoWhenImageCheckSkipped(t *testing.T) {
 	}
 }
 
+func TestSubscriptionPricingCoverage_WarnsPartialTerritories(t *testing.T) {
+	checks := subscriptionPricingCoverageChecks([]Subscription{
+		{ID: "sub-1", Name: "Monthly", ProductID: "com.example.monthly", State: "APPROVED", PriceCount: 1},
+	}, 175)
+	if !hasCheckID(checks, "subscriptions.pricing.partial_territory_coverage") {
+		t.Fatalf("expected partial coverage warning, got %v", checks)
+	}
+	if checks[0].Severity != SeverityWarning {
+		t.Fatalf("expected warning severity, got %s", checks[0].Severity)
+	}
+	if !strings.Contains(checks[0].Message, "1") || !strings.Contains(checks[0].Message, "175") {
+		t.Fatalf("expected message to mention price count and territory count, got %s", checks[0].Message)
+	}
+}
+
+func TestSubscriptionPricingCoverage_NoWarningWhenFullCoverage(t *testing.T) {
+	checks := subscriptionPricingCoverageChecks([]Subscription{
+		{ID: "sub-1", State: "APPROVED", PriceCount: 175},
+	}, 175)
+	if len(checks) != 0 {
+		t.Fatalf("expected no checks when fully covered, got %d (%v)", len(checks), checks)
+	}
+}
+
+func TestSubscriptionPricingCoverage_SkipsWhenNoPrices(t *testing.T) {
+	// PriceCount == 0 is already covered by subscriptionMetadataDiagnostics
+	checks := subscriptionPricingCoverageChecks([]Subscription{
+		{ID: "sub-1", State: "MISSING_METADATA", PriceCount: 0},
+	}, 175)
+	if len(checks) != 0 {
+		t.Fatalf("expected no checks when zero prices (handled elsewhere), got %d (%v)", len(checks), checks)
+	}
+}
+
+func TestSubscriptionPricingCoverage_SkipsRemovedFromSale(t *testing.T) {
+	checks := subscriptionPricingCoverageChecks([]Subscription{
+		{ID: "sub-1", State: "REMOVED_FROM_SALE", PriceCount: 1},
+	}, 175)
+	if len(checks) != 0 {
+		t.Fatalf("expected no checks for removed subs, got %d (%v)", len(checks), checks)
+	}
+}
+
+func TestSubscriptionPricingCoverage_SkipsWhenZeroAvailableTerritories(t *testing.T) {
+	checks := subscriptionPricingCoverageChecks([]Subscription{
+		{ID: "sub-1", State: "APPROVED", PriceCount: 1},
+	}, 0)
+	if len(checks) != 0 {
+		t.Fatalf("expected no checks when available territories unknown, got %d (%v)", len(checks), checks)
+	}
+}
+
+func TestSubscriptionPricingCoverage_SkipsWhenPriceCheckSkipped(t *testing.T) {
+	checks := subscriptionPricingCoverageChecks([]Subscription{
+		{ID: "sub-1", State: "APPROVED", PriceCount: 1, PriceCheckSkipped: true},
+	}, 175)
+	if len(checks) != 0 {
+		t.Fatalf("expected no checks when price check was skipped, got %d (%v)", len(checks), checks)
+	}
+}
+
+func TestSubscriptionPricingVerificationChecks_AddsInfoWhenPriceCheckSkipped(t *testing.T) {
+	checks := subscriptionPricingVerificationChecks([]Subscription{
+		{
+			ID:                   "sub-1",
+			Name:                 "Monthly",
+			ProductID:            "com.example.monthly",
+			State:                "APPROVED",
+			PriceCheckSkipped:    true,
+			PriceCheckSkipReason: "price endpoint forbidden",
+		},
+	})
+	if !hasCheckID(checks, "subscriptions.pricing.unverified") {
+		t.Fatalf("expected pricing-unverified check, got %v", checks)
+	}
+	if checks[0].Severity != SeverityInfo {
+		t.Fatalf("expected info severity, got %s", checks[0].Severity)
+	}
+	if !strings.Contains(checks[0].Remediation, "price endpoint forbidden") {
+		t.Fatalf("expected remediation to preserve skip reason, got %+v", checks[0])
+	}
+}
+
+func TestSubscriptionPricingVerificationChecks_SkipsMissingMetadata(t *testing.T) {
+	checks := subscriptionPricingVerificationChecks([]Subscription{
+		{
+			ID:                   "sub-1",
+			State:                "MISSING_METADATA",
+			PriceCheckSkipped:    true,
+			PriceCheckSkipReason: "price endpoint forbidden",
+		},
+	})
+	if len(checks) != 0 {
+		t.Fatalf("expected MISSING_METADATA pricing skip to stay in diagnostics, got %v", checks)
+	}
+}
+
 func TestSubscriptionMetadataDiagnostics_ReportsConcreteMissingItems(t *testing.T) {
 	checks := subscriptionMetadataDiagnostics([]Subscription{
 		{
@@ -184,5 +281,51 @@ func TestSubscriptionMetadataDiagnostics_UsesInfoChecksWhenLocalizationVerificat
 		if check.ID == "subscriptions.diagnostics.pricing_unverified" && !strings.Contains(check.Remediation, "price endpoint forbidden") {
 			t.Fatalf("expected pricing-unverified remediation to preserve skip reason, got %+v", check)
 		}
+	}
+}
+
+func TestValidateIncludesPricingCoverageCheck(t *testing.T) {
+	report := Validate(Input{
+		AppID:                "app-1",
+		VersionID:            "ver-1",
+		AvailableTerritories: 175,
+		Subscriptions: []Subscription{
+			{ID: "sub-1", Name: "Monthly", ProductID: "com.example.monthly", State: "APPROVED", PriceCount: 1},
+		},
+	}, false)
+	if !hasCheckID(report.Checks, "subscriptions.pricing.partial_territory_coverage") {
+		t.Fatalf("expected pricing coverage check in unified validate, got %+v", report.Checks)
+	}
+}
+
+func TestValidateSubscriptionsIncludesPricingCoverageCheck(t *testing.T) {
+	report := ValidateSubscriptions(SubscriptionsInput{
+		AppID:                "app-1",
+		AvailableTerritories: 175,
+		Subscriptions: []Subscription{
+			{ID: "sub-1", Name: "Monthly", ProductID: "com.example.monthly", State: "APPROVED", PriceCount: 1},
+		},
+	}, false)
+	if !hasCheckID(report.Checks, "subscriptions.pricing.partial_territory_coverage") {
+		t.Fatalf("expected pricing coverage check in standalone validate, got %+v", report.Checks)
+	}
+}
+
+func TestValidateSubscriptionsIncludesPricingVerificationCheck(t *testing.T) {
+	report := ValidateSubscriptions(SubscriptionsInput{
+		AppID: "app-1",
+		Subscriptions: []Subscription{
+			{
+				ID:                   "sub-1",
+				Name:                 "Monthly",
+				ProductID:            "com.example.monthly",
+				State:                "APPROVED",
+				PriceCheckSkipped:    true,
+				PriceCheckSkipReason: "price endpoint forbidden",
+			},
+		},
+	}, false)
+	if !hasCheckID(report.Checks, "subscriptions.pricing.unverified") {
+		t.Fatalf("expected pricing verification check in standalone validate, got %+v", report.Checks)
 	}
 }

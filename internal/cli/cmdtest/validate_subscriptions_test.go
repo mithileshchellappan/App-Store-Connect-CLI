@@ -20,6 +20,9 @@ import (
 
 type validateSubscriptionsFixture struct {
 	groups                     string
+	availabilityV2             string
+	availabilityV2Status       int
+	territories                string
 	subscriptionsByGroup       map[string]string
 	groupLocalizationsByGroup  map[string]string
 	groupLocalizationStatus    map[string]int
@@ -29,6 +32,7 @@ type validateSubscriptionsFixture struct {
 	localizationsBySub         map[string]string
 	localizationsStatusBySub   map[string]int
 	pricesBySubscription       map[string]string
+	expectedPriceInclude       string
 	pricesStatusBySubscription map[string]int
 	priceErrorBySubscription   map[string]error
 	subscriptionGroupsStatus   int
@@ -55,6 +59,19 @@ func newValidateSubscriptionsClient(t *testing.T, fixture validateSubscriptionsF
 				return jsonResponse(fixture.subscriptionGroupsStatus, apiErrorJSONForStatus(fixture.subscriptionGroupsStatus))
 			}
 			return jsonResponse(http.StatusOK, fixture.groups)
+		case path == "/v1/apps/app-1/appAvailabilityV2":
+			if fixture.availabilityV2Status != 0 {
+				return jsonResponse(fixture.availabilityV2Status, fixture.availabilityV2)
+			}
+			if fixture.availabilityV2 != "" {
+				return jsonResponse(http.StatusOK, fixture.availabilityV2)
+			}
+			return jsonResponse(http.StatusNotFound, notFound)
+		case strings.HasPrefix(path, "/v2/appAvailabilities/") && strings.HasSuffix(path, "/territoryAvailabilities"):
+			if fixture.territories != "" {
+				return jsonResponse(http.StatusOK, fixture.territories)
+			}
+			return jsonResponse(http.StatusOK, `{"data":[]}`)
 		case strings.HasPrefix(path, "/v1/subscriptionGroups/") && strings.HasSuffix(path, "/subscriptionGroupLocalizations"):
 			groupID := strings.TrimSuffix(strings.TrimPrefix(path, "/v1/subscriptionGroups/"), "/subscriptionGroupLocalizations")
 			if status, ok := fixture.groupLocalizationStatus[groupID]; ok {
@@ -81,6 +98,9 @@ func newValidateSubscriptionsClient(t *testing.T, fixture validateSubscriptionsF
 			return jsonResponse(http.StatusOK, `{"data":[]}`)
 		case strings.HasPrefix(path, "/v1/subscriptions/") && strings.HasSuffix(path, "/prices"):
 			subscriptionID := strings.TrimSuffix(strings.TrimPrefix(path, "/v1/subscriptions/"), "/prices")
+			if fixture.expectedPriceInclude != "" && req.URL.Query().Get("include") != fixture.expectedPriceInclude {
+				t.Fatalf("expected include=%q, got %q", fixture.expectedPriceInclude, req.URL.Query().Get("include"))
+			}
 			if err, ok := fixture.priceErrorBySubscription[subscriptionID]; ok {
 				return nil, err
 			}
@@ -194,6 +214,87 @@ func TestValidateSubscriptionsOutputsJSONAndTable(t *testing.T) {
 
 	if !strings.Contains(stdout, "Severity") {
 		t.Fatalf("expected table output to include headers, got %q", stdout)
+	}
+}
+
+func TestValidateSubscriptionsWarnsPartialSubscriptionPricingCoverage(t *testing.T) {
+	fixture := validValidateSubscriptionsFixture()
+	fixture.availabilityV2 = `{"data":{"type":"appAvailabilities","id":"avail-1","attributes":{"availableInNewTerritories":true}}}`
+	fixture.territories = `{"data":[` +
+		`{"type":"territoryAvailabilities","id":"ta-1","attributes":{"available":true}},` +
+		`{"type":"territoryAvailabilities","id":"ta-2","attributes":{"available":true}}` +
+		`]}`
+	fixture.expectedPriceInclude = "territory"
+	fixture.pricesBySubscription = map[string]string{
+		"sub-1": `{"data":[
+			{"type":"subscriptionPrices","id":"price-old","attributes":{"startDate":"2026-01-01"},"relationships":{"territory":{"data":{"type":"territories","id":"USA"}}}},
+			{"type":"subscriptionPrices","id":"price-current","attributes":{"startDate":"2026-02-01"},"relationships":{"territory":{"data":{"type":"territories","id":"USA"}}}}
+		]}`,
+	}
+
+	client := newValidateSubscriptionsClient(t, fixture)
+	restore := validate.SetClientFactory(func() (*asc.Client, error) {
+		return client, nil
+	})
+	defer restore()
+
+	root := RootCommand("1.2.3")
+	stdout, stderr := captureOutput(t, func() {
+		if err := root.Parse([]string{"validate", "subscriptions", "--app", "app-1"}); err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+		if err := root.Run(context.Background()); err != nil {
+			t.Fatalf("expected warning-only validate subscriptions run, got %v", err)
+		}
+	})
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+
+	var report validation.SubscriptionsReport
+	if err := json.Unmarshal([]byte(stdout), &report); err != nil {
+		t.Fatalf("failed to parse JSON output: %v", err)
+	}
+	if !hasCheckWithID(report.Checks, "subscriptions.pricing.partial_territory_coverage") {
+		t.Fatalf("expected pricing coverage warning, got %+v", report.Checks)
+	}
+}
+
+func TestValidateSubscriptionsSurfacesSkippedPricingVerificationForApprovedSubscriptions(t *testing.T) {
+	fixture := validValidateSubscriptionsFixture()
+	fixture.expectedPriceInclude = "territory"
+	fixture.pricesStatusBySubscription = map[string]int{
+		"sub-1": http.StatusForbidden,
+	}
+
+	client := newValidateSubscriptionsClient(t, fixture)
+	restore := validate.SetClientFactory(func() (*asc.Client, error) {
+		return client, nil
+	})
+	defer restore()
+
+	root := RootCommand("1.2.3")
+	stdout, stderr := captureOutput(t, func() {
+		if err := root.Parse([]string{"validate", "subscriptions", "--app", "app-1"}); err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+		if err := root.Run(context.Background()); err != nil {
+			t.Fatalf("expected skipped pricing verification to stay non-blocking, got %v", err)
+		}
+	})
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+
+	var report validation.SubscriptionsReport
+	if err := json.Unmarshal([]byte(stdout), &report); err != nil {
+		t.Fatalf("failed to parse JSON output: %v", err)
+	}
+	if !hasCheckWithID(report.Checks, "subscriptions.pricing.unverified") {
+		t.Fatalf("expected pricing verification info check, got %+v", report.Checks)
+	}
+	if hasCheckWithID(report.Checks, "subscriptions.diagnostics.pricing_unverified") {
+		t.Fatalf("did not expect missing-metadata pricing diagnostic for approved subscription, got %+v", report.Checks)
 	}
 }
 
