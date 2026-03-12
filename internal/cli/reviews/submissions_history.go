@@ -107,9 +107,11 @@ Examples:
 				if pErr != nil {
 					return fmt.Errorf("review submissions-history: %w", pErr)
 				}
-				if aggResp, ok := resp.(*asc.ReviewSubmissionsResponse); ok {
-					submissions = aggResp.Data
+				aggResp, ok := resp.(*asc.ReviewSubmissionsResponse)
+				if !ok {
+					return fmt.Errorf("review submissions-history: unexpected pagination response type %T", resp)
 				}
+				submissions = aggResp.Data
 			} else {
 				resp, fErr := client.GetReviewSubmissions(requestCtx, resolvedAppID, opts...)
 				if fErr != nil {
