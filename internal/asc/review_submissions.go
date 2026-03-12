@@ -28,10 +28,11 @@ type ReviewSubmissionAttributes struct {
 
 // ReviewSubmissionRelationships describes review submission relationships.
 type ReviewSubmissionRelationships struct {
-	App                *Relationship     `json:"app,omitempty"`
-	Items              *RelationshipList `json:"items,omitempty"`
-	SubmittedByActor   *Relationship     `json:"submittedByActor,omitempty"`
-	LastUpdatedByActor *Relationship     `json:"lastUpdatedByActor,omitempty"`
+	App                      *Relationship     `json:"app,omitempty"`
+	Items                    *RelationshipList `json:"items,omitempty"`
+	AppStoreVersionForReview *Relationship     `json:"appStoreVersionForReview,omitempty"`
+	SubmittedByActor         *Relationship     `json:"submittedByActor,omitempty"`
+	LastUpdatedByActor       *Relationship     `json:"lastUpdatedByActor,omitempty"`
 }
 
 // ReviewSubmissionResource represents a review submission resource.

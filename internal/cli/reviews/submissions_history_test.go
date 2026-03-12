@@ -6,6 +6,7 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"flag"
@@ -170,6 +171,20 @@ func makeSubmissions(entries ...struct {
 	return subs
 }
 
+func makeSubmissionVersionContexts(entries ...struct {
+	id, version, platform string
+},
+) map[string]submissionVersionContext {
+	contexts := make(map[string]submissionVersionContext, len(entries))
+	for _, e := range entries {
+		contexts[e.id] = submissionVersionContext{
+			VersionString: e.version,
+			Platform:      e.platform,
+		}
+	}
+	return contexts
+}
+
 func TestEnrichSubmissions_HappyPath(t *testing.T) {
 	transport := testRoundTripper(func(req *http.Request) (*http.Response, error) {
 		path := req.URL.Path
@@ -198,16 +213,6 @@ func TestEnrichSubmissions_HappyPath(t *testing.T) {
 				}],
 				"links": {"self": "/v1/reviewSubmissions/sub-2/items"}
 			}`), nil
-		case path == "/v1/appStoreVersions/ver-1":
-			return testJSONResponse(200, `{
-				"data": {"type": "appStoreVersions", "id": "ver-1", "attributes": {"versionString": "3.1.1", "platform": "TV_OS"}},
-				"links": {"self": "/v1/appStoreVersions/ver-1"}
-			}`), nil
-		case path == "/v1/appStoreVersions/ver-2":
-			return testJSONResponse(200, `{
-				"data": {"type": "appStoreVersions", "id": "ver-2", "attributes": {"versionString": "3.0.0", "platform": "TV_OS"}},
-				"links": {"self": "/v1/appStoreVersions/ver-2"}
-			}`), nil
 		default:
 			return testJSONResponse(404, `{"errors":[{"status":"404"}]}`), nil
 		}
@@ -219,7 +224,11 @@ func TestEnrichSubmissions_HappyPath(t *testing.T) {
 	)
 
 	client := newTestHistoryClient(t, transport)
-	entries, err := enrichSubmissions(context.Background(), client, subs, "")
+	versionContexts := makeSubmissionVersionContexts(
+		struct{ id, version, platform string }{"sub-1", "3.1.1", "TV_OS"},
+		struct{ id, version, platform string }{"sub-2", "3.0.0", "TV_OS"},
+	)
+	entries, err := enrichSubmissions(context.Background(), client, subs, versionContexts, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -249,7 +258,7 @@ func TestEnrichSubmissions_EmptySubmissions(t *testing.T) {
 		t.Fatal("no API calls expected for empty submissions")
 		return nil, nil
 	}))
-	entries, err := enrichSubmissions(context.Background(), client, nil, "")
+	entries, err := enrichSubmissions(context.Background(), client, nil, nil, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -258,42 +267,46 @@ func TestEnrichSubmissions_EmptySubmissions(t *testing.T) {
 	}
 }
 
-func TestEnrichSubmissions_Version404(t *testing.T) {
-	transport := testRoundTripper(func(req *http.Request) (*http.Response, error) {
-		path := req.URL.Path
-		switch {
-		case path == "/v1/reviewSubmissions/sub-1/items":
-			return testJSONResponse(200, `{
-				"data": [{
-					"type": "reviewSubmissionItems",
-					"id": "item-1",
-					"attributes": {"state": "APPROVED"},
-					"relationships": {
-						"appStoreVersion": {"data": {"type": "appStoreVersions", "id": "ver-gone"}}
-					}
-				}],
-				"links": {"self": "/v1/reviewSubmissions/sub-1/items"}
-			}`), nil
-		case path == "/v1/appStoreVersions/ver-gone":
-			return testJSONResponse(404, `{"errors":[{"status":"404","code":"NOT_FOUND","title":"The specified resource does not exist"}]}`), nil
-		default:
-			return testJSONResponse(404, `{"errors":[{"status":"404"}]}`), nil
-		}
-	})
+func TestSubmissionVersionContexts_FromIncluded(t *testing.T) {
+	resp := &asc.ReviewSubmissionsResponse{
+		Data: []asc.ReviewSubmissionResource{
+			{
+				ID: "sub-1",
+				Relationships: &asc.ReviewSubmissionRelationships{
+					AppStoreVersionForReview: &asc.Relationship{
+						Data: asc.ResourceData{
+							Type: asc.ResourceTypeAppStoreVersions,
+							ID:   "ver-1",
+						},
+					},
+				},
+			},
+		},
+		Included: json.RawMessage(`[
+			{
+				"type": "appStoreVersions",
+				"id": "ver-1",
+				"attributes": {
+					"versionString": "2.0.0",
+					"platform": "IOS"
+				}
+			}
+		]`),
+	}
 
-	subs := makeSubmissions(
-		struct{ id, platform, state, date string }{"sub-1", "IOS", "COMPLETE", "2026-03-01T12:00:00Z"},
-	)
-	client := newTestHistoryClient(t, transport)
-	entries, err := enrichSubmissions(context.Background(), client, subs, "")
+	got, err := submissionVersionContexts(resp)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("submissionVersionContexts() error: %v", err)
 	}
-	if len(entries) != 1 {
-		t.Fatalf("expected 1 entry, got %d", len(entries))
+	ctx, ok := got["sub-1"]
+	if !ok {
+		t.Fatal("expected version context for submission sub-1")
 	}
-	if entries[0].VersionString != "unknown" {
-		t.Errorf("version = %q, want %q", entries[0].VersionString, "unknown")
+	if ctx.VersionString != "2.0.0" {
+		t.Fatalf("version = %q, want %q", ctx.VersionString, "2.0.0")
+	}
+	if ctx.Platform != "IOS" {
+		t.Fatalf("platform = %q, want %q", ctx.Platform, "IOS")
 	}
 }
 
@@ -313,16 +326,6 @@ func TestEnrichSubmissions_VersionFilter(t *testing.T) {
 					"relationships": {"appStoreVersion": {"data": {"type": "appStoreVersions", "id": "ver-2"}}}}],
 				"links": {"self": "/v1/reviewSubmissions/sub-2/items"}
 			}`), nil
-		case path == "/v1/appStoreVersions/ver-1":
-			return testJSONResponse(200, `{
-				"data": {"type": "appStoreVersions", "id": "ver-1", "attributes": {"versionString": "2.0.0", "platform": "IOS"}},
-				"links": {"self": "/v1/appStoreVersions/ver-1"}
-			}`), nil
-		case path == "/v1/appStoreVersions/ver-2":
-			return testJSONResponse(200, `{
-				"data": {"type": "appStoreVersions", "id": "ver-2", "attributes": {"versionString": "1.0.0", "platform": "IOS"}},
-				"links": {"self": "/v1/appStoreVersions/ver-2"}
-			}`), nil
 		default:
 			return testJSONResponse(404, `{"errors":[{"status":"404"}]}`), nil
 		}
@@ -333,7 +336,11 @@ func TestEnrichSubmissions_VersionFilter(t *testing.T) {
 		struct{ id, platform, state, date string }{"sub-2", "IOS", "COMPLETE", "2026-02-01T12:00:00Z"},
 	)
 	client := newTestHistoryClient(t, transport)
-	entries, err := enrichSubmissions(context.Background(), client, subs, "2.0.0")
+	versionContexts := makeSubmissionVersionContexts(
+		struct{ id, version, platform string }{"sub-1", "2.0.0", "IOS"},
+		struct{ id, version, platform string }{"sub-2", "1.0.0", "IOS"},
+	)
+	entries, err := enrichSubmissions(context.Background(), client, subs, versionContexts, "2.0.0")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -360,7 +367,7 @@ func TestEnrichSubmissions_NoItems(t *testing.T) {
 		struct{ id, platform, state, date string }{"sub-1", "IOS", "COMPLETE", "2026-03-01T12:00:00Z"},
 	)
 	client := newTestHistoryClient(t, transport)
-	entries, err := enrichSubmissions(context.Background(), client, subs, "")
+	entries, err := enrichSubmissions(context.Background(), client, subs, nil, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -397,7 +404,7 @@ func TestEnrichSubmissions_ItemWithoutVersionRelationship(t *testing.T) {
 		struct{ id, platform, state, date string }{"sub-1", "IOS", "COMPLETE", "2026-03-01T12:00:00Z"},
 	)
 	client := newTestHistoryClient(t, transport)
-	entries, err := enrichSubmissions(context.Background(), client, subs, "")
+	entries, err := enrichSubmissions(context.Background(), client, subs, nil, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -433,6 +440,53 @@ func TestPrintHistoryTable_NoError(t *testing.T) {
 	}
 }
 
+func TestEnrichSubmissions_PaginatesItemsBeforeOutcome(t *testing.T) {
+	transport := testRoundTripper(func(req *http.Request) (*http.Response, error) {
+		if req.URL.Path != "/v1/reviewSubmissions/sub-1/items" {
+			return testJSONResponse(404, `{"errors":[{"status":"404"}]}`), nil
+		}
+		if req.URL.Query().Get("cursor") == "next-page" {
+			return testJSONResponse(200, `{
+				"data": [{
+					"type": "reviewSubmissionItems",
+					"id": "item-2",
+					"attributes": {"state": "REJECTED"}
+				}],
+				"links": {"self": "/v1/reviewSubmissions/sub-1/items?cursor=next-page"}
+			}`), nil
+		}
+		return testJSONResponse(200, `{
+			"data": [{
+				"type": "reviewSubmissionItems",
+				"id": "item-1",
+				"attributes": {"state": "APPROVED"}
+			}],
+			"links": {
+				"self": "/v1/reviewSubmissions/sub-1/items?limit=200",
+				"next": "https://api.appstoreconnect.apple.com/v1/reviewSubmissions/sub-1/items?cursor=next-page"
+			}
+		}`), nil
+	})
+
+	subs := makeSubmissions(
+		struct{ id, platform, state, date string }{"sub-1", "IOS", "COMPLETE", "2026-03-01T12:00:00Z"},
+	)
+	client := newTestHistoryClient(t, transport)
+	entries, err := enrichSubmissions(context.Background(), client, subs, nil, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if entries[0].Outcome != "rejected" {
+		t.Fatalf("outcome = %q, want %q", entries[0].Outcome, "rejected")
+	}
+	if len(entries[0].Items) != 2 {
+		t.Fatalf("items count = %d, want 2", len(entries[0].Items))
+	}
+}
+
 func TestFormatItemsSummary(t *testing.T) {
 	tests := []struct {
 		name  string
@@ -453,6 +507,31 @@ func TestFormatItemsSummary(t *testing.T) {
 	}
 }
 
+func TestEnrichSubmissions_SortsByParsedTimestamp(t *testing.T) {
+	transport := testRoundTripper(func(req *http.Request) (*http.Response, error) {
+		return testJSONResponse(200, `{
+			"data": [],
+			"links": {"self": "/v1/reviewSubmissions/items"}
+		}`), nil
+	})
+
+	subs := makeSubmissions(
+		struct{ id, platform, state, date string }{"sub-1", "IOS", "COMPLETE", "2026-02-20T01:00:00+01:00"},
+		struct{ id, platform, state, date string }{"sub-2", "IOS", "COMPLETE", "2026-02-20T00:30:00Z"},
+	)
+	client := newTestHistoryClient(t, transport)
+	entries, err := enrichSubmissions(context.Background(), client, subs, nil, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(entries))
+	}
+	if entries[0].SubmissionID != "sub-2" {
+		t.Fatalf("first submission = %q, want %q", entries[0].SubmissionID, "sub-2")
+	}
+}
+
 func TestEnrichSubmissions_SkipsEmptySubmittedDate(t *testing.T) {
 	calls := 0
 	transport := testRoundTripper(func(req *http.Request) (*http.Response, error) {
@@ -464,7 +543,7 @@ func TestEnrichSubmissions_SkipsEmptySubmittedDate(t *testing.T) {
 		struct{ id, platform, state, date string }{"sub-draft", "IOS", "READY_FOR_REVIEW", ""},
 	)
 	client := newTestHistoryClient(t, transport)
-	entries, err := enrichSubmissions(context.Background(), client, subs, "")
+	entries, err := enrichSubmissions(context.Background(), client, subs, nil, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -473,5 +552,30 @@ func TestEnrichSubmissions_SkipsEmptySubmittedDate(t *testing.T) {
 	}
 	if calls != 0 {
 		t.Errorf("expected 0 API calls for draft submissions, got %d", calls)
+	}
+}
+
+func TestEnrichSubmissions_EmptyResultsMarshalAsArray(t *testing.T) {
+	client := newTestHistoryClient(t, testRoundTripper(func(req *http.Request) (*http.Response, error) {
+		t.Fatal("no API calls expected for draft-only results")
+		return nil, nil
+	}))
+	subs := makeSubmissions(
+		struct{ id, platform, state, date string }{"sub-draft", "IOS", "READY_FOR_REVIEW", ""},
+	)
+
+	entries, err := enrichSubmissions(context.Background(), client, subs, nil, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if entries == nil {
+		t.Fatal("expected non-nil empty slice")
+	}
+	data, err := json.Marshal(entries)
+	if err != nil {
+		t.Fatalf("marshal error: %v", err)
+	}
+	if string(data) != "[]" {
+		t.Fatalf("json = %s, want []", data)
 	}
 }

@@ -1721,6 +1721,13 @@ func WithReviewSubmissionsApps(appIDs []string) ReviewSubmissionsOption {
 	}
 }
 
+// WithReviewSubmissionsInclude includes related resources for review submissions responses.
+func WithReviewSubmissionsInclude(include []string) ReviewSubmissionsOption {
+	return func(q *reviewSubmissionsQuery) {
+		q.include = normalizeList(include)
+	}
+}
+
 // WithReviewSubmissionItemsLimit sets the max number of review submission items to return.
 func WithReviewSubmissionItemsLimit(limit int) ReviewSubmissionItemsOption {
 	return func(q *reviewSubmissionItemsQuery) {

@@ -2,11 +2,13 @@ package reviews
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/peterbourgon/ff/v3/ffcli"
 
@@ -31,6 +33,11 @@ type SubmissionHistoryItem struct {
 	State      string `json:"state"`
 	Type       string `json:"type"`
 	ResourceID string `json:"resourceId"`
+}
+
+type submissionVersionContext struct {
+	VersionString string
+	Platform      string
 }
 
 // SubmissionsHistoryCommand returns the submissions-history subcommand.
@@ -90,38 +97,18 @@ Examples:
 				asc.WithReviewSubmissionsLimit(*limit),
 				asc.WithReviewSubmissionsPlatforms(platforms),
 				asc.WithReviewSubmissionsStates(states),
+				asc.WithReviewSubmissionsInclude([]string{"appStoreVersionForReview"}),
 			}
-
-			// Fetch submissions (with or without pagination)
-			var submissions []asc.ReviewSubmissionResource
 			if *paginate {
-				paginateOpts := append(opts, asc.WithReviewSubmissionsLimit(200))
-				resp, pErr := shared.PaginateWithSpinner(requestCtx,
-					func(ctx context.Context) (asc.PaginatedResponse, error) {
-						return client.GetReviewSubmissions(ctx, resolvedAppID, paginateOpts...)
-					},
-					func(ctx context.Context, nextURL string) (asc.PaginatedResponse, error) {
-						return client.GetReviewSubmissions(ctx, resolvedAppID, asc.WithReviewSubmissionsNextURL(nextURL))
-					},
-				)
-				if pErr != nil {
-					return fmt.Errorf("review submissions-history: %w", pErr)
-				}
-				aggResp, ok := resp.(*asc.ReviewSubmissionsResponse)
-				if !ok {
-					return fmt.Errorf("review submissions-history: unexpected pagination response type %T", resp)
-				}
-				submissions = aggResp.Data
-			} else {
-				resp, fErr := client.GetReviewSubmissions(requestCtx, resolvedAppID, opts...)
-				if fErr != nil {
-					return fmt.Errorf("review submissions-history: %w", fErr)
-				}
-				submissions = resp.Data
+				opts = append(opts, asc.WithReviewSubmissionsLimit(200))
 			}
 
-			// Enrich with items + version strings
-			entries, err := enrichSubmissions(requestCtx, client, submissions, strings.TrimSpace(*version))
+			submissions, versionContexts, err := fetchReviewSubmissions(requestCtx, client, resolvedAppID, opts, *paginate)
+			if err != nil {
+				return fmt.Errorf("review submissions-history: %w", err)
+			}
+
+			entries, err := enrichSubmissions(requestCtx, client, submissions, versionContexts, strings.TrimSpace(*version))
 			if err != nil {
 				return fmt.Errorf("review submissions-history: %w", err)
 			}
@@ -133,11 +120,116 @@ Examples:
 	}
 }
 
+func fetchReviewSubmissions(ctx context.Context, client *asc.Client, appID string, opts []asc.ReviewSubmissionsOption, paginate bool) ([]asc.ReviewSubmissionResource, map[string]submissionVersionContext, error) {
+	submissions := make([]asc.ReviewSubmissionResource, 0)
+	versionContexts := make(map[string]submissionVersionContext)
+
+	collectPage := func(resp *asc.ReviewSubmissionsResponse) error {
+		if resp == nil {
+			return nil
+		}
+		submissions = append(submissions, resp.Data...)
+		pageContexts, err := submissionVersionContexts(resp)
+		if err != nil {
+			return err
+		}
+		for submissionID, ctx := range pageContexts {
+			versionContexts[submissionID] = ctx
+		}
+		return nil
+	}
+
+	fetchAll := func() error {
+		resp, err := client.GetReviewSubmissions(ctx, appID, opts...)
+		if err != nil {
+			return err
+		}
+		if err := collectPage(resp); err != nil {
+			return err
+		}
+		if !paginate {
+			return nil
+		}
+
+		current := resp
+		seenNext := make(map[string]struct{})
+		page := 1
+		for current != nil && strings.TrimSpace(current.Links.Next) != "" {
+			nextURL := strings.TrimSpace(current.Links.Next)
+			if _, ok := seenNext[nextURL]; ok {
+				return fmt.Errorf("page %d: %w", page+1, asc.ErrRepeatedPaginationURL)
+			}
+			seenNext[nextURL] = struct{}{}
+
+			nextResp, err := client.GetReviewSubmissions(ctx, appID, asc.WithReviewSubmissionsNextURL(nextURL))
+			if err != nil {
+				return fmt.Errorf("page %d: %w", page+1, err)
+			}
+			if err := collectPage(nextResp); err != nil {
+				return fmt.Errorf("page %d: %w", page+1, err)
+			}
+
+			current = nextResp
+			page++
+		}
+		return nil
+	}
+
+	if paginate {
+		if err := shared.WithSpinner("", fetchAll); err != nil {
+			return nil, nil, err
+		}
+	} else if err := fetchAll(); err != nil {
+		return nil, nil, err
+	}
+
+	return submissions, versionContexts, nil
+}
+
+func submissionVersionContexts(resp *asc.ReviewSubmissionsResponse) (map[string]submissionVersionContext, error) {
+	contexts := make(map[string]submissionVersionContext)
+	if resp == nil || len(resp.Data) == 0 {
+		return contexts, nil
+	}
+
+	versionByID := make(map[string]submissionVersionContext)
+	if len(resp.Included) != 0 {
+		var included []asc.Resource[asc.AppStoreVersionAttributes]
+		if err := json.Unmarshal(resp.Included, &included); err != nil {
+			return nil, fmt.Errorf("failed to parse included review submission versions: %w", err)
+		}
+		for _, version := range included {
+			if version.Type != asc.ResourceTypeAppStoreVersions {
+				continue
+			}
+			versionByID[version.ID] = submissionVersionContext{
+				VersionString: version.Attributes.VersionString,
+				Platform:      string(version.Attributes.Platform),
+			}
+		}
+	}
+
+	for _, sub := range resp.Data {
+		if sub.Relationships == nil || sub.Relationships.AppStoreVersionForReview == nil {
+			continue
+		}
+		versionID := strings.TrimSpace(sub.Relationships.AppStoreVersionForReview.Data.ID)
+		if versionID == "" {
+			continue
+		}
+		if ctx, ok := versionByID[versionID]; ok {
+			contexts[sub.ID] = ctx
+		}
+	}
+
+	return contexts, nil
+}
+
 // enrichSubmissions takes already-fetched submissions and enriches each with
 // item states and version strings. Applies client-side version filtering and
 // sorts by submittedDate descending.
-func enrichSubmissions(ctx context.Context, client *asc.Client, submissions []asc.ReviewSubmissionResource, versionFilter string) ([]SubmissionHistoryEntry, error) {
-	var entries []SubmissionHistoryEntry
+func enrichSubmissions(ctx context.Context, client *asc.Client, submissions []asc.ReviewSubmissionResource, versionContexts map[string]submissionVersionContext, versionFilter string) ([]SubmissionHistoryEntry, error) {
+	entries := make([]SubmissionHistoryEntry, 0, len(submissions))
 	for _, sub := range submissions {
 		// Skip pre-submission drafts (no submittedDate)
 		if strings.TrimSpace(sub.Attributes.SubmittedDate) == "" {
@@ -150,39 +242,26 @@ func enrichSubmissions(ctx context.Context, client *asc.Client, submissions []as
 			State:         string(sub.Attributes.SubmissionState),
 			SubmittedDate: sub.Attributes.SubmittedDate,
 		}
+		if versionCtx, ok := versionContexts[sub.ID]; ok {
+			entry.VersionString = strings.TrimSpace(versionCtx.VersionString)
+			if entry.Platform == "" {
+				entry.Platform = strings.TrimSpace(versionCtx.Platform)
+			}
+		}
 
-		// Fetch items for this submission
-		itemsResp, err := client.GetReviewSubmissionItems(ctx, sub.ID)
+		items, err := fetchAllSubmissionItems(ctx, client, sub.ID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch items for submission %s: %w", sub.ID, err)
 		}
 
-		var itemStates []string
-		for _, item := range itemsResp.Data {
+		itemStates := make([]string, 0, len(items))
+		entry.Items = make([]SubmissionHistoryItem, 0, len(items))
+		for _, item := range items {
 			histItem := SubmissionHistoryItem{
 				ID:    item.ID,
 				State: item.Attributes.State,
 			}
-
-			// Extract version relationship if present
-			if item.Relationships != nil && item.Relationships.AppStoreVersion != nil {
-				histItem.Type = "appStoreVersion"
-				histItem.ResourceID = item.Relationships.AppStoreVersion.Data.ID
-
-				// Fetch version string
-				if histItem.ResourceID != "" {
-					verResp, verErr := client.GetAppStoreVersion(ctx, histItem.ResourceID)
-					if verErr != nil {
-						if asc.IsNotFound(verErr) {
-							entry.VersionString = "unknown"
-						} else {
-							return nil, fmt.Errorf("failed to fetch version %s: %w", histItem.ResourceID, verErr)
-						}
-					} else if entry.VersionString == "" {
-						entry.VersionString = verResp.Data.Attributes.VersionString
-					}
-				}
-			}
+			populateSubmissionHistoryItem(&histItem, item)
 
 			itemStates = append(itemStates, item.Attributes.State)
 			entry.Items = append(entry.Items, histItem)
@@ -199,7 +278,7 @@ func enrichSubmissions(ctx context.Context, client *asc.Client, submissions []as
 
 	// Client-side version filter
 	if versionFilter != "" {
-		var filtered []SubmissionHistoryEntry
+		filtered := make([]SubmissionHistoryEntry, 0, len(entries))
 		for _, e := range entries {
 			if e.VersionString == versionFilter {
 				filtered = append(filtered, e)
@@ -210,10 +289,65 @@ func enrichSubmissions(ctx context.Context, client *asc.Client, submissions []as
 
 	// Sort by submittedDate descending
 	sort.Slice(entries, func(i, j int) bool {
-		return entries[i].SubmittedDate > entries[j].SubmittedDate
+		cmp := compareRFC3339DateStrings(entries[i].SubmittedDate, entries[j].SubmittedDate)
+		if cmp == 0 {
+			return entries[i].SubmissionID > entries[j].SubmissionID
+		}
+		return cmp > 0
 	})
 
 	return entries, nil
+}
+
+func fetchAllSubmissionItems(ctx context.Context, client *asc.Client, submissionID string) ([]asc.ReviewSubmissionItemResource, error) {
+	firstPage, err := client.GetReviewSubmissionItems(ctx, submissionID, asc.WithReviewSubmissionItemsLimit(200))
+	if err != nil {
+		return nil, err
+	}
+	if firstPage == nil {
+		return []asc.ReviewSubmissionItemResource{}, nil
+	}
+
+	resp, err := asc.PaginateAll(ctx, firstPage, func(ctx context.Context, nextURL string) (asc.PaginatedResponse, error) {
+		return client.GetReviewSubmissionItems(ctx, submissionID, asc.WithReviewSubmissionItemsNextURL(nextURL))
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	aggResp, ok := resp.(*asc.ReviewSubmissionItemsResponse)
+	if !ok {
+		return nil, fmt.Errorf("unexpected review submission items pagination response type %T", resp)
+	}
+	if aggResp == nil || aggResp.Data == nil {
+		return []asc.ReviewSubmissionItemResource{}, nil
+	}
+
+	return aggResp.Data, nil
+}
+
+func populateSubmissionHistoryItem(histItem *SubmissionHistoryItem, item asc.ReviewSubmissionItemResource) {
+	if histItem == nil || item.Relationships == nil {
+		return
+	}
+
+	switch {
+	case item.Relationships.AppStoreVersion != nil:
+		histItem.Type = "appStoreVersion"
+		histItem.ResourceID = item.Relationships.AppStoreVersion.Data.ID
+	case item.Relationships.AppCustomProductPage != nil:
+		histItem.Type = "appCustomProductPage"
+		histItem.ResourceID = item.Relationships.AppCustomProductPage.Data.ID
+	case item.Relationships.AppEvent != nil:
+		histItem.Type = "appEvent"
+		histItem.ResourceID = item.Relationships.AppEvent.Data.ID
+	case item.Relationships.AppStoreVersionExperiment != nil:
+		histItem.Type = "appStoreVersionExperiment"
+		histItem.ResourceID = item.Relationships.AppStoreVersionExperiment.Data.ID
+	case item.Relationships.AppStoreVersionExperimentTreatment != nil:
+		histItem.Type = "appStoreVersionExperimentTreatment"
+		histItem.ResourceID = item.Relationships.AppStoreVersionExperimentTreatment.Data.ID
+	}
 }
 
 func printHistoryTable(entries []SubmissionHistoryEntry) error {
@@ -295,4 +429,48 @@ func deriveOutcome(submissionState string, itemStates []string) string {
 		return "rejected"
 	}
 	return strings.ToLower(submissionState)
+}
+
+func compareRFC3339DateStrings(current, best string) int {
+	currentTime, currentValid := parseRFC3339Date(current)
+	bestTime, bestValid := parseRFC3339Date(best)
+
+	switch {
+	case currentValid && bestValid:
+		if currentTime.After(bestTime) {
+			return 1
+		}
+		if currentTime.Before(bestTime) {
+			return -1
+		}
+		return 0
+	case currentValid:
+		return 1
+	case bestValid:
+		return -1
+	default:
+		current = strings.TrimSpace(current)
+		best = strings.TrimSpace(best)
+		if current > best {
+			return 1
+		}
+		if current < best {
+			return -1
+		}
+		return 0
+	}
+}
+
+func parseRFC3339Date(value string) (time.Time, bool) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return time.Time{}, false
+	}
+	if parsed, err := time.Parse(time.RFC3339, trimmed); err == nil {
+		return parsed, true
+	}
+	if parsed, err := time.Parse(time.RFC3339Nano, trimmed); err == nil {
+		return parsed, true
+	}
+	return time.Time{}, false
 }

@@ -250,6 +250,7 @@ type reviewSubmissionsQuery struct {
 	platforms []string
 	states    []string
 	appIDs    []string
+	include   []string
 }
 
 type reviewSubmissionItemsQuery struct {
@@ -1300,6 +1301,7 @@ func buildReviewSubmissionsQuery(query *reviewSubmissionsQuery) string {
 	addCSV(values, "filter[platform]", query.platforms)
 	addCSV(values, "filter[state]", query.states)
 	addCSV(values, "filter[app]", query.appIDs)
+	addCSV(values, "include", query.include)
 	addLimit(values, query.limit)
 	return values.Encode()
 }

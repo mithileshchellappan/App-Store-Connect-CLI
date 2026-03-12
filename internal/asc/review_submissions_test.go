@@ -380,6 +380,65 @@ func TestGetReviewSubmissionItems(t *testing.T) {
 	}
 }
 
+func TestGetReviewSubmissions_WithInclude(t *testing.T) {
+	response := reviewSubmissionsJSONResponse(http.StatusOK, `{
+		"data": [
+			{
+				"type": "reviewSubmissions",
+				"id": "submission-456",
+				"relationships": {
+					"appStoreVersionForReview": {
+						"data": {
+							"type": "appStoreVersions",
+							"id": "version-123"
+						}
+					}
+				}
+			}
+		],
+		"included": [
+			{
+				"type": "appStoreVersions",
+				"id": "version-123",
+				"attributes": {
+					"versionString": "1.2.3",
+					"platform": "IOS"
+				}
+			}
+		]
+	}`)
+
+	client := newTestClient(t, func(req *http.Request) {
+		if req.Method != http.MethodGet {
+			t.Fatalf("expected GET, got %s", req.Method)
+		}
+		if req.URL.Path != "/v1/apps/app-123/reviewSubmissions" {
+			t.Fatalf("expected path /v1/apps/app-123/reviewSubmissions, got %s", req.URL.Path)
+		}
+		if got := req.URL.Query().Get("include"); got != "appStoreVersionForReview" {
+			t.Fatalf("expected include=appStoreVersionForReview, got %q", got)
+		}
+	}, response)
+
+	resp, err := client.GetReviewSubmissions(context.Background(), "app-123", WithReviewSubmissionsInclude([]string{"appStoreVersionForReview"}))
+	if err != nil {
+		t.Fatalf("GetReviewSubmissions() error: %v", err)
+	}
+
+	if len(resp.Data) != 1 {
+		t.Fatalf("expected 1 submission, got %d", len(resp.Data))
+	}
+	if resp.Data[0].Relationships == nil || resp.Data[0].Relationships.AppStoreVersionForReview == nil {
+		t.Fatal("expected appStoreVersionForReview relationship to be populated")
+	}
+	if resp.Data[0].Relationships.AppStoreVersionForReview.Data.ID != "version-123" {
+		t.Fatalf("expected version relationship ID version-123, got %s", resp.Data[0].Relationships.AppStoreVersionForReview.Data.ID)
+	}
+	if len(resp.Included) == 0 {
+		t.Fatal("expected included appStoreVersion payload")
+	}
+}
+
 func TestReviewSubmissionValidationErrors(t *testing.T) {
 	client := newTestClient(t, nil, nil)
 
