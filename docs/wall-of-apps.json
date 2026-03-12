@@ -173,6 +173,13 @@
     "platform": ["iOS"]
   },
   {
+    "app": "FlipKit - Flipbook Maker",
+    "link": "https://apps.apple.com/us/app/flipkit-flipbook-maker/id1507694594?uo=4",
+    "creator": "mbuchetics",
+    "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/a1/e6/4f/a1e64f9f-de99-5fc1-f7e0-7ecbe7fafedb/AppIcon-0-1x_U007emarketing-0-11-0-sRGB-85-220-0.png/512x512bb.jpg",
+    "platform": ["iOS"]
+  },
+  {
     "app": "Foundation Lab",
     "link": "https://testflight.apple.com/join/JWR9FpP3",
     "creator": "rudrankriyam",
