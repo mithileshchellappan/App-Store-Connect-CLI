@@ -317,6 +317,124 @@ func TestRun_ExtractsDeclaredOutputs(t *testing.T) {
 	}
 }
 
+func TestRun_ExtractsDeclaredOutputsInQuotedCommand(t *testing.T) {
+	def := &Definition{
+		Workflows: map[string]Workflow{
+			"release": {
+				Steps: []Step{
+					{
+						Name: "upload",
+						Run:  `printf '{"buildId":"build-42","processingState":"VALID"}'`,
+						Outputs: map[string]string{
+							"BUILD_ID":         "$.buildId",
+							"PROCESSING_STATE": "$.processingState",
+						},
+					},
+					{
+						Name: "distribute",
+						Run:  `if [ "${steps.upload.BUILD_ID}" = "build-42" ]; then echo distributed; else exit 9; fi`,
+					},
+				},
+			},
+		},
+	}
+
+	opts := runOpts("release")
+	opts.WorkflowFile = filepath.Join(t.TempDir(), "workflow.json")
+	opts.StateDir = filepath.Join(t.TempDir(), "runs")
+
+	result, err := Run(context.Background(), def, opts)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if result.Status != "ok" {
+		t.Fatalf("expected status ok, got %q", result.Status)
+	}
+	if result.Outputs["upload"]["BUILD_ID"] != "build-42" {
+		t.Fatalf("expected BUILD_ID=build-42, got %#v", result.Outputs["upload"])
+	}
+	stdout := opts.Stdout.(*bytes.Buffer).String()
+	if !strings.Contains(stdout, "distributed") {
+		t.Fatalf("expected interpolated command output on stdout, got %q", stdout)
+	}
+}
+
+func TestRun_ExtractsDeclaredOutputsInEmbeddedDoubleQuotedCommand(t *testing.T) {
+	def := &Definition{
+		Workflows: map[string]Workflow{
+			"release": {
+				Steps: []Step{
+					{
+						Name: "upload",
+						Run:  `printf '{"ipaPath":"artifacts/My App.ipa"}'`,
+						Outputs: map[string]string{
+							"IPA_PATH": "$.ipaPath",
+						},
+					},
+					{
+						Name: "distribute",
+						Run:  `if [ "selected=${steps.upload.IPA_PATH}" = "selected=artifacts/My App.ipa" ]; then echo distributed; else exit 9; fi`,
+					},
+				},
+			},
+		},
+	}
+
+	opts := runOpts("release")
+	opts.WorkflowFile = filepath.Join(t.TempDir(), "workflow.json")
+	opts.StateDir = filepath.Join(t.TempDir(), "runs")
+
+	result, err := Run(context.Background(), def, opts)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if result.Status != "ok" {
+		t.Fatalf("expected status ok, got %q", result.Status)
+	}
+	stdout := opts.Stdout.(*bytes.Buffer).String()
+	if !strings.Contains(stdout, "distributed") {
+		t.Fatalf("expected interpolated command output on stdout, got %q", stdout)
+	}
+}
+
+func TestRun_ExtractsDeclaredOutputsInEmbeddedSingleQuotedCommand(t *testing.T) {
+	def := &Definition{
+		Workflows: map[string]Workflow{
+			"release": {
+				Steps: []Step{
+					{
+						Name: "upload",
+						Run:  `printf '{"buildId":"build-42"}'`,
+						Outputs: map[string]string{
+							"BUILD_ID": "$.buildId",
+						},
+					},
+					{
+						Name: "distribute",
+						Run:  `if [ 'artifact-${steps.upload.BUILD_ID}.ipa' = 'artifact-build-42.ipa' ]; then echo distributed; else exit 9; fi`,
+					},
+				},
+			},
+		},
+	}
+
+	opts := runOpts("release")
+	opts.WorkflowFile = filepath.Join(t.TempDir(), "workflow.json")
+	opts.StateDir = filepath.Join(t.TempDir(), "runs")
+
+	result, err := Run(context.Background(), def, opts)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if result.Status != "ok" {
+		t.Fatalf("expected status ok, got %q", result.Status)
+	}
+	stdout := opts.Stdout.(*bytes.Buffer).String()
+	if !strings.Contains(stdout, "distributed") {
+		t.Fatalf("expected interpolated command output on stdout, got %q", stdout)
+	}
+}
+
 func TestRun_ResumeSkipsCompletedStepsAndReusesOutputs(t *testing.T) {
 	dir := t.TempDir()
 	counterPath := filepath.Join(dir, "upload-count.txt")

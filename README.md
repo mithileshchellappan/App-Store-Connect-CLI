@@ -172,6 +172,18 @@ asc bundle-ids list
 asc workflow run release
 ```
 
+### Verified local Xcode -> TestFlight workflow
+
+See [docs/WORKFLOWS.md](docs/WORKFLOWS.md) for a copyable `.asc/workflow.json`
+and `ExportOptions.plist` that use `asc builds latest`, `asc xcode archive`,
+`asc xcode export`, and `asc publish testflight --group ... --wait`.
+
+```bash
+asc workflow validate
+asc workflow run --dry-run testflight_beta VERSION:1.2.3
+asc workflow run testflight_beta VERSION:1.2.3
+```
+
 ### Xcode Cloud workflows and build runs
 
 ```bash
@@ -202,6 +214,7 @@ For full command families, flags, and discovery patterns, see:
 
 - [docs/CI_CD.md](docs/CI_CD.md) - CI/CD integration guides (GitHub Actions, GitLab, Bitrise, CircleCI)
 - [docs/COMMANDS.md](docs/COMMANDS.md) - Command families and reference navigation
+- [docs/WORKFLOWS.md](docs/WORKFLOWS.md) - Reusable workflow patterns, including local Xcode to TestFlight
 - [docs/API_NOTES.md](docs/API_NOTES.md) - API quirks and behaviors
 - [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) - CLI development and testing notes
 - [docs/TESTING.md](docs/TESTING.md) - Testing patterns and conventions

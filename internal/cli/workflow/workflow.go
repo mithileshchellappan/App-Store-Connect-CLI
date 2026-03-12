@@ -48,6 +48,7 @@ Tips:
   Preview the plan with asc workflow run --dry-run <name>.
   Run-step outputs can be referenced later as ${steps.resolve_build.BUILD_ID}.
   For asc commands that declare outputs, usually pass --output json.
+  A proven local Xcode -> TestFlight shape is: asc builds latest --next -> asc xcode archive -> asc xcode export -> asc publish testflight --group ... --wait.
 
 Example workflow file (.asc/workflow.json):
 
@@ -116,6 +117,9 @@ Try it:
   asc workflow run --dry-run beta
   asc workflow run beta BUILD_ID:123456789 GROUP_ID:abcdef
   asc workflow run release --resume beta-20260312T120000Z-deadbeef
+
+More docs:
+  https://github.com/rudrankriyam/App-Store-Connect-CLI/blob/main/docs/WORKFLOWS.md
 
 Examples:
   asc workflow list

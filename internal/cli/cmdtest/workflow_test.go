@@ -49,8 +49,8 @@ func TestWorkflow_ShowsHelp(t *testing.T) {
 	if !strings.Contains(stderr, "${steps.resolve_build.BUILD_ID}") {
 		t.Fatalf("expected help to document step output references, got %q", stderr)
 	}
-	if strings.Contains(stderr, "WORKFLOWS.md") {
-		t.Fatalf("expected help to stop pointing to deleted workflow docs, got %q", stderr)
+	if !strings.Contains(stderr, "WORKFLOWS.md") {
+		t.Fatalf("expected help to link workflow docs, got %q", stderr)
 	}
 }
 

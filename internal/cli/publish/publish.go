@@ -395,7 +395,7 @@ type publishUploadResult struct {
 }
 
 func uploadBuildAndWaitForID(ctx context.Context, client *asc.Client, appID, ipaPath string, fileInfo os.FileInfo, version, buildNumber string, platform asc.Platform, pollInterval time.Duration, uploadTimeout time.Duration, overrideUploadTimeout bool) (*publishUploadResult, error) {
-	_, fileResp, err := prepareBuildUpload(ctx, client, appID, fileInfo, version, buildNumber, platform)
+	uploadResp, fileResp, err := prepareBuildUpload(ctx, client, appID, fileInfo, version, buildNumber, platform)
 	if err != nil {
 		return nil, err
 	}
@@ -404,6 +404,7 @@ func uploadBuildAndWaitForID(ctx context.Context, client *asc.Client, appID, ipa
 		return nil, fmt.Errorf("no upload operations returned")
 	}
 
+	fmt.Fprintf(os.Stderr, "Uploading %s (%d bytes) to App Store Connect...\n", fileInfo.Name(), fileInfo.Size())
 	uploadCtx, uploadCancel := contextWithPublishUploadTimeout(ctx, uploadTimeout, overrideUploadTimeout)
 	err = asc.ExecuteUploadOperations(uploadCtx, ipaPath, fileResp.Data.Attributes.UploadOperations)
 	uploadCancel()
@@ -418,7 +419,9 @@ func uploadBuildAndWaitForID(ctx context.Context, client *asc.Client, appID, ipa
 		return nil, err
 	}
 
-	buildResp, err := shared.WaitForBuildByNumber(ctx, client, appID, version, buildNumber, string(platform), pollInterval)
+	fmt.Fprintln(os.Stderr, "Upload committed in App Store Connect.")
+	fmt.Fprintf(os.Stderr, "Waiting for build %s (%s) to appear in App Store Connect...\n", buildNumber, version)
+	buildResp, err := shared.WaitForBuildByNumberOrUploadFailure(ctx, client, appID, uploadResp.Data.ID, version, buildNumber, string(platform), pollInterval)
 	if err != nil {
 		return nil, err
 	}
