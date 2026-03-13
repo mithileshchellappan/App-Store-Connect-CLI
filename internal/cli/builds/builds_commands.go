@@ -444,6 +444,7 @@ func BuildsListCommand() *ffcli.Command {
 	sort := fs.String("sort", "", "Sort by uploadedDate or -uploadedDate")
 	version := fs.String("version", "", "Filter by marketing version string (CFBundleShortVersionString)")
 	buildNumber := fs.String("build-number", "", "Filter by build number (CFBundleVersion)")
+	platform := fs.String("platform", "", "Filter by platform: IOS, MAC_OS, TV_OS, VISION_OS")
 	processingState := fs.String("processing-state", "", "Filter by processing state: VALID, PROCESSING, FAILED, INVALID, or all")
 	limit := fs.Int("limit", 0, "Maximum results per page (1-200)")
 	next := fs.String("next", "", "Fetch next page using a links.next URL")
@@ -462,6 +463,8 @@ Examples:
   asc builds list --app "123456789"
   asc builds list --app "123456789" --version "1.2.3"
   asc builds list --app "123456789" --build-number "123"
+  asc builds list --app "123456789" --platform TV_OS
+  asc builds list --app "123456789" --platform IOS --version "1.2.3"
   asc builds list --app "123456789" --processing-state "PROCESSING"
   asc builds list --app "123456789" --processing-state "all"
   asc builds list --app "123456789" --version "1.2.3" --build-number "123"
@@ -479,6 +482,13 @@ Examples:
 			}
 			if err := shared.ValidateSort(*sort, "uploadedDate", "-uploadedDate"); err != nil {
 				return fmt.Errorf("builds: %w", err)
+			}
+
+			platformValue := strings.ToUpper(strings.TrimSpace(*platform))
+			if platformValue != "" {
+				if _, err := shared.NormalizePlatform(platformValue); err != nil {
+					return fmt.Errorf("builds: %w", err)
+				}
 			}
 
 			versionValue := strings.TrimSpace(*version)
@@ -529,6 +539,9 @@ Examples:
 			}
 			if buildNumberValue != "" {
 				opts = append(opts, asc.WithBuildsBuildNumber(buildNumberValue))
+			}
+			if platformValue != "" {
+				opts = append(opts, asc.WithBuildsPreReleaseVersionPlatforms([]string{platformValue}))
 			}
 			if len(processingStateValues) > 0 {
 				opts = append(opts, asc.WithBuildsProcessingStates(processingStateValues))
