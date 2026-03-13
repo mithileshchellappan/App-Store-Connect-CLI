@@ -21,6 +21,7 @@ func TestCollectCommunityWallSubmitInputAllowsAppIDOnlyWhenNonInteractive(t *tes
 		"",
 		"",
 		"",
+		"",
 	)
 	if err != nil {
 		t.Fatalf("collect input: %v", err)
@@ -31,6 +32,50 @@ func TestCollectCommunityWallSubmitInputAllowsAppIDOnlyWhenNonInteractive(t *tes
 	}
 	if input.Creator != "" {
 		t.Fatalf("expected creator to stay empty, got %q", input.Creator)
+	}
+	if len(input.Platform) != 0 {
+		t.Fatalf("expected no explicit platform override, got %+v", input.Platform)
+	}
+}
+
+func TestCollectCommunityWallSubmitInputRequiresPlatformWithLinkWhenNonInteractive(t *testing.T) {
+	previousPromptEnabled := communityWallPromptEnabled
+	communityWallPromptEnabled = func() bool { return false }
+	t.Cleanup(func() { communityWallPromptEnabled = previousPromptEnabled })
+
+	_, err := collectCommunityWallSubmitInput(
+		"",
+		"My Beta App",
+		"https://testflight.apple.com/join/ABCDEFG",
+		"",
+		"",
+	)
+	if err == nil {
+		t.Fatal("expected platform usage error for manual link submission")
+	}
+	if !strings.Contains(err.Error(), "--platform is required when --link is used") {
+		t.Fatalf("expected platform guidance, got %v", err)
+	}
+}
+
+func TestCollectCommunityWallSubmitInputAcceptsLegacyPlatformOverride(t *testing.T) {
+	previousPromptEnabled := communityWallPromptEnabled
+	communityWallPromptEnabled = func() bool { return false }
+	t.Cleanup(func() { communityWallPromptEnabled = previousPromptEnabled })
+
+	input, err := collectCommunityWallSubmitInput(
+		"1234567890",
+		"",
+		"",
+		"",
+		"ios, macos",
+	)
+	if err != nil {
+		t.Fatalf("collect input: %v", err)
+	}
+
+	if got := strings.Join(input.Platform, ","); got != "iOS,macOS" {
+		t.Fatalf("expected canonicalized platforms, got %q", got)
 	}
 }
 
@@ -78,9 +123,10 @@ func TestSubmitCommunityWallEntryDryRunReturnsPlan(t *testing.T) {
 	communityWallLookupAppDetails = func(ctx context.Context, ids []string) (map[string]communityWallAppDetails, error) {
 		return map[string]communityWallAppDetails{
 			"1234567890": {
-				Name: "Beta",
-				Link: "https://apps.apple.com/us/app/beta/id1234567890",
-				Icon: "https://example.com/icon.png",
+				Name:     "Beta",
+				Link:     "https://apps.apple.com/us/app/beta/id1234567890",
+				Icon:     "https://example.com/icon.png",
+				Platform: []string{"iOS", "macOS"},
 			},
 		}, nil
 	}
@@ -124,8 +170,14 @@ func TestSubmitCommunityWallEntryDryRunReturnsPlan(t *testing.T) {
 	if result.Link != "https://apps.apple.com/us/app/beta/id1234567890" {
 		t.Fatalf("expected resolved App Store link, got %q", result.Link)
 	}
+	if got := strings.Join(result.Platform, ","); got != "iOS,macOS" {
+		t.Fatalf("expected inferred platforms in result, got %q", got)
+	}
 	if !strings.Contains(result.PullRequestTitle, "apps wall: add Beta") {
 		t.Fatalf("unexpected PR title %q", result.PullRequestTitle)
+	}
+	if !strings.Contains(result.PullRequestBody, "- Platform: iOS, macOS") {
+		t.Fatalf("expected PR body to include inferred platforms, got %q", result.PullRequestBody)
 	}
 }
 
@@ -173,8 +225,9 @@ func TestSubmitCommunityWallEntryRejectsDuplicateAppID(t *testing.T) {
 	communityWallLookupAppDetails = func(ctx context.Context, ids []string) (map[string]communityWallAppDetails, error) {
 		return map[string]communityWallAppDetails{
 			"1234567890": {
-				Name: "Beta 2",
-				Link: "https://apps.apple.com/us/app/beta-2/id1234567890",
+				Name:     "Beta 2",
+				Link:     "https://apps.apple.com/us/app/beta-2/id1234567890",
+				Platform: []string{"iOS"},
 			},
 		}, nil
 	}
@@ -244,8 +297,9 @@ func TestSubmitCommunityWallEntryRejectsMalformedExistingSource(t *testing.T) {
 	communityWallLookupAppDetails = func(ctx context.Context, ids []string) (map[string]communityWallAppDetails, error) {
 		return map[string]communityWallAppDetails{
 			"1234567890": {
-				Name: "Beta",
-				Link: "https://apps.apple.com/us/app/beta/id1234567890",
+				Name:     "Beta",
+				Link:     "https://apps.apple.com/us/app/beta/id1234567890",
+				Platform: []string{"iOS"},
 			},
 		}, nil
 	}
@@ -288,8 +342,9 @@ func TestSubmitCommunityWallEntryRejectsExistingNonForkRepo(t *testing.T) {
 	communityWallLookupAppDetails = func(ctx context.Context, ids []string) (map[string]communityWallAppDetails, error) {
 		return map[string]communityWallAppDetails{
 			"1234567890": {
-				Name: "Beta",
-				Link: "https://apps.apple.com/us/app/beta/id1234567890",
+				Name:     "Beta",
+				Link:     "https://apps.apple.com/us/app/beta/id1234567890",
+				Platform: []string{"iOS"},
 			},
 		}, nil
 	}
@@ -373,6 +428,47 @@ func TestCommunityWallPullRequestBodyOmitsOptionalMetadata(t *testing.T) {
 	}
 }
 
+func TestInferCommunityWallPlatforms(t *testing.T) {
+	tests := []struct {
+		name             string
+		kind             string
+		supportedDevices []string
+		want             string
+	}{
+		{
+			name: "ios and watch",
+			kind: "software",
+			supportedDevices: []string{
+				"iPhone17-iPhone17",
+				"AppleWatchUltra2-AppleWatchUltra2",
+			},
+			want: "iOS,watchOS",
+		},
+		{
+			name: "tv only",
+			kind: "software",
+			supportedDevices: []string{
+				"AppleTV4KThirdGen-AppleTV4KThirdGen",
+			},
+			want: "tvOS",
+		},
+		{
+			name: "mac kind",
+			kind: "mac-software",
+			want: "macOS",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got := strings.Join(inferCommunityWallPlatforms(test.kind, test.supportedDevices), ",")
+			if got != test.want {
+				t.Fatalf("expected %q, got %q", test.want, got)
+			}
+		})
+	}
+}
+
 func TestWaitForRepoReturnsFriendlyTimeoutAfterSleepCancellation(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet || r.URL.Path != "/repos/tester/App-Store-Connect-CLI" {
@@ -416,7 +512,7 @@ func TestFetchCommunityWallAppDetailsOmitsCountryFilter(t *testing.T) {
 		if got := r.URL.Query().Get("country"); got != "" {
 			t.Fatalf("expected no country query filter, got %q", got)
 		}
-		_, _ = w.Write([]byte(`{"results":[{"trackId":1234567890,"trackName":"Beta","trackViewUrl":"https://apps.apple.com/app/id1234567890","artworkUrl100":"https://example.com/icon.png"}]}`))
+		_, _ = w.Write([]byte(`{"results":[{"trackId":1234567890,"trackName":"Beta","trackViewUrl":"https://apps.apple.com/app/id1234567890","artworkUrl100":"https://example.com/icon.png","kind":"software","supportedDevices":["iPhone17-iPhone17","AppleWatchUltra2-AppleWatchUltra2"]}]}`))
 	}))
 	defer server.Close()
 
@@ -432,5 +528,8 @@ func TestFetchCommunityWallAppDetailsOmitsCountryFilter(t *testing.T) {
 	}
 	if got := details["1234567890"].Name; got != "Beta" {
 		t.Fatalf("expected app details for requested ID, got %+v", details)
+	}
+	if got := strings.Join(details["1234567890"].Platform, ","); got != "iOS,watchOS" {
+		t.Fatalf("expected inferred platforms in app details, got %+v", details["1234567890"].Platform)
 	}
 }

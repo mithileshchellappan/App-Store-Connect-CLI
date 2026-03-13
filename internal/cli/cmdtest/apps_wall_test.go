@@ -98,6 +98,33 @@ func TestAppsWallSubmitRequiresConfirmUnlessDryRun(t *testing.T) {
 	}
 }
 
+func TestAppsWallSubmitLegacyPlatformFlagStillAccepted(t *testing.T) {
+	root := RootCommand("1.2.3")
+	root.FlagSet.SetOutput(io.Discard)
+
+	var runErr error
+	stdout, stderr := captureOutput(t, func() {
+		if err := root.Parse([]string{
+			"apps", "wall", "submit",
+			"--app", "1234567890",
+			"--platform", "iOS",
+		}); err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+		runErr = root.Run(context.Background())
+	})
+
+	if !errors.Is(runErr, flag.ErrHelp) {
+		t.Fatalf("expected ErrHelp, got %v", runErr)
+	}
+	if stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", stdout)
+	}
+	if !strings.Contains(stderr, "--confirm is required unless --dry-run is set") {
+		t.Fatalf("expected confirm guidance in stderr, got %q", stderr)
+	}
+}
+
 func TestAppsWallSubmitRejectsParentWallFlags(t *testing.T) {
 	root := RootCommand("1.2.3")
 	root.FlagSet.SetOutput(io.Discard)

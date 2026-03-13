@@ -72,10 +72,11 @@ var communityWallPlatformDisplayAliases = map[string]string{
 }
 
 type communityWallSubmitInput struct {
-	AppID   string
-	Name    string
-	Link    string
-	Creator string
+	AppID    string
+	Name     string
+	Link     string
+	Creator  string
+	Platform []string
 }
 
 type communityWallSubmitRequest struct {
@@ -91,6 +92,7 @@ type communityWallSubmitResult struct {
 	App               string   `json:"app"`
 	Creator           string   `json:"creator,omitempty"`
 	Link              string   `json:"link"`
+	Platform          []string `json:"platform,omitempty"`
 	UpstreamRepo      string   `json:"upstreamRepo"`
 	ForkRepo          string   `json:"forkRepo"`
 	Branch            string   `json:"branch"`
@@ -106,9 +108,10 @@ type communityWallSubmitResult struct {
 }
 
 type communityWallAppDetails struct {
-	Name string
-	Link string
-	Icon string
+	Name     string
+	Link     string
+	Icon     string
+	Platform []string
 }
 
 type communityWallGitHubUser struct {
@@ -166,6 +169,7 @@ func AppsWallSubmitCommand(parentWallFlags *flag.FlagSet) *ffcli.Command {
 	name := fs.String("name", "", "Override the app name resolved from the App Store lookup")
 	link := fs.String("link", "", "Manual app URL for non-App-Store entries")
 	creator := fs.String("creator", "", "Optional creator name for the Wall of Apps")
+	platformCSV := fs.String("platform", "", "Deprecated: comma-separated platform labels; optional override for --app, required with --link")
 	confirm := fs.Bool("confirm", false, defaultCommunityWallSubmitMessage)
 	dryRun := fs.Bool("dry-run", false, "Preview the fork, branch, and pull request plan without creating anything")
 	output := shared.BindOutputFlagsWithAllowed(fs, "output", defaultCommunityWallSubmitOutput, "Output format: json (default)", "json")
@@ -178,7 +182,11 @@ func AppsWallSubmitCommand(parentWallFlags *flag.FlagSet) *ffcli.Command {
 
 Use --app for the normal flow: the command resolves the public App Store name, URL,
 and icon from the app ID automatically. For entries that are not on the public App
-Store yet, use --link with --name instead.
+Store yet, use --link with --name and --platform instead.
+
+Platform labels are inferred automatically for App Store lookups. The deprecated
+--platform flag remains available as an override for existing scripts and for
+manual --link submissions where the platform cannot be inferred.
 
 Prompts for missing fields when running interactively. The pull request only updates
 docs/wall-of-apps.json so community submissions stay focused to a single file.
@@ -187,7 +195,7 @@ Examples:
   asc apps wall submit --app "1234567890" --dry-run
   asc apps wall submit --app "1234567890" --confirm
   asc apps wall submit --app "1234567890" --creator "Your Name" --confirm
-  asc apps wall submit --link "https://testflight.apple.com/join/ABCDEFG" --name "My Beta App" --confirm`,
+  asc apps wall submit --link "https://testflight.apple.com/join/ABCDEFG" --name "My Beta App" --platform "iOS" --confirm`,
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, args []string) error {
@@ -209,7 +217,7 @@ Examples:
 				return fmt.Errorf("apps wall submit: %w", err)
 			}
 
-			input, err := collectCommunityWallSubmitInput(*appID, *name, *link, *creator)
+			input, err := collectCommunityWallSubmitInput(*appID, *name, *link, *creator, *platformCSV)
 			if err != nil {
 				if errors.Is(err, errCommunityWallUsage) {
 					fmt.Fprintf(os.Stderr, "Error: %s\n", err.Error())
@@ -302,13 +310,14 @@ func resolveCommunityWallGitHubIdentity(ctx context.Context) (string, string, er
 	return token, login, nil
 }
 
-func collectCommunityWallSubmitInput(appIDValue, nameValue, linkValue, creatorValue string) (communityWallSubmitInput, error) {
+func collectCommunityWallSubmitInput(appIDValue, nameValue, linkValue, creatorValue, platformCSV string) (communityWallSubmitInput, error) {
 	canPrompt := communityWallPromptEnabled()
 
 	appIDValue = normalizeCommunityWallAppID(appIDValue)
 	nameValue = strings.TrimSpace(nameValue)
 	linkValue = strings.TrimSpace(linkValue)
 	creatorValue = strings.TrimSpace(creatorValue)
+	platformCSV = strings.TrimSpace(platformCSV)
 
 	if appIDValue != "" && linkValue != "" {
 		return communityWallSubmitInput{}, communityWallUsageError{message: "use either --app or --link, not both"}
@@ -321,7 +330,6 @@ func collectCommunityWallSubmitInput(appIDValue, nameValue, linkValue, creatorVa
 		prompted, err := promptCommunityWallSubmitText(
 			"App ID:",
 			"Paste the App Store or App Store Connect app ID. Leave blank to use a manual link instead.",
-			"",
 			validateCommunityWallOptionalAppIDValue,
 		)
 		if err != nil {
@@ -337,7 +345,6 @@ func collectCommunityWallSubmitInput(appIDValue, nameValue, linkValue, creatorVa
 		prompted, err := promptCommunityWallSubmitText(
 			"Manual link:",
 			"Paste the TestFlight, GitHub, or product URL for entries that are not on the public App Store yet.",
-			"",
 			validateCommunityWallLinkValue,
 		)
 		if err != nil {
@@ -361,7 +368,6 @@ func collectCommunityWallSubmitInput(appIDValue, nameValue, linkValue, creatorVa
 			prompted, err := promptCommunityWallSubmitText(
 				"App name:",
 				"The name that should appear on the Wall of Apps",
-				"",
 				validateCommunityWallRequiredValue,
 			)
 			if err != nil {
@@ -369,13 +375,36 @@ func collectCommunityWallSubmitInput(appIDValue, nameValue, linkValue, creatorVa
 			}
 			nameValue = prompted
 		}
+		if platformCSV == "" {
+			if !canPrompt {
+				return communityWallSubmitInput{}, communityWallUsageError{message: "--platform is required when --link is used"}
+			}
+			prompted, err := promptCommunityWallSubmitText(
+				"Platforms:",
+				"Comma-separated platform labels such as iOS,macOS,watchOS",
+				validateCommunityWallPlatformCSVValue,
+			)
+			if err != nil {
+				return communityWallSubmitInput{}, err
+			}
+			platformCSV = prompted
+		}
+	}
+
+	platforms := []string(nil)
+	if platformCSV != "" {
+		platforms = splitCommunityWallPlatformCSV(platformCSV)
+		if len(platforms) == 0 {
+			return communityWallSubmitInput{}, communityWallUsageError{message: "--platform must include at least one platform label"}
+		}
 	}
 
 	input := communityWallSubmitInput{
-		AppID:   appIDValue,
-		Name:    nameValue,
-		Link:    linkValue,
-		Creator: creatorValue,
+		AppID:    appIDValue,
+		Name:     nameValue,
+		Link:     linkValue,
+		Creator:  creatorValue,
+		Platform: platforms,
 	}
 
 	if input.AppID == "" && input.Link == "" {
@@ -385,7 +414,7 @@ func collectCommunityWallSubmitInput(appIDValue, nameValue, linkValue, creatorVa
 	return input, nil
 }
 
-func promptCommunityWallSubmitText(message, help, defaultValue string, validator survey.Validator) (string, error) {
+func promptCommunityWallSubmitText(message, help string, validator survey.Validator) (string, error) {
 	answer := ""
 	opts := []survey.AskOpt{}
 	if validator != nil {
@@ -394,7 +423,6 @@ func promptCommunityWallSubmitText(message, help, defaultValue string, validator
 	if err := survey.AskOne(&survey.Input{
 		Message: message,
 		Help:    help,
-		Default: defaultValue,
 	}, &answer, opts...); err != nil {
 		return "", err
 	}
@@ -440,9 +468,18 @@ func validateCommunityWallAppID(value string) error {
 	return nil
 }
 
+func validateCommunityWallPlatformCSVValue(ans interface{}) error {
+	value, _ := ans.(string)
+	if len(splitCommunityWallPlatformCSV(value)) == 0 {
+		return fmt.Errorf("provide at least one platform label")
+	}
+	return nil
+}
+
 func resolveCommunityWallCandidate(ctx context.Context, input communityWallSubmitInput) (communityWallEntry, []string, error) {
 	candidate := communityWallEntry{
-		Creator: input.Creator,
+		Creator:  input.Creator,
+		Platform: append([]string(nil), input.Platform...),
 	}
 	warnings := []string{}
 
@@ -465,6 +502,14 @@ func resolveCommunityWallCandidate(ctx context.Context, input communityWallSubmi
 			candidate.Link = communityWallAppStoreURL(input.AppID)
 		}
 		candidate.Icon = strings.TrimSpace(details.Icon)
+		if len(candidate.Platform) == 0 {
+			candidate.Platform = append([]string(nil), details.Platform...)
+			if len(candidate.Platform) == 0 {
+				warnings = append(warnings, "could not infer platform labels from the public App Store lookup; use --platform if you rely on platform-filtered wall views")
+			}
+		} else {
+			warnings = append(warnings, "--platform overrides the automatically inferred App Store platform labels")
+		}
 	} else {
 		candidate.App = strings.TrimSpace(input.Name)
 		candidate.Link = strings.TrimSpace(input.Link)
@@ -513,6 +558,7 @@ func submitCommunityWallEntry(ctx context.Context, req communityWallSubmitReques
 		App:              candidate.App,
 		Creator:          candidate.Creator,
 		Link:             candidate.Link,
+		Platform:         append([]string(nil), candidate.Platform...),
 		UpstreamRepo:     upstreamRepo,
 		ForkRepo:         forkRepo,
 		Branch:           branch,
@@ -616,6 +662,9 @@ func communityWallPullRequestBody(input communityWallSubmitInput, candidate comm
 	if strings.TrimSpace(candidate.Creator) != "" {
 		builder.WriteString(fmt.Sprintf("- Creator: %s\n", strings.TrimSpace(candidate.Creator)))
 	}
+	if len(candidate.Platform) > 0 {
+		builder.WriteString(fmt.Sprintf("- Platform: %s\n", strings.Join(candidate.Platform, ", ")))
+	}
 	builder.WriteString("\n## Notes\n\n")
 	builder.WriteString("- Submitted via `asc apps wall submit`\n")
 	return builder.String()
@@ -715,6 +764,23 @@ func validateCommunityWallHTTPURL(value string) error {
 		return fmt.Errorf("invalid URL scheme")
 	}
 	return nil
+}
+
+func splitCommunityWallPlatformCSV(value string) []string {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+
+	parts := strings.Split(value, ",")
+	platforms := make([]string, 0, len(parts))
+	for _, part := range parts {
+		normalized := normalizeCommunityPlatformLabelForDisplay(part)
+		if normalized == "" || containsCommunityValueFold(platforms, normalized) {
+			continue
+		}
+		platforms = append(platforms, normalized)
+	}
+	return platforms
 }
 
 func normalizeCommunityPlatformLabelForDisplay(value string) string {
@@ -889,11 +955,13 @@ func fetchCommunityWallAppDetails(ctx context.Context, ids []string) (map[string
 
 	var payload struct {
 		Results []struct {
-			TrackID       int64  `json:"trackId"`
-			TrackName     string `json:"trackName"`
-			TrackViewURL  string `json:"trackViewUrl"`
-			ArtworkURL512 string `json:"artworkUrl512"`
-			ArtworkURL100 string `json:"artworkUrl100"`
+			TrackID          int64    `json:"trackId"`
+			TrackName        string   `json:"trackName"`
+			TrackViewURL     string   `json:"trackViewUrl"`
+			ArtworkURL512    string   `json:"artworkUrl512"`
+			ArtworkURL100    string   `json:"artworkUrl100"`
+			Kind             string   `json:"kind"`
+			SupportedDevices []string `json:"supportedDevices"`
 		} `json:"results"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
@@ -911,12 +979,57 @@ func fetchCommunityWallAppDetails(ctx context.Context, ids []string) (map[string
 		}
 		appStoreID := strconv.FormatInt(result.TrackID, 10)
 		detailsByID[appStoreID] = communityWallAppDetails{
-			Name: strings.TrimSpace(result.TrackName),
-			Link: strings.TrimSpace(result.TrackViewURL),
-			Icon: iconURL,
+			Name:     strings.TrimSpace(result.TrackName),
+			Link:     strings.TrimSpace(result.TrackViewURL),
+			Icon:     iconURL,
+			Platform: inferCommunityWallPlatforms(result.Kind, result.SupportedDevices),
 		}
 	}
 	return detailsByID, nil
+}
+
+func inferCommunityWallPlatforms(kind string, supportedDevices []string) []string {
+	kind = strings.TrimSpace(strings.ToLower(kind))
+
+	hasIOS := false
+	hasMacOS := kind == "mac-software"
+	hasWatchOS := false
+	hasTVOS := false
+	hasVisionOS := false
+
+	for _, rawDevice := range supportedDevices {
+		device := strings.TrimSpace(strings.ToLower(rawDevice))
+		switch {
+		case strings.Contains(device, "watch"):
+			hasWatchOS = true
+		case strings.Contains(device, "appletv"):
+			hasTVOS = true
+		case strings.Contains(device, "vision"):
+			hasVisionOS = true
+		case strings.Contains(device, "mac"):
+			hasMacOS = true
+		case strings.Contains(device, "iphone"), strings.Contains(device, "ipad"), strings.Contains(device, "ipod"):
+			hasIOS = true
+		}
+	}
+
+	platforms := make([]string, 0, 5)
+	if hasIOS {
+		platforms = append(platforms, "iOS")
+	}
+	if hasMacOS {
+		platforms = append(platforms, "macOS")
+	}
+	if hasWatchOS {
+		platforms = append(platforms, "watchOS")
+	}
+	if hasTVOS {
+		platforms = append(platforms, "tvOS")
+	}
+	if hasVisionOS {
+		platforms = append(platforms, "visionOS")
+	}
+	return platforms
 }
 
 func defaultCommunityWallGHCommandRunner(ctx context.Context, args ...string) ([]byte, []byte, error) {
