@@ -716,6 +716,13 @@
     "platform": ["iOS"]
   },
   {
+    "app": "Visa Day Tracker: Residency",
+    "link": "https://apps.apple.com/us/app/visa-day-tracker-residency/id6749048224?uo=4",
+    "creator": "valzevul",
+    "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/73/d0/88/73d088d4-104c-b8ea-4b0d-863da7932f6d/AppIcon-0-0-1x_U007epad-0-1-85-220.png/512x512bb.jpg",
+    "platform": ["iOS"]
+  },
+  {
     "app": "Voice Do",
     "link": "https://apps.apple.com/us/app/voice-do-task-manager/id6746357453",
     "creator": "maail",
