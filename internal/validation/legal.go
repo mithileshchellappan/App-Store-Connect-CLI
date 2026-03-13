@@ -175,17 +175,3 @@ func isValidHTTPURL(s string) bool {
 	}
 	return (u.Scheme == "http" || u.Scheme == "https") && u.Hostname() != ""
 }
-
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
-func max(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
