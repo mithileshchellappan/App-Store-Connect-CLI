@@ -285,72 +285,9 @@ func resolveMetadataPullAppInfoID(
 	dir string,
 	versionState string,
 ) (string, error) {
-	if appInfoID != "" {
-		return appInfoID, nil
-	}
-
-	resp, err := client.GetAppInfos(ctx, appID)
-	if err != nil {
-		return "", err
-	}
-	if len(resp.Data) == 0 {
-		return "", fmt.Errorf("no app info found for app %q", appID)
-	}
-	if len(resp.Data) == 1 {
-		return strings.TrimSpace(resp.Data[0].ID), nil
-	}
-
-	candidates := make([]appInfoCandidate, 0, len(resp.Data))
-	for _, item := range resp.Data {
-		candidates = append(candidates, appInfoCandidate{
-			id:    strings.TrimSpace(item.ID),
-			state: appInfoState(item.Attributes),
-		})
-	}
-	sort.Slice(candidates, func(i, j int) bool {
-		return candidates[i].id < candidates[j].id
+	return resolveMetadataAppInfoID(ctx, client, appID, appInfoID, version, platform, dir, versionState, func(aid, v, p, d, infoID string) string {
+		return buildMetadataAppInfoExample("pull", aid, v, p, d, infoID)
 	})
-
-	if resolvedID, ok := autoResolveAppInfoIDByVersionState(candidates, versionState); ok {
-		return resolvedID, nil
-	}
-
-	exampleAppInfoID := "<APP_INFO_ID>"
-	for _, candidate := range candidates {
-		if candidate.id != "" {
-			exampleAppInfoID = candidate.id
-			break
-		}
-	}
-	exampleCommand := buildMetadataPullAppInfoExample(appID, version, platform, dir, exampleAppInfoID)
-	return "", shared.UsageErrorf(
-		"multiple app infos found for app %q (%s). Run `asc apps info list --app %q` to inspect candidates, then re-run with --app-info. Example: %s",
-		appID,
-		formatAppInfoCandidates(candidates),
-		appID,
-		exampleCommand,
-	)
-}
-
-func buildMetadataPullAppInfoExample(appID, version, platform, dir, appInfoID string) string {
-	parts := []string{
-		"asc metadata pull",
-		fmt.Sprintf(`--app %q`, appID),
-		fmt.Sprintf(`--version %q`, version),
-	}
-	if strings.TrimSpace(platform) != "" {
-		parts = append(parts, fmt.Sprintf("--platform %s", strings.TrimSpace(platform)))
-	}
-
-	dirValue := strings.TrimSpace(dir)
-	if dirValue == "" {
-		dirValue = "./metadata"
-	}
-	parts = append(parts,
-		fmt.Sprintf(`--dir %q`, dirValue),
-		fmt.Sprintf(`--app-info %q`, appInfoID),
-	)
-	return strings.Join(parts, " ")
 }
 
 func fetchAppInfoLocalizations(ctx context.Context, client *asc.Client, appInfoID string) ([]asc.Resource[asc.AppInfoLocalizationAttributes], error) {

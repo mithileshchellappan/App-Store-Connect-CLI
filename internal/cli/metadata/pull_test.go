@@ -23,9 +23,10 @@ func TestMetadataPullCommand_AppInfoFlagDefault(t *testing.T) {
 	}
 }
 
-func TestBuildMetadataPullAppInfoExample(t *testing.T) {
+func TestBuildMetadataAppInfoExample(t *testing.T) {
 	tests := []struct {
 		name     string
+		command  string
 		appID    string
 		version  string
 		platform string
@@ -33,14 +34,24 @@ func TestBuildMetadataPullAppInfoExample(t *testing.T) {
 		want     string
 	}{
 		{
-			name:    "basic",
+			name:    "pull basic",
+			command: "pull",
 			appID:   "123",
 			version: "1.0",
 			dir:     "./metadata",
 			want:    `asc metadata pull --app "123" --version "1.0" --dir "./metadata" --app-info "info-1"`,
 		},
 		{
+			name:    "push basic",
+			command: "push",
+			appID:   "123",
+			version: "1.0",
+			dir:     "./metadata",
+			want:    `asc metadata push --app "123" --version "1.0" --dir "./metadata" --app-info "info-1"`,
+		},
+		{
 			name:     "with platform",
+			command:  "pull",
 			appID:    "123",
 			version:  "1.0",
 			platform: "IOS",
@@ -49,6 +60,7 @@ func TestBuildMetadataPullAppInfoExample(t *testing.T) {
 		},
 		{
 			name:    "empty dir uses default",
+			command: "pull",
 			appID:   "123",
 			version: "1.0",
 			dir:     "",
@@ -58,9 +70,9 @@ func TestBuildMetadataPullAppInfoExample(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := buildMetadataPullAppInfoExample(tc.appID, tc.version, tc.platform, tc.dir, "info-1")
+			got := buildMetadataAppInfoExample(tc.command, tc.appID, tc.version, tc.platform, tc.dir, "info-1")
 			if got != tc.want {
-				t.Fatalf("buildMetadataPullAppInfoExample() = %q, want %q", got, tc.want)
+				t.Fatalf("got %q, want %q", got, tc.want)
 			}
 		})
 	}

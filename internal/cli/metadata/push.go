@@ -259,6 +259,8 @@ type appInfoCandidate struct {
 	state string
 }
 
+type exampleBuilderFunc func(appID, version, platform, dir, appInfoID string) string
+
 func resolveMetadataPushAppInfoID(
 	ctx context.Context,
 	client *asc.Client,
@@ -268,6 +270,22 @@ func resolveMetadataPushAppInfoID(
 	platform string,
 	dir string,
 	versionState string,
+) (string, error) {
+	return resolveMetadataAppInfoID(ctx, client, appID, appInfoID, version, platform, dir, versionState, func(aid, v, p, d, infoID string) string {
+		return buildMetadataAppInfoExample("push", aid, v, p, d, infoID) + " --dry-run"
+	})
+}
+
+func resolveMetadataAppInfoID(
+	ctx context.Context,
+	client *asc.Client,
+	appID string,
+	appInfoID string,
+	version string,
+	platform string,
+	dir string,
+	versionState string,
+	buildExample exampleBuilderFunc,
 ) (string, error) {
 	if appInfoID != "" {
 		return appInfoID, nil
@@ -306,7 +324,7 @@ func resolveMetadataPushAppInfoID(
 			break
 		}
 	}
-	exampleCommand := buildMetadataPushAppInfoExample(appID, version, platform, dir, exampleAppInfoID)
+	exampleCommand := buildExample(appID, version, platform, dir, exampleAppInfoID)
 	return "", shared.UsageErrorf(
 		"multiple app infos found for app %q (%s). Run `asc apps info list --app %q` to inspect candidates, then re-run with --app-info. Example: %s",
 		appID,
@@ -396,9 +414,9 @@ func formatAppInfoCandidates(candidates []appInfoCandidate) string {
 	return strings.Join(parts, ", ")
 }
 
-func buildMetadataPushAppInfoExample(appID, version, platform, dir, appInfoID string) string {
+func buildMetadataAppInfoExample(command, appID, version, platform, dir, appInfoID string) string {
 	parts := []string{
-		"asc metadata push",
+		fmt.Sprintf("asc metadata %s", command),
 		fmt.Sprintf(`--app %q`, appID),
 		fmt.Sprintf(`--version %q`, version),
 	}
@@ -413,7 +431,6 @@ func buildMetadataPushAppInfoExample(appID, version, platform, dir, appInfoID st
 	parts = append(parts,
 		fmt.Sprintf(`--dir %q`, dirValue),
 		fmt.Sprintf(`--app-info %q`, appInfoID),
-		"--dry-run",
 	)
 	return strings.Join(parts, " ")
 }
