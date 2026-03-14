@@ -290,6 +290,18 @@ func xcodeCloudProductsList(ctx context.Context, appID string, limit int, next s
 	requestCtx, cancel := contextWithXcodeCloudTimeout(ctx, 0)
 	defer cancel()
 
+	if strings.TrimSpace(next) == "" && resolvedAppID != "" {
+		resolvedAppID, err = resolveXcodeCloudAppID(requestCtx, client, resolvedAppID)
+		if err != nil {
+			return fmt.Errorf("xcode-cloud products: %w", err)
+		}
+		opts = []asc.CiProductsOption{
+			asc.WithCiProductsLimit(limit),
+			asc.WithCiProductsNextURL(next),
+			asc.WithCiProductsAppID(resolvedAppID),
+		}
+	}
+
 	if paginate {
 		paginateOpts := append(opts, asc.WithCiProductsLimit(200))
 		resp, err := shared.PaginateWithSpinner(requestCtx,
