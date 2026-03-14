@@ -362,3 +362,54 @@ func TestWorkflowsOptionsRejectUnsupportedOutput(t *testing.T) {
 		})
 	}
 }
+
+func TestWorkflowsOptionsSchemesRejectsExplicitNonPositiveLimit(t *testing.T) {
+	origResolveSession := resolveSessionFn
+	t.Cleanup(func() { resolveSessionFn = origResolveSession })
+
+	resolveSessionFn = func(
+		ctx context.Context,
+		appleID, password, twoFactorCode string,
+	) (*webcore.AuthSession, string, error) {
+		return &webcore.AuthSession{
+			PublicProviderID: "team-uuid",
+			Client: &http.Client{
+				Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+					t.Fatal("did not expect request for invalid limit")
+					return nil, nil
+				}),
+			},
+		}, "cache", nil
+	}
+
+	tests := []struct {
+		name  string
+		limit string
+	}{
+		{name: "zero", limit: "0"},
+		{name: "negative", limit: "-1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := webXcodeCloudWorkflowOptionsSchemesCommand()
+			if err := cmd.FlagSet.Parse([]string{
+				"--apple-id", "user@example.com",
+				"--product-id", "prod-1",
+				"--limit", tt.limit,
+			}); err != nil {
+				t.Fatalf("parse error: %v", err)
+			}
+
+			_, stderr := captureOutput(t, func() {
+				err := cmd.Exec(context.Background(), nil)
+				if !errors.Is(err, flag.ErrHelp) {
+					t.Fatalf("expected flag.ErrHelp, got %v", err)
+				}
+			})
+			if !strings.Contains(stderr, "--limit must be greater than 0 when provided") {
+				t.Fatalf("expected limit validation in stderr, got %q", stderr)
+			}
+		})
+	}
+}

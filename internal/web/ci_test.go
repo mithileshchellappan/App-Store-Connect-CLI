@@ -1339,6 +1339,21 @@ func TestGetCISchemesRejectsEmptyInputs(t *testing.T) {
 	}
 }
 
+func TestGetCISchemesRejectsNegativeLimit(t *testing.T) {
+	client := testWebClientWithHandler(t, func(r *http.Request) *http.Response {
+		t.Fatal("did not expect request for negative limit")
+		return nil
+	})
+
+	_, err := client.GetCISchemes(context.Background(), "team-uuid", "prod-1", "", -1, "")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "limit must be zero or greater") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestGetCITestDestinations(t *testing.T) {
 	client := testWebClientWithHandler(t, func(r *http.Request) *http.Response {
 		if r.URL.Path != "/teams/team-uuid/test-destinations-v3" {
