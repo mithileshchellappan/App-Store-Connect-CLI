@@ -495,6 +495,41 @@ func listRepoLabels(ctx context.Context, token string) ([]string, error) {
 	return labels, nil
 }
 
+func validateRequestedLabels(ctx context.Context, token string, requested []string) ([]string, error) {
+	requested = dedupeLabels(requested)
+	if len(requested) == 0 {
+		return nil, nil
+	}
+
+	repoLabels, err := listRepoLabels(ctx, token)
+	if err != nil {
+		return nil, shared.UsageErrorf("failed to validate --label values: %v", err)
+	}
+
+	labelIndex := make(map[string]string, len(repoLabels))
+	for _, label := range repoLabels {
+		labelIndex[strings.ToLower(label)] = label
+	}
+
+	validated := make([]string, 0, len(requested))
+	unknown := make([]string, 0, len(requested))
+	for _, label := range requested {
+		canonical, ok := labelIndex[strings.ToLower(label)]
+		if !ok {
+			unknown = append(unknown, label)
+			continue
+		}
+		validated = append(validated, canonical)
+	}
+
+	if len(unknown) > 0 {
+		sort.Strings(unknown)
+		return nil, shared.UsageErrorf("--label must reference existing repo labels; unknown label(s): %s", strings.Join(unknown, ", "))
+	}
+
+	return validated, nil
+}
+
 func readLocalLog(path string) ([]LogEntry, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
