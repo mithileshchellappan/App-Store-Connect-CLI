@@ -14,6 +14,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Validate release tag
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+
+          if [[ ! "$TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Release tags must match x.y.z. Got: ${TAG}"
+            exit 1
+          fi
+
+          printf 'VERSION=%s\n' "$TAG" >> "$GITHUB_ENV"
+
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -42,7 +53,6 @@ jobs:
 
       - name: Build for macOS
         run: |
-          VERSION="${GITHUB_REF_NAME}"
           COMMIT=$(git rev-parse --short HEAD)
           DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           GOOS=darwin GOARCH=amd64 go build -ldflags "-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}" -o release/asc_${VERSION}_macOS_amd64 .
@@ -59,7 +69,6 @@ jobs:
 
       - name: Build for Linux
         run: |
-          VERSION="${GITHUB_REF_NAME}"
           COMMIT=$(git rev-parse --short HEAD)
           DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           GOOS=linux GOARCH=amd64 go build -ldflags "-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}" -o release/asc_${VERSION}_linux_amd64 .
@@ -67,14 +76,12 @@ jobs:
 
       - name: Build for Windows
         run: |
-          VERSION="${GITHUB_REF_NAME}"
           COMMIT=$(git rev-parse --short HEAD)
           DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           GOOS=windows GOARCH=amd64 go build -ldflags "-s -w -X main.version=${VERSION} -X main.commit=${COMMIT} -X main.date=${DATE}" -o release/asc_${VERSION}_windows_amd64.exe .
 
       - name: Create checksums
         run: |
-          VERSION="${GITHUB_REF_NAME}"
           cd release
           shasum -a 256 * > asc_${VERSION}_checksums.txt
 
@@ -99,7 +106,6 @@ jobs:
             exit 0
           fi
 
-          VERSION="${GITHUB_REF_NAME}"
           SHA256=$(shasum -a 256 release/asc_${VERSION}_macOS_arm64 | cut -d ' ' -f 1)
 
           # Clone the tap repo
@@ -116,16 +122,16 @@ jobs:
 
           class Asc < Formula
             desc "A fast, AI-agent friendly CLI for App Store Connect"
-            homepage "https://github.com/rudrankriyam/App-Store-Connect-CLI"
-            url "https://github.com/rudrankriyam/App-Store-Connect-CLI/releases/download/${VERSION}/asc_${VERSION}_macOS_arm64"
-            version "${VERSION}"
-            sha256 "${SHA256}"
-            license "MIT"
+            homepage 'https://github.com/rudrankriyam/App-Store-Connect-CLI'
+            url 'https://github.com/rudrankriyam/App-Store-Connect-CLI/releases/download/${VERSION}/asc_${VERSION}_macOS_arm64'
+            version '${VERSION}'
+            sha256 '${SHA256}'
+            license 'MIT'
 
             depends_on :macos
 
             def install
-              bin.install "asc_${VERSION}_macOS_arm64" => "asc"
+              bin.install 'asc_${VERSION}_macOS_arm64' => 'asc'
             end
 
             test do
