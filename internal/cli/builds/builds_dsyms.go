@@ -226,8 +226,11 @@ func dsymFileName(bundleID, appVersion, buildVersion, buildID string, index int)
 	if bundleID != "" && appVersion != "" && buildVersion != "" {
 		return fmt.Sprintf("%s-%s-%s.dSYM.zip", bundleID, appVersion, buildVersion)
 	}
+	if bundleID != "" && buildVersion != "" {
+		return fmt.Sprintf("%s-%s.dSYM.zip", bundleID, buildVersion)
+	}
 	if bundleID != "" {
-		return bundleID + ".dSYM.zip"
+		return fmt.Sprintf("%s-%s.dSYM.zip", bundleID, buildID)
 	}
 	return fmt.Sprintf("%s_%d.dSYM.zip", buildID, index)
 }

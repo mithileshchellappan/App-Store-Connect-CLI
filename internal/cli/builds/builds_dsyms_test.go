@@ -105,10 +105,17 @@ func TestDsymFileName(t *testing.T) {
 			want:         "com.example.app-1.2.3-42.dSYM.zip",
 		},
 		{
-			name:     "bundle id only",
+			name:         "bundle id with build version",
+			bundleID:     "com.example.app",
+			buildVersion: "42",
+			buildID:      "build-1",
+			want:         "com.example.app-42.dSYM.zip",
+		},
+		{
+			name:     "bundle id only fallback to build id",
 			bundleID: "com.example.app",
 			buildID:  "build-1",
-			want:     "com.example.app.dSYM.zip",
+			want:     "com.example.app-build-1.dSYM.zip",
 		},
 		{
 			name:    "fallback to build id",
