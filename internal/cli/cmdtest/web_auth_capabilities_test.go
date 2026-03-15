@@ -3,11 +3,13 @@ package cmdtest
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"testing"
 
 	cmd "github.com/rudrankriyam/App-Store-Connect-CLI/cmd"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/shared"
 	webcmd "github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/web"
+	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/config"
 	webcore "github.com/rudrankriyam/App-Store-Connect-CLI/internal/web"
 )
 
@@ -69,5 +71,82 @@ func TestWebAuthCapabilitiesRunWithKeyIDOutputsJSON(t *testing.T) {
 	}
 	if len(payload.Roles) != 1 || payload.Roles[0] != "APP_MANAGER" {
 		t.Fatalf("unexpected roles: %#v", payload.Roles)
+	}
+}
+
+func TestWebAuthCapabilitiesRunHonorsRootProfileFlag(t *testing.T) {
+	tempDir := t.TempDir()
+	configPath := filepath.Join(tempDir, "config.json")
+	keyPath := filepath.Join(tempDir, "AuthKey.p8")
+	writeECDSAPEM(t, keyPath)
+
+	cfg := &config.Config{
+		DefaultKeyName: "first",
+		Keys: []config.Credential{
+			{
+				Name:           "first",
+				KeyID:          "KEY_A",
+				IssuerID:       "ISS_A",
+				PrivateKeyPath: keyPath,
+			},
+			{
+				Name:           "second",
+				KeyID:          "KEY_B",
+				IssuerID:       "ISS_B",
+				PrivateKeyPath: keyPath,
+			},
+		},
+	}
+	if err := config.SaveAt(configPath, cfg); err != nil {
+		t.Fatalf("SaveAt() error: %v", err)
+	}
+
+	t.Setenv("ASC_CONFIG_PATH", configPath)
+	t.Setenv("ASC_BYPASS_KEYCHAIN", "1")
+	t.Setenv("ASC_PROFILE", "")
+	t.Setenv("ASC_KEY_ID", "")
+	t.Setenv("ASC_ISSUER_ID", "")
+	t.Setenv("ASC_PRIVATE_KEY_PATH", "")
+	t.Setenv("ASC_PRIVATE_KEY", "")
+	t.Setenv("ASC_PRIVATE_KEY_B64", "")
+
+	prevProfile := shared.SelectedProfile()
+	shared.SetSelectedProfile("")
+	t.Cleanup(func() {
+		shared.SetSelectedProfile(prevProfile)
+	})
+
+	stubWebAuthCapabilitiesLookup(t, func(ctx context.Context, client *webcore.Client, keyID string) (*webcore.APIKeyRoleLookup, error) {
+		return &webcore.APIKeyRoleLookup{
+			KeyID:      keyID,
+			Kind:       "team",
+			Roles:      []string{"APP_MANAGER"},
+			RoleSource: "key",
+			Active:     true,
+			Lookup:     "team_keys",
+		}, nil
+	})
+
+	var code int
+	stdout, stderr := captureOutput(t, func() {
+		code = cmd.Run([]string{"--profile", "second", "web", "auth", "capabilities", "--output", "json"}, "1.0.0")
+	})
+	if code != cmd.ExitSuccess {
+		t.Fatalf("exit code = %d, want %d; stderr=%q", code, cmd.ExitSuccess, stderr)
+	}
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+
+	var payload struct {
+		KeyID        string `json:"keyId"`
+		Profile      string `json:"profile"`
+		ResolvedFrom string `json:"resolvedFrom"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("json.Unmarshal() error: %v; stdout=%q", err, stdout)
+	}
+	if payload.KeyID != "KEY_B" || payload.Profile != "second" || payload.ResolvedFrom != "auth" {
+		t.Fatalf("unexpected payload: %+v", payload)
 	}
 }
