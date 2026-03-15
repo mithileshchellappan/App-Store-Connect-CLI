@@ -23,6 +23,8 @@ var (
 	loginJWTGenerator        = asc.GenerateJWT
 	loginNetworkValidate     = validateLoginNetwork
 	statusValidateCredential = validateStoredCredential
+	listStoredCredentials    = authsvc.ListCredentials
+	listCredentialSummaries  = authsvc.ListCredentialSummaries
 )
 
 // Auth command factory
@@ -542,7 +544,7 @@ Examples:
 				return flag.ErrHelp
 			}
 
-			credentials, err := authsvc.ListCredentials()
+			credentials, err := listCredentialSummaries()
 			if err != nil {
 				if warning, ok := errors.AsType[*authsvc.CredentialsWarning](err); ok {
 					fmt.Fprintf(os.Stderr, "Warning: %s\n", warning)
@@ -649,7 +651,11 @@ Examples:
 				return shared.UsageError(err.Error())
 			}
 
-			credentials, err := authsvc.ListCredentials()
+			credentialLister := listCredentialSummaries
+			if *validate || *verbose {
+				credentialLister = listStoredCredentials
+			}
+			credentials, err := credentialLister()
 			var listWarning *authsvc.CredentialsWarning
 			if err != nil {
 				warning, ok := errors.AsType[*authsvc.CredentialsWarning](err)
