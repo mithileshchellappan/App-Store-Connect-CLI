@@ -17,8 +17,10 @@ type GitStore struct {
 	Branch   string
 }
 
-// Clone clones the git repo to a temp directory. If the repo is empty, initializes it.
-func (g *GitStore) Clone(ctx context.Context) error {
+// Clone clones the git repo. If allowCreate is true (push mode), falls back to
+// initializing an empty repo when the branch doesn't exist. If false (pull mode),
+// fails when the branch is missing.
+func (g *GitStore) Clone(ctx context.Context, allowCreate bool) error {
 	branch := g.Branch
 	if branch == "" {
 		branch = "main"
@@ -26,23 +28,30 @@ func (g *GitStore) Clone(ctx context.Context) error {
 
 	// Try cloning with the branch first.
 	err := g.gitRun(ctx, "", "clone", "--single-branch", "--branch", branch, "--depth", "1", g.RepoURL, g.LocalDir)
-	if err != nil {
-		// May be empty repo — clone without branch and init.
-		if err2 := g.gitRun(ctx, "", "clone", g.RepoURL, g.LocalDir); err2 != nil {
-			return fmt.Errorf("git clone: %w", err2)
+	if err == nil {
+		return nil
+	}
+
+	if !allowCreate {
+		return fmt.Errorf("git clone: branch %q not found in %s", branch, g.RepoURL)
+	}
+
+	// Push mode: may be empty repo — clone without branch and init.
+	if err2 := g.gitRun(ctx, "", "clone", g.RepoURL, g.LocalDir); err2 != nil {
+		return fmt.Errorf("git clone: %w", err2)
+	}
+
+	// Ensure we're on the target branch.
+	if _, err2 := g.gitOutput(ctx, g.LocalDir, "rev-parse", "HEAD"); err2 != nil {
+		// Empty repo — create the branch.
+		if err3 := g.gitRun(ctx, g.LocalDir, "checkout", "-b", branch); err3 != nil {
+			return fmt.Errorf("git checkout -b: %w", err3)
 		}
-		// Ensure we're on the target branch.
-		if _, err2 := g.gitOutput(ctx, g.LocalDir, "rev-parse", "HEAD"); err2 != nil {
-			// Empty repo — create the branch.
-			if err3 := g.gitRun(ctx, g.LocalDir, "checkout", "-b", branch); err3 != nil {
-				return fmt.Errorf("git checkout -b: %w", err3)
-			}
-		} else {
-			// Non-empty repo — switch to or create the target branch.
-			if err3 := g.gitRun(ctx, g.LocalDir, "checkout", branch); err3 != nil {
-				if err4 := g.gitRun(ctx, g.LocalDir, "checkout", "-b", branch); err4 != nil {
-					return fmt.Errorf("git checkout -b %s: %w", branch, err4)
-				}
+	} else {
+		// Non-empty repo — switch to or create the target branch.
+		if err3 := g.gitRun(ctx, g.LocalDir, "checkout", branch); err3 != nil {
+			if err4 := g.gitRun(ctx, g.LocalDir, "checkout", "-b", branch); err4 != nil {
+				return fmt.Errorf("git checkout -b %s: %w", branch, err4)
 			}
 		}
 	}
@@ -51,6 +60,7 @@ func (g *GitStore) Clone(ctx context.Context) error {
 }
 
 // WriteEncryptedFile writes an encrypted file into the repo.
+// Validates that the resolved path stays inside LocalDir to prevent symlink escapes.
 func (g *GitStore) WriteEncryptedFile(relPath string, plaintext []byte, password string) error {
 	encrypted, err := Encrypt(plaintext, password)
 	if err != nil {
@@ -58,6 +68,10 @@ func (g *GitStore) WriteEncryptedFile(relPath string, plaintext []byte, password
 	}
 
 	fullPath := filepath.Join(g.LocalDir, relPath+".enc")
+	if err := ensureInsideDir(g.LocalDir, fullPath); err != nil {
+		return err
+	}
+
 	if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
 		return err
 	}
@@ -68,6 +82,10 @@ func (g *GitStore) WriteEncryptedFile(relPath string, plaintext []byte, password
 // ReadEncryptedFile reads and decrypts a file from the repo.
 func (g *GitStore) ReadEncryptedFile(relPath string, password string) ([]byte, error) {
 	fullPath := filepath.Join(g.LocalDir, relPath+".enc")
+	if err := ensureInsideDir(g.LocalDir, fullPath); err != nil {
+		return nil, err
+	}
+
 	data, err := os.ReadFile(fullPath)
 	if err != nil {
 		return nil, err
@@ -136,6 +154,23 @@ func (g *GitStore) Cleanup() error {
 		return nil
 	}
 	return os.RemoveAll(g.LocalDir)
+}
+
+// ensureInsideDir checks that target resolves to a path inside baseDir,
+// preventing symlink escape attacks from repo content.
+func ensureInsideDir(baseDir, target string) error {
+	absBase, err := filepath.Abs(baseDir)
+	if err != nil {
+		return fmt.Errorf("resolve base dir: %w", err)
+	}
+	absTarget, err := filepath.Abs(target)
+	if err != nil {
+		return fmt.Errorf("resolve target path: %w", err)
+	}
+	if !strings.HasPrefix(absTarget, absBase+string(filepath.Separator)) && absTarget != absBase {
+		return fmt.Errorf("path %q escapes base directory %q", target, baseDir)
+	}
+	return nil
 }
 
 func (g *GitStore) gitRun(ctx context.Context, dir string, args ...string) error {

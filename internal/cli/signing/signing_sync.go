@@ -109,6 +109,10 @@ func syncPushCommand() *ffcli.Command {
 			if repo == "" {
 				return shared.UsageError("--repo is required")
 			}
+			if *createMissing && isDevelopmentProfile(profType) && strings.TrimSpace(*deviceIDs) == "" {
+				return shared.UsageError("--device is required for development profiles with --create-missing")
+			}
+
 			pass, err := resolvePassword(*password)
 			if err != nil {
 				return err
@@ -163,7 +167,7 @@ func syncPushCommand() *ffcli.Command {
 			defer store.Cleanup()
 
 			fmt.Fprintln(os.Stderr, "Cloning signing repo...")
-			if err := store.Clone(ctx); err != nil {
+			if err := store.Clone(ctx, true); err != nil {
 				return fmt.Errorf("signing sync push: %w", err)
 			}
 
@@ -265,7 +269,7 @@ func syncPullCommand() *ffcli.Command {
 			defer store.Cleanup()
 
 			fmt.Fprintln(os.Stderr, "Cloning signing repo...")
-			if err := store.Clone(ctx); err != nil {
+			if err := store.Clone(ctx, false); err != nil {
 				return fmt.Errorf("signing sync pull: %w", err)
 			}
 
