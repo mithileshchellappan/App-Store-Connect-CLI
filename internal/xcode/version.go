@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -39,6 +41,7 @@ type VersionInfo struct {
 	Version     string `json:"version"`
 	BuildNumber string `json:"buildNumber"`
 	ProjectDir  string `json:"projectDir"`
+	Modern      bool   `json:"modern"` // true if project uses MARKETING_VERSION build setting
 }
 
 // SetVersionOptions configures what to set.
@@ -90,10 +93,29 @@ func GetVersion(ctx context.Context, projectDir string) (*VersionInfo, error) {
 		return nil, fmt.Errorf("failed to read build number: %w", err)
 	}
 
+	parsedVersion := parseAgvtoolVersionOutput(version)
+	parsedBuild := parseAgvtoolBuildOutput(buildNumber)
+	modern := isVariableReference(parsedVersion)
+
+	// Modern project: agvtool returns $(MARKETING_VERSION). Resolve via xcodebuild.
+	if modern {
+		resolved, err := readBuildSettings(ctx, projectDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to resolve build settings: %w", err)
+		}
+		if v := resolved["MARKETING_VERSION"]; v != "" {
+			parsedVersion = v
+		}
+		if b := resolved["CURRENT_PROJECT_VERSION"]; b != "" {
+			parsedBuild = b
+		}
+	}
+
 	return &VersionInfo{
-		Version:     parseAgvtoolVersionOutput(version),
-		BuildNumber: parseAgvtoolBuildOutput(buildNumber),
+		Version:     parsedVersion,
+		BuildNumber: parsedBuild,
 		ProjectDir:  projectDir,
+		Modern:      modern,
 	}, nil
 }
 
@@ -107,19 +129,30 @@ func SetVersion(ctx context.Context, opts SetVersionOptions) (*SetVersionResult,
 	}
 
 	result := &SetVersionResult{ProjectDir: opts.ProjectDir}
+	modern := isModernProject(ctx, opts.ProjectDir)
 
 	if v := strings.TrimSpace(opts.Version); v != "" {
-		_, err := runAgvtool(ctx, opts.ProjectDir, "new-marketing-version", v)
-		if err != nil {
-			return nil, fmt.Errorf("failed to set marketing version: %w", err)
+		if modern {
+			if err := updatePbxprojSetting(opts.ProjectDir, "MARKETING_VERSION", v); err != nil {
+				return nil, fmt.Errorf("failed to set marketing version: %w", err)
+			}
+		} else {
+			if _, err := runAgvtool(ctx, opts.ProjectDir, "new-marketing-version", v); err != nil {
+				return nil, fmt.Errorf("failed to set marketing version: %w", err)
+			}
 		}
 		result.Version = v
 	}
 
 	if b := strings.TrimSpace(opts.BuildNumber); b != "" {
-		_, err := runAgvtool(ctx, opts.ProjectDir, "new-version", "-all", b)
-		if err != nil {
-			return nil, fmt.Errorf("failed to set build number: %w", err)
+		if modern {
+			if err := updatePbxprojSetting(opts.ProjectDir, "CURRENT_PROJECT_VERSION", b); err != nil {
+				return nil, fmt.Errorf("failed to set build number: %w", err)
+			}
+		} else {
+			if _, err := runAgvtool(ctx, opts.ProjectDir, "new-version", "-all", b); err != nil {
+				return nil, fmt.Errorf("failed to set build number: %w", err)
+			}
 		}
 		result.BuildNumber = b
 	}
@@ -148,15 +181,25 @@ func BumpVersion(ctx context.Context, opts BumpVersionOptions) (*BumpVersionResu
 
 	if opts.BumpType == BumpBuild {
 		result.OldBuild = current.BuildNumber
-		_, err := runAgvtool(ctx, opts.ProjectDir, "next-version", "-all")
-		if err != nil {
-			return nil, fmt.Errorf("failed to increment build number: %w", err)
+		if current.Modern {
+			newBuild, err := incrementBuildString(current.BuildNumber)
+			if err != nil {
+				return nil, fmt.Errorf("failed to increment build number: %w", err)
+			}
+			if err := updatePbxprojSetting(opts.ProjectDir, "CURRENT_PROJECT_VERSION", newBuild); err != nil {
+				return nil, fmt.Errorf("failed to set build number: %w", err)
+			}
+			result.NewBuild = newBuild
+		} else {
+			if _, err := runAgvtool(ctx, opts.ProjectDir, "next-version", "-all"); err != nil {
+				return nil, fmt.Errorf("failed to increment build number: %w", err)
+			}
+			updated, err := GetVersion(ctx, opts.ProjectDir)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read updated build number: %w", err)
+			}
+			result.NewBuild = updated.BuildNumber
 		}
-		updated, err := GetVersion(ctx, opts.ProjectDir)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read updated build number: %w", err)
-		}
-		result.NewBuild = updated.BuildNumber
 		return result, nil
 	}
 
@@ -167,9 +210,14 @@ func BumpVersion(ctx context.Context, opts BumpVersionOptions) (*BumpVersionResu
 		return nil, err
 	}
 
-	_, err = runAgvtool(ctx, opts.ProjectDir, "new-marketing-version", newVersion)
-	if err != nil {
-		return nil, fmt.Errorf("failed to set marketing version: %w", err)
+	if current.Modern {
+		if err := updatePbxprojSetting(opts.ProjectDir, "MARKETING_VERSION", newVersion); err != nil {
+			return nil, fmt.Errorf("failed to set marketing version: %w", err)
+		}
+	} else {
+		if _, err := runAgvtool(ctx, opts.ProjectDir, "new-marketing-version", newVersion); err != nil {
+			return nil, fmt.Errorf("failed to set marketing version: %w", err)
+		}
 	}
 	result.NewVersion = newVersion
 
@@ -207,6 +255,125 @@ func runAgvtool(ctx context.Context, projectDir string, args ...string) (string,
 	}
 
 	return stdout.String(), nil
+}
+
+// readBuildSettings runs xcodebuild -showBuildSettings and extracts key=value pairs.
+func readBuildSettings(ctx context.Context, projectDir string) (map[string]string, error) {
+	xcodeproj, err := findXcodeproj(projectDir)
+	if err != nil {
+		return nil, err
+	}
+
+	cmd := commandContextFn(ctx, "xcodebuild", "-showBuildSettings", "-project", xcodeproj)
+	cmd.Dir = projectDir
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		stderrText := strings.TrimSpace(stderr.String())
+		if stderrText != "" {
+			return nil, fmt.Errorf("%w: %s", err, stderrText)
+		}
+		return nil, err
+	}
+
+	settings := make(map[string]string)
+	for _, line := range strings.Split(stdout.String(), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if idx := strings.Index(trimmed, " = "); idx > 0 {
+			key := strings.TrimSpace(trimmed[:idx])
+			value := strings.TrimSpace(trimmed[idx+3:])
+			settings[key] = value
+		}
+	}
+	return settings, nil
+}
+
+// findXcodeproj finds the .xcodeproj directory in a project dir.
+func findXcodeproj(projectDir string) (string, error) {
+	entries, err := os.ReadDir(projectDir)
+	if err != nil {
+		return "", fmt.Errorf("failed to read project directory: %w", err)
+	}
+	for _, entry := range entries {
+		if entry.IsDir() && strings.HasSuffix(entry.Name(), ".xcodeproj") {
+			return filepath.Join(projectDir, entry.Name()), nil
+		}
+	}
+	return "", fmt.Errorf("no .xcodeproj found in %s", projectDir)
+}
+
+// findPbxprojPath finds the project.pbxproj inside the .xcodeproj.
+func findPbxprojPath(projectDir string) (string, error) {
+	xcodeproj, err := findXcodeproj(projectDir)
+	if err != nil {
+		return "", err
+	}
+	pbxproj := filepath.Join(xcodeproj, "project.pbxproj")
+	if _, err := os.Stat(pbxproj); err != nil {
+		return "", fmt.Errorf("project.pbxproj not found in %s", xcodeproj)
+	}
+	return pbxproj, nil
+}
+
+// updatePbxprojSetting replaces all occurrences of a build setting in project.pbxproj.
+// Matches lines like: MARKETING_VERSION = 1.2.3;
+func updatePbxprojSetting(projectDir, setting, newValue string) error {
+	pbxprojPath, err := findPbxprojPath(projectDir)
+	if err != nil {
+		return err
+	}
+
+	data, err := os.ReadFile(pbxprojPath)
+	if err != nil {
+		return fmt.Errorf("failed to read %s: %w", pbxprojPath, err)
+	}
+
+	oldContent := string(data)
+	var replaced int
+	var result strings.Builder
+	result.Grow(len(oldContent))
+
+	for _, line := range strings.Split(oldContent, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, setting+" = ") && strings.HasSuffix(trimmed, ";") {
+			// Preserve original indentation.
+			indent := line[:len(line)-len(strings.TrimLeft(line, " \t"))]
+			result.WriteString(indent)
+			result.WriteString(setting)
+			result.WriteString(" = ")
+			result.WriteString(newValue)
+			result.WriteString(";\n")
+			replaced++
+		} else {
+			result.WriteString(line)
+			result.WriteString("\n")
+		}
+	}
+
+	// Remove trailing extra newline from the loop.
+	output := strings.TrimSuffix(result.String(), "\n")
+
+	if replaced == 0 {
+		return fmt.Errorf("%s not found in %s", setting, pbxprojPath)
+	}
+
+	return os.WriteFile(pbxprojPath, []byte(output), 0o644)
+}
+
+// isVariableReference checks if a value is an Xcode variable like $(MARKETING_VERSION).
+func isVariableReference(value string) bool {
+	return strings.Contains(value, "$(")
+}
+
+// isModernProject detects if the project uses build-setting-based versioning.
+func isModernProject(ctx context.Context, projectDir string) bool {
+	version, err := runAgvtool(ctx, projectDir, "what-marketing-version", "-terse1")
+	if err != nil {
+		return false
+	}
+	return isVariableReference(parseAgvtoolVersionOutput(version))
 }
 
 // parseAgvtoolVersionOutput extracts the version from agvtool output.
@@ -283,4 +450,22 @@ func bumpVersionString(current string, bumpType BumpType) (string, error) {
 		result[i] = strconv.Itoa(v)
 	}
 	return strings.Join(result, "."), nil
+}
+
+// incrementBuildString increments a numeric build string by 1.
+func incrementBuildString(current string) (string, error) {
+	current = strings.TrimSpace(current)
+	if current == "" {
+		return "", fmt.Errorf("build number is empty")
+	}
+
+	// Support dotted build numbers (e.g. 1.2.3 → 1.2.4).
+	parts := strings.Split(current, ".")
+	last := parts[len(parts)-1]
+	val, err := strconv.Atoi(last)
+	if err != nil {
+		return "", fmt.Errorf("build number %q is not numeric", current)
+	}
+	parts[len(parts)-1] = strconv.Itoa(val + 1)
+	return strings.Join(parts, "."), nil
 }

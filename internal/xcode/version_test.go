@@ -82,6 +82,56 @@ func TestBumpVersionType_Validate(t *testing.T) {
 	}
 }
 
+func TestIsVariableReference(t *testing.T) {
+	tests := []struct {
+		input string
+		want  bool
+	}{
+		{"$(MARKETING_VERSION)", true},
+		{"1.2.3", false},
+		{"$(CURRENT_PROJECT_VERSION)", true},
+		{"", false},
+	}
+
+	for _, tt := range tests {
+		if got := isVariableReference(tt.input); got != tt.want {
+			t.Errorf("isVariableReference(%q) = %v, want %v", tt.input, got, tt.want)
+		}
+	}
+}
+
+func TestIncrementBuildString(t *testing.T) {
+	tests := []struct {
+		current string
+		want    string
+		wantErr bool
+	}{
+		{"42", "43", false},
+		{"1", "2", false},
+		{"1.2.3", "1.2.4", false},
+		{"", "", true},
+		{"abc", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.current, func(t *testing.T) {
+			got, err := incrementBuildString(tt.current)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got %q", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tt.want {
+				t.Errorf("incrementBuildString(%q) = %q, want %q", tt.current, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestBumpVersionString(t *testing.T) {
 	tests := []struct {
 		current  string
