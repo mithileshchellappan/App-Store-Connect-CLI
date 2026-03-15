@@ -916,7 +916,7 @@ func listFromKeyring(kr keyring.Keyring) ([]Credential, error) {
 			return nil, fmt.Errorf("invalid keychain entry %q: %w", key, err)
 		}
 		name := strings.TrimPrefix(key, keyringItemPrefix)
-		needsRewrite := strings.TrimSpace(item.Description) != credentialMetadataDescription(payload)
+		needsRewrite := false
 		if strings.TrimSpace(payload.PrivateKeyPEM) == "" {
 			if privateKeyPEM, err := loadPrivateKeyPEMForStorage(payload.PrivateKeyPath); err == nil && strings.TrimSpace(privateKeyPEM) != "" {
 				payload.PrivateKeyPEM = privateKeyPEM

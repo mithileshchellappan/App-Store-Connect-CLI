@@ -921,6 +921,9 @@ func TestGetCredentialsWithSource_BackfillsLegacyKeychainPayload(t *testing.T) {
 	if strings.TrimSpace(payload.PrivateKeyPEM) == "" {
 		t.Fatal("expected legacy payload to be backfilled with private key PEM")
 	}
+	if item.Description != testCredentialMetadataDescription {
+		t.Fatalf("expected metadata description %q, got %q", testCredentialMetadataDescription, item.Description)
+	}
 
 	if err := os.Remove(keyPath); err != nil {
 		t.Fatalf("os.Remove(%q) error: %v", keyPath, err)

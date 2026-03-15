@@ -169,9 +169,19 @@ func TestInspectProfiles_UsesMetadataOnlyListing(t *testing.T) {
 	}
 }
 
-func TestListCredentials_BackfillsKeychainMetadataDescriptionOnFullRead(t *testing.T) {
+func TestListCredentials_DoesNotRewriteMetadataOnlyMismatchOnFullRead(t *testing.T) {
 	name := "default"
-	kr := keyring.NewArrayKeyring(nil)
+	kr := &metadataKeyring{
+		metadata: map[string]keyring.Metadata{
+			keyringKey(name): {
+				Item: &keyring.Item{
+					Key:   keyringKey(name),
+					Label: "ASC API Key (default)",
+				},
+			},
+		},
+		items: map[string]keyring.Item{},
+	}
 	withMetadataKeyring(t, kr)
 
 	payload := credentialPayload{
@@ -183,12 +193,10 @@ func TestListCredentials_BackfillsKeychainMetadataDescriptionOnFullRead(t *testi
 	if err != nil {
 		t.Fatalf("marshal payload error: %v", err)
 	}
-	if err := kr.Set(keyring.Item{
+	kr.items[keyringKey(name)] = keyring.Item{
 		Key:   keyringKey(name),
 		Data:  data,
 		Label: "ASC API Key (default)",
-	}); err != nil {
-		t.Fatalf("store keyring item error: %v", err)
 	}
 
 	creds, err := ListCredentials()
@@ -199,11 +207,7 @@ func TestListCredentials_BackfillsKeychainMetadataDescriptionOnFullRead(t *testi
 		t.Fatalf("expected one credential, got %d", len(creds))
 	}
 
-	item, err := kr.Get(keyringKey(name))
-	if err != nil {
-		t.Fatalf("Get() error: %v", err)
-	}
-	if item.Description != testCredentialMetadataDescription {
-		t.Fatalf("expected metadata description %q, got %q", testCredentialMetadataDescription, item.Description)
+	if kr.setCalls != 0 {
+		t.Fatalf("expected metadata-only mismatch to avoid keychain writes, got %d Set() calls", kr.setCalls)
 	}
 }
