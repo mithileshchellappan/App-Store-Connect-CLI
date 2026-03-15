@@ -23,7 +23,19 @@ type ResolveBuildOptions struct {
 // Returns the build response or an error. Callers use this to avoid duplicating
 // build lookup logic across commands (dsyms, wait, find, etc.).
 func ResolveBuild(ctx context.Context, client *asc.Client, opts ResolveBuildOptions) (*asc.BuildResponse, error) {
-	// Direct build ID — just wrap it.
+	buildNumber := strings.TrimSpace(opts.BuildNumber)
+	appID := strings.TrimSpace(opts.AppID)
+	hasAppSelectors := appID != "" || opts.Latest || buildNumber != "" || strings.TrimSpace(opts.Version) != "" || strings.TrimSpace(opts.Platform) != ""
+
+	// Reject conflicting selectors early, before any API calls.
+	if opts.BuildID != "" && hasAppSelectors {
+		return nil, shared.UsageError("--build cannot be combined with --app, --latest, --build-number, --version, or --platform")
+	}
+	if opts.Latest && buildNumber != "" {
+		return nil, shared.UsageError("--latest and --build-number are mutually exclusive")
+	}
+
+	// Direct build ID.
 	if opts.BuildID != "" {
 		resp, err := client.GetBuild(ctx, opts.BuildID)
 		if err != nil {
@@ -32,16 +44,12 @@ func ResolveBuild(ctx context.Context, client *asc.Client, opts ResolveBuildOpti
 		return resp, nil
 	}
 
-	appID := strings.TrimSpace(opts.AppID)
-	buildNumber := strings.TrimSpace(opts.BuildNumber)
-
-	// Reject conflicting selectors early, before any API calls.
-	if opts.Latest && buildNumber != "" {
-		return nil, fmt.Errorf("--latest and --build-number are mutually exclusive")
+	if appID == "" {
+		return nil, shared.UsageError("--build or --app is required (or set ASC_APP_ID)")
 	}
 
-	if appID == "" {
-		return nil, fmt.Errorf("--app is required when --build is not provided (or set ASC_APP_ID)")
+	if !opts.Latest && buildNumber == "" {
+		return nil, shared.UsageError("--build, --latest, or --build-number is required")
 	}
 
 	resolvedAppID, err := shared.ResolveAppIDWithLookup(ctx, client, appID)
@@ -76,10 +84,6 @@ func ResolveBuild(ctx context.Context, client *asc.Client, opts ResolveBuildOpti
 	}
 
 	// Build number mode: find by app + build number + platform.
-	if buildNumber == "" {
-		return nil, fmt.Errorf("--build, --latest, or --build-number is required")
-	}
-
 	buildOpts := []asc.BuildsOption{
 		asc.WithBuildsBuildNumber(buildNumber),
 		asc.WithBuildsSort("-uploadedDate"),

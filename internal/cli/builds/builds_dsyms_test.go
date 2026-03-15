@@ -1,7 +1,8 @@
 package builds
 
 import (
-	"strings"
+	"errors"
+	"flag"
 	"testing"
 )
 
@@ -149,15 +150,25 @@ func TestResolveBuildOptions_RequiresInput(t *testing.T) {
 }
 
 func TestResolveBuildOptions_RejectsConflictingSelectors(t *testing.T) {
-	_, err := ResolveBuild(t.Context(), nil, ResolveBuildOptions{
-		AppID:       "app-1",
-		Latest:      true,
-		BuildNumber: "42",
+	t.Run("latest + build-number", func(t *testing.T) {
+		_, err := ResolveBuild(t.Context(), nil, ResolveBuildOptions{
+			AppID:       "app-1",
+			Latest:      true,
+			BuildNumber: "42",
+		})
+		if !errors.Is(err, flag.ErrHelp) {
+			t.Fatalf("expected flag.ErrHelp (usage error), got: %v", err)
+		}
 	})
-	if err == nil {
-		t.Fatal("expected error for --latest + --build-number")
-	}
-	if !strings.Contains(err.Error(), "mutually exclusive") {
-		t.Errorf("expected mutually exclusive error, got: %s", err.Error())
-	}
+
+	t.Run("build + app selectors", func(t *testing.T) {
+		_, err := ResolveBuild(t.Context(), nil, ResolveBuildOptions{
+			BuildID: "build-1",
+			AppID:   "app-1",
+			Latest:  true,
+		})
+		if !errors.Is(err, flag.ErrHelp) {
+			t.Fatalf("expected flag.ErrHelp (usage error), got: %v", err)
+		}
+	})
 }
