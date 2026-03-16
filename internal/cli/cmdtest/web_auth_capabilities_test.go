@@ -192,6 +192,39 @@ func TestWebAuthCapabilitiesRunReturnsRuntimeErrorForMissingKey(t *testing.T) {
 	}
 }
 
+func TestWebAuthCapabilitiesRunOutputsTable(t *testing.T) {
+	stubWebAuthCapabilitiesLookup(t, func(ctx context.Context, client *webcore.Client, keyID string) (*webcore.APIKeyRoleLookup, error) {
+		return &webcore.APIKeyRoleLookup{
+			KeyID:      keyID,
+			Name:       "asc_cli",
+			Kind:       "team",
+			Roles:      []string{"APP_MANAGER", "FINANCE"},
+			RoleSource: "key",
+			Active:     true,
+			Lookup:     "team_keys",
+		}, nil
+	})
+
+	stdout, stderr := captureOutput(t, func() {
+		code := cmd.Run([]string{"web", "auth", "capabilities", "--key-id", "39MX87M9Y4", "--output", "table"}, "1.0.0")
+		if code != cmd.ExitSuccess {
+			t.Fatalf("exit code = %d, want %d", code, cmd.ExitSuccess)
+		}
+	})
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+	if !strings.Contains(stdout, "KEY ID") || !strings.Contains(stdout, "CAPABILITIES") {
+		t.Fatalf("expected table headers, got %q", stdout)
+	}
+	if !strings.Contains(stdout, "App Manager, Finance") {
+		t.Fatalf("expected joined role labels, got %q", stdout)
+	}
+	if !strings.Contains(stdout, "Manage app pricing and App Store information") {
+		t.Fatalf("expected capability labels, got %q", stdout)
+	}
+}
+
 func TestWebAuthCapabilitiesRunUsesEnvAuthResolution(t *testing.T) {
 	tempDir := t.TempDir()
 	keyPath := filepath.Join(tempDir, "AuthKey.p8")

@@ -76,36 +76,6 @@ func TestWebAuthCapabilitiesRejectsPrettyForTableOutput(t *testing.T) {
 	}
 }
 
-func TestWebAuthCapabilitiesRows(t *testing.T) {
-	rows := webAuthCapabilitiesRows(webAuthCapabilitiesResult{
-		KeyID:        "39MX87M9Y4",
-		Kind:         "team",
-		Active:       true,
-		Roles:        []string{"APP_MANAGER", "FINANCE"},
-		Name:         "asc_cli",
-		Lookup:       "team_keys",
-		ResolvedFrom: "auth",
-		Profile:      "client",
-		RoleDetails: []webAuthRoleDetailResult{
-			{Code: "APP_MANAGER", Label: "App Manager"},
-			{Code: "FINANCE", Label: "Finance"},
-		},
-		Capabilities: []webAuthCapabilityResult{
-			{ID: "app_pricing_and_store_info", Label: "Manage app pricing and App Store information"},
-			{ID: "payments_financial_reports_and_tax", Label: "Payments, financial reports, and tax forms"},
-		},
-	})
-	if len(rows) != 1 {
-		t.Fatalf("expected one row, got %d", len(rows))
-	}
-	if rows[0][3] != "App Manager, Finance" {
-		t.Fatalf("unexpected role join output: %#v", rows[0])
-	}
-	if rows[0][4] != "Manage app pricing and App Store information, Payments, financial reports, and tax forms" {
-		t.Fatalf("unexpected capability join output: %#v", rows[0])
-	}
-}
-
 func TestWebAuthCapabilitiesKeyIDOutputsJSON(t *testing.T) {
 	labels := stubWebProgressLabels(t)
 
