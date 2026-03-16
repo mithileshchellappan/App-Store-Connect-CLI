@@ -23,6 +23,8 @@ import (
 	"golang.org/x/crypto/pbkdf2"
 )
 
+var errAppleAccountActionRequired = errors.New("complete the pending Apple Account web prompt in a browser (privacy acknowledgement or 2FA upgrade) and try again")
+
 func newIrisHTTPClient(jar http.CookieJar) *http.Client {
 	transport, ok := http.DefaultTransport.(*http.Transport)
 	if !ok {
@@ -62,6 +64,24 @@ func extractServiceErrorCodes(respBody []byte) []string {
 		}
 	}
 	return codes
+}
+
+func isAppleAccountActionRequiredSigninComplete(status int, respBody []byte) bool {
+	if status != http.StatusPreconditionFailed {
+		return false
+	}
+	var payload struct {
+		AuthType string `json:"authType"`
+	}
+	if err := json.Unmarshal(respBody, &payload); err != nil {
+		return false
+	}
+	switch strings.TrimSpace(payload.AuthType) {
+	case "sa", "hsa", "non-sa", "hsa2":
+		return true
+	default:
+		return false
+	}
 }
 
 const (
@@ -554,7 +574,7 @@ func getHashcash(client *http.Client, serviceKey string) (string, error) {
 	bitsValue := strings.TrimSpace(resp.Header.Get("X-Apple-HC-Bits"))
 	challenge := strings.TrimSpace(resp.Header.Get("X-Apple-HC-Challenge"))
 	if bitsValue == "" || challenge == "" {
-		return "", fmt.Errorf("missing hashcash headers in signin response")
+		return "", nil
 	}
 
 	bits, err := strconv.Atoi(bitsValue)
@@ -684,7 +704,9 @@ func signinComplete(client *http.Client, username, m1, m2, challenge, serviceKey
 	req.Header.Set("X-Apple-Widget-Key", serviceKey)
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
 	req.Header.Set("Accept", "application/json, text/javascript")
-	req.Header.Set("X-Apple-HC", hashcash)
+	if strings.TrimSpace(hashcash) != "" {
+		req.Header.Set("X-Apple-HC", hashcash)
+	}
 	setModifiedCookieHeader(client, req)
 
 	resp, err := client.Do(req)
@@ -706,6 +728,9 @@ func signinComplete(client *http.Client, username, m1, m2, challenge, serviceKey
 			AppleIDSessionID: strings.TrimSpace(resp.Header.Get("X-Apple-ID-Session-Id")),
 			SCNT:             strings.TrimSpace(resp.Header.Get("scnt")),
 		}
+	}
+	if isAppleAccountActionRequiredSigninComplete(resp.StatusCode, respBody) {
+		return errAppleAccountActionRequired
 	}
 
 	return fmt.Errorf("signin complete failed with status %d: %s", resp.StatusCode, string(respBody))

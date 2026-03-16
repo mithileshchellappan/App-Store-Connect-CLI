@@ -186,6 +186,55 @@ func TestSigninCompleteKeepsGenericUnauthorizedErrorsForOtherCodes(t *testing.T)
 	}
 }
 
+func TestSigninCompleteReturnsAppleAccountActionRequiredForPreconditionFailed(t *testing.T) {
+	client := &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode: http.StatusPreconditionFailed,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader(`{"authType":"hsa2"}`)),
+			}, nil
+		}),
+	}
+
+	err := signinComplete(
+		context.Background(),
+		client,
+		"user@example.com",
+		"m1-proof",
+		"m2-proof",
+		json.RawMessage(`{"v":1}`),
+		"service-key",
+		"hashcash-token",
+	)
+	if !errors.Is(err, errAppleAccountActionRequired) {
+		t.Fatalf("expected account-action-required error, got %v", err)
+	}
+}
+
+func TestGetHashcashAllowsMissingChallengeHeaders(t *testing.T) {
+	client := &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			if got, want := req.URL.String(), authServiceURL+"/signin?widgetKey=service-key"; got != want {
+				t.Fatalf("expected request URL %q, got %q", want, got)
+			}
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader("")),
+			}, nil
+		}),
+	}
+
+	hashcash, err := getHashcash(context.Background(), client, "service-key")
+	if err != nil {
+		t.Fatalf("expected missing-hashcash headers to be tolerated, got %v", err)
+	}
+	if hashcash != "" {
+		t.Fatalf("expected empty hashcash when headers are absent, got %q", hashcash)
+	}
+}
+
 func TestPrepareTwoFactorChallengeRequestsPhoneCodeWhenNoTrustedDevicesHasMultipleNumbers(t *testing.T) {
 	session := &AuthSession{
 		Client: &http.Client{
