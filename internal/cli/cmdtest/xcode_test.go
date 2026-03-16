@@ -92,6 +92,27 @@ func TestXcodeVersionHelpShowsCanonicalSubcommands(t *testing.T) {
 	}
 }
 
+func TestXcodeExportHelpMentionsDirectUploadMode(t *testing.T) {
+	root := RootCommand("1.2.3")
+
+	exportCmd := findSubcommand(root, "xcode", "export")
+	if exportCmd == nil {
+		t.Fatal("expected xcode export command")
+	}
+	if !strings.Contains(exportCmd.ShortHelp, "direct upload") {
+		t.Fatalf("expected short help to mention direct upload, got %q", exportCmd.ShortHelp)
+	}
+	if !strings.Contains(exportCmd.LongHelp, "destination=upload") {
+		t.Fatalf("expected long help to mention destination=upload, got %q", exportCmd.LongHelp)
+	}
+	if !strings.Contains(exportCmd.LongHelp, "without writing a local") {
+		t.Fatalf("expected long help to explain no local IPA is written, got %q", exportCmd.LongHelp)
+	}
+	if got := exportCmd.FlagSet.Lookup("ipa-path").Usage; !strings.Contains(got, "when one is produced") {
+		t.Fatalf("expected ipa-path usage to mention produced IPA behavior, got %q", got)
+	}
+}
+
 func TestXcodeArchiveRequiresWorkspaceOrProject(t *testing.T) {
 	root := RootCommand("1.2.3")
 	root.FlagSet.SetOutput(io.Discard)

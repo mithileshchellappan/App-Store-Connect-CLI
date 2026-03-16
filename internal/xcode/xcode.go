@@ -114,8 +114,23 @@ func Export(ctx context.Context, opts ExportOptions) (*ExportResult, error) {
 	if err := validateExportInputPaths(opts); err != nil {
 		return nil, err
 	}
-	if err := prepareIPAPath(opts.IPAPath, opts.Overwrite); err != nil {
-		return nil, err
+
+	// Always ensure parent dir exists (needed for temp dir creation below).
+	if err := os.MkdirAll(filepath.Dir(opts.IPAPath), 0o755); err != nil {
+		return nil, fmt.Errorf("create output directory: %w", err)
+	}
+
+	// When the ExportOptions plist has destination=upload, xcodebuild uploads
+	// directly to App Store Connect and does not produce a local .ipa file.
+	// This is the normal path for tvOS and some macOS exports. Detect this
+	// mode before prepareIPAPath to avoid deleting an existing IPA that will
+	// never be replaced.
+	uploadMode := isDirectUploadMode(opts.ExportOptions)
+
+	if !uploadMode {
+		if err := prepareIPAPath(opts.IPAPath, opts.Overwrite); err != nil {
+			return nil, err
+		}
 	}
 	maybeWarnAboutBetaXcodeForAppStoreExport(ctx, opts.ExportOptions, opts.LogWriter)
 
@@ -128,6 +143,21 @@ func Export(ctx context.Context, opts ExportOptions) (*ExportResult, error) {
 	args := buildExportCommand(opts, tempExportDir)
 	if err := runXcodebuild(ctx, args, opts.LogWriter); err != nil {
 		return nil, err
+	}
+
+	if uploadMode {
+		// xcodebuild uploaded directly — no local IPA produced.
+		info, err := readArchiveBundleInfo(opts.ArchivePath)
+		if err != nil {
+			return nil, fmt.Errorf("read archive bundle info after direct upload: %w", err)
+		}
+		return &ExportResult{
+			ArchivePath: opts.ArchivePath,
+			IPAPath:     "",
+			BundleID:    info.BundleID,
+			Version:     info.Version,
+			BuildNumber: info.BuildNumber,
+		}, nil
 	}
 
 	exportedIPAPath, err := findExportedIPA(tempExportDir)
@@ -543,6 +573,22 @@ func findExportedIPA(exportDir string) (string, error) {
 		return "", fmt.Errorf("xcodebuild export produced multiple .ipa files")
 	}
 	return matches[0], nil
+}
+
+// isDirectUploadMode reads the ExportOptions plist and returns true when
+// destination is set to "upload". In this mode xcodebuild uploads the build
+// directly to App Store Connect and does not produce a local .ipa file.
+func isDirectUploadMode(exportOptionsPlistPath string) bool {
+	data, err := os.ReadFile(exportOptionsPlistPath)
+	if err != nil {
+		return false
+	}
+	var payload map[string]any
+	if _, err := plist.Unmarshal(data, &payload); err != nil {
+		return false
+	}
+	dest, _ := payload["destination"].(string)
+	return strings.EqualFold(dest, "upload")
 }
 
 func moveExportedIPA(sourcePath, destinationPath string, overwrite bool) error {

@@ -162,7 +162,7 @@ func XcodeExportCommand() *ffcli.Command {
 
 	archivePath := fs.String("archive-path", "", "Path to the .xcarchive input (required)")
 	exportOptions := fs.String("export-options", "", "Path to ExportOptions.plist (required)")
-	ipaPath := fs.String("ipa-path", "", "Destination path for the exported .ipa file (required)")
+	ipaPath := fs.String("ipa-path", "", "Destination path for a local .ipa when one is produced (required)")
 	overwrite := fs.Bool("overwrite", false, "Replace an existing IPA at --ipa-path")
 	var xcodebuildFlags multiStringFlag
 	fs.Var(&xcodebuildFlags, "xcodebuild-flag", "Pass a raw argument through to xcodebuild (repeatable)")
@@ -171,15 +171,18 @@ func XcodeExportCommand() *ffcli.Command {
 	return &ffcli.Command{
 		Name:       "export",
 		ShortUsage: "asc xcode export [flags]",
-		ShortHelp:  "Export an .ipa to an exact path.",
-		LongHelp: `Export an .ipa to an exact path.
+		ShortHelp:  "Export an archive to a deterministic IPA path or direct upload.",
+		LongHelp: `Export an archive to a deterministic IPA path or direct upload.
 
-This command runs xcodebuild -exportArchive into a temporary directory and then
-moves the produced IPA to --ipa-path so workflows and humans can rely on one
-deterministic artifact path.
+This command runs xcodebuild -exportArchive into a temporary directory.
+When ExportOptions.plist produces a local IPA, asc moves it to --ipa-path.
+When ExportOptions.plist uses destination=upload, xcodebuild uploads directly
+to App Store Connect and asc returns archive metadata without writing a local
+IPA at --ipa-path.
 
 Examples:
   asc xcode export --archive-path .asc/artifacts/App.xcarchive --export-options ExportOptions.plist --ipa-path .asc/artifacts/App.ipa
+  asc xcode export --archive-path .asc/artifacts/App.xcarchive --export-options UploadExportOptions.plist --ipa-path .asc/artifacts/App.ipa --output json
   asc xcode export --archive-path .asc/artifacts/App.xcarchive --export-options ExportOptions.plist --ipa-path .asc/artifacts/App.ipa --xcodebuild-flag=-allowProvisioningUpdates --output json`,
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
@@ -245,11 +248,18 @@ func archiveResultRows(result *localxcode.ArchiveResult) [][]string {
 }
 
 func exportResultRows(result *localxcode.ExportResult) [][]string {
-	return [][]string{
+	rows := [][]string{
 		{"archive_path", result.ArchivePath},
-		{"ipa_path", result.IPAPath},
-		{"bundle_id", result.BundleID},
-		{"version", result.Version},
-		{"build_number", result.BuildNumber},
 	}
+	if result.IPAPath != "" {
+		rows = append(rows, []string{"ipa_path", result.IPAPath})
+	} else {
+		rows = append(rows, []string{"ipa_path", "(direct upload - no local artifact)"})
+	}
+	rows = append(rows,
+		[]string{"bundle_id", result.BundleID},
+		[]string{"version", result.Version},
+		[]string{"build_number", result.BuildNumber},
+	)
+	return rows
 }
