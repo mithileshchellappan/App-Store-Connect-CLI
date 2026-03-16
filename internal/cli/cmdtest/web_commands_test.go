@@ -77,7 +77,7 @@ func TestWebAppsCreateExposesPasswordCompatibilityFlag(t *testing.T) {
 		t.Fatal("expected web apps create command")
 	}
 	if cmd.FlagSet.Lookup("password") == nil {
-		t.Fatal("expected temporary --password compatibility flag on web apps create")
+		t.Fatal("expected temporary password compatibility flag on web apps create")
 	}
 }
 

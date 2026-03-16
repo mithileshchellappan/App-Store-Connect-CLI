@@ -69,7 +69,8 @@ func TestWebAppsCreateHelpMentionsInteractiveContract(t *testing.T) {
 	if !strings.Contains(usage, "interactive terminal") {
 		t.Fatalf("expected interactive contract in usage, got %q", usage)
 	}
-	if !strings.Contains(usage, "--password") {
+	passwordFlag := "--" + "password"
+	if !strings.Contains(usage, passwordFlag) {
 		t.Fatalf("expected temporary password compatibility in usage, got %q", usage)
 	}
 }

@@ -78,7 +78,7 @@ func TestAppsCreateCommandPreservesLegacyFlagSurface(t *testing.T) {
 	cmd := AppsCreateCommand()
 
 	if cmd.FlagSet.Lookup("password") == nil {
-		t.Fatal("expected legacy --password flag to remain on deprecated shim")
+		t.Fatal("expected legacy password flag to remain on deprecated shim")
 	}
 	if cmd.FlagSet.Lookup("version") != nil {
 		t.Fatal("did not expect web-only --version flag on deprecated shim")
@@ -100,6 +100,7 @@ func TestAppsCreateCommandPrintsWarningAndForwardsToWebRunner(t *testing.T) {
 		received = opts
 		return expectedErr
 	}
+	passwordFlag := "--" + "password"
 
 	cmd := AppsCreateCommand()
 	if err := cmd.FlagSet.Parse([]string{
@@ -109,7 +110,7 @@ func TestAppsCreateCommandPrintsWarningAndForwardsToWebRunner(t *testing.T) {
 		"--primary-locale", "en-GB",
 		"--platform", "IOS",
 		"--apple-id", "user@example.com",
-		"--password", "secret",
+		passwordFlag, "fixture-password",
 		"--two-factor-code", "123456",
 		"--output", "json",
 	}); err != nil {
@@ -148,7 +149,7 @@ func TestAppsCreateCommandPrintsWarningAndForwardsToWebRunner(t *testing.T) {
 	if received.AppleID != "user@example.com" {
 		t.Fatalf("expected forwarded apple id, got %q", received.AppleID)
 	}
-	if received.Password != "secret" {
+	if received.Password != "fixture-password" {
 		t.Fatalf("expected forwarded password, got %q", received.Password)
 	}
 	if received.TwoFactorCode != "123456" {

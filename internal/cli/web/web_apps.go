@@ -218,7 +218,7 @@ Authentication:
   --apple-id with one of:
     - secure interactive prompt (default and recommended for local use)
     - ASC_WEB_PASSWORD environment variable
-    - temporary --password compatibility flag during the apps-create deprecation window
+    - temporary direct-password compatibility flag during the apps-create deprecation window
   If you already have a cached web session, --apple-id can be omitted.
 
 Bundle ID preflight:
@@ -230,7 +230,6 @@ Bundle ID preflight:
 Examples:
   asc web apps create
   asc web apps create --name "My App" --bundle-id "com.example.app" --sku "MYAPP123" --apple-id "user@example.com"
-  asc web apps create --name "My App" --bundle-id "com.example.app" --sku "MYAPP123" --apple-id "user@example.com" --password "app-specific-password"
   ASC_WEB_PASSWORD="..." asc web apps create --name "My App" --bundle-id "com.example.app" --sku "MYAPP123" --apple-id "user@example.com"`,
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,

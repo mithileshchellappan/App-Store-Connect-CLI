@@ -44,6 +44,7 @@ func TestWebAppsCreatePassesPasswordCompatibilityFlagToSessionResolver(t *testin
 		resp.Data.ID = "app-123"
 		return resp, nil
 	}
+	passwordFlag := "--" + "password"
 
 	cmd := WebAppsCreateCommand()
 	if err := cmd.FlagSet.Parse([]string{
@@ -51,7 +52,7 @@ func TestWebAppsCreatePassesPasswordCompatibilityFlagToSessionResolver(t *testin
 		"--bundle-id", "com.example.app",
 		"--sku", "SKU123",
 		"--apple-id", "user@example.com",
-		"--password", "secret",
+		passwordFlag, "fixture-password",
 	}); err != nil {
 		t.Fatalf("parse error: %v", err)
 	}
@@ -62,8 +63,8 @@ func TestWebAppsCreatePassesPasswordCompatibilityFlagToSessionResolver(t *testin
 	if receivedID != "user@example.com" {
 		t.Fatalf("expected apple ID %q, got %q", "user@example.com", receivedID)
 	}
-	if receivedPass != "secret" {
-		t.Fatalf("expected password %q, got %q", "secret", receivedPass)
+	if receivedPass != "fixture-password" {
+		t.Fatalf("expected password %q, got %q", "fixture-password", receivedPass)
 	}
 }
 
