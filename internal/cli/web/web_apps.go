@@ -205,7 +205,7 @@ func WebAppsCreateCommand() *ffcli.Command {
 		Name:       "create",
 		ShortUsage: "asc web apps create [flags]",
 		ShortHelp:  "[experimental] Create app via unofficial Apple web API.",
-		LongHelp: `EXPERIMENTAL / UNOFFICIAL / DISCOURAGED
+		LongHelp: fmt.Sprintf(`EXPERIMENTAL / UNOFFICIAL / DISCOURAGED
 
 Create an app through Apple's internal web API using a web-session login.
 This is the canonical app-creation path for web-session based flows and is
@@ -217,7 +217,7 @@ for the missing app-creation inputs.
 Authentication:
   --apple-id with one of:
     - secure interactive prompt (default and recommended for local use)
-    - ASC_WEB_PASSWORD environment variable
+    - %s environment variable
     - temporary direct-password compatibility flag during the apps-create deprecation window
   If you already have a cached web session, --apple-id can be omitted.
 
@@ -225,12 +225,12 @@ Bundle ID preflight:
   If official ASC API authentication is available, the CLI will check or create
   the Bundle ID before app creation. Otherwise it assumes the Bundle ID already exists.
 
-` + webWarningText + `
+`+webWarningText+`
 
 Examples:
   asc web apps create
   asc web apps create --name "My App" --bundle-id "com.example.app" --sku "MYAPP123" --apple-id "user@example.com"
-  ASC_WEB_PASSWORD="..." asc web apps create --name "My App" --bundle-id "com.example.app" --sku "MYAPP123" --apple-id "user@example.com"`,
+  %s asc web apps create --name "My App" --bundle-id "com.example.app" --sku "MYAPP123" --apple-id "user@example.com"`, webPasswordEnvDisplay(), webPasswordEnvAssignmentExample()),
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, args []string) error {

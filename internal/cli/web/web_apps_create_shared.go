@@ -228,7 +228,7 @@ func resolveAppCreateSession(ctx context.Context, appleID, password, twoFactorCo
 		password = strings.TrimSpace(os.Getenv(webPasswordEnv))
 		if password == "" {
 			if !appCreateCanPromptInteractivelyFn() {
-				return nil, "", shared.UsageError("password is required: run in a terminal for an interactive prompt or set ASC_WEB_PASSWORD")
+				return nil, "", shared.UsageError(fmt.Sprintf("password is required: run in a terminal for an interactive prompt or set %s", webPasswordEnvDisplay()))
 			}
 			if err := promptAppsCreatePassword(&password); err != nil {
 				return nil, "", err

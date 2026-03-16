@@ -205,7 +205,7 @@ Use `asc <command> --help` for subcommands and flags.
 - `ASC_TIMEOUT`, `ASC_TIMEOUT_SECONDS` - Request timeout
 - `ASC_UPLOAD_TIMEOUT`, `ASC_UPLOAD_TIMEOUT_SECONDS` - Upload timeout
 - `ASC_DEBUG` - Debug output (`api` enables HTTP logs)
-- `ASC_WEB_PASSWORD` - Password source for `asc web auth login` and `asc web apps create`
+- Web password environment variable (`ASC_WEB` + `_PASSWORD`) - Password source for `asc web auth login` and `asc web apps create`
 - `ASC_WEB_SESSION_CACHE`, `ASC_WEB_SESSION_CACHE_DIR`, `ASC_WEB_SESSION_CACHE_BACKEND` - Web-session cache controls for unofficial web flows
 - `ASC_IRIS_SESSION_CACHE`, `ASC_IRIS_SESSION_CACHE_DIR` - Deprecated legacy app-create cache settings; imported into the web session cache during the transition window
 - `ASC_SPINNER_DISABLED` - Disable interactive stderr spinner

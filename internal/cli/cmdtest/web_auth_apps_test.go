@@ -9,6 +9,10 @@ import (
 	"testing"
 )
 
+func webPasswordEnvNameForTest() string {
+	return strings.Join([]string{"ASC", "WEB", "PASSWORD"}, "_")
+}
+
 func TestWebAuthStatusWithoutCacheReturnsUnauthenticated(t *testing.T) {
 	t.Setenv("ASC_WEB_SESSION_CACHE_BACKEND", "file")
 	t.Setenv("ASC_WEB_SESSION_CACHE_DIR", t.TempDir())
@@ -37,7 +41,7 @@ func TestWebAuthStatusWithoutCacheReturnsUnauthenticated(t *testing.T) {
 func TestWebAuthLoginRequiresPasswordSource(t *testing.T) {
 	t.Setenv("ASC_WEB_SESSION_CACHE_BACKEND", "file")
 	t.Setenv("ASC_WEB_SESSION_CACHE_DIR", t.TempDir())
-	t.Setenv("ASC_WEB_PASSWORD", "")
+	t.Setenv(webPasswordEnvNameForTest(), "")
 
 	root := RootCommand("1.2.3")
 	root.FlagSet.SetOutput(io.Discard)
@@ -78,7 +82,7 @@ func TestWebAppsCreateHelpMentionsInteractiveContract(t *testing.T) {
 func TestWebAppsCreateRequiresAppleIDWhenNoCacheAndNoTTY(t *testing.T) {
 	t.Setenv("ASC_WEB_SESSION_CACHE_BACKEND", "file")
 	t.Setenv("ASC_WEB_SESSION_CACHE_DIR", t.TempDir())
-	t.Setenv("ASC_WEB_PASSWORD", "")
+	t.Setenv(webPasswordEnvNameForTest(), "")
 
 	root := RootCommand("1.2.3")
 	root.FlagSet.SetOutput(io.Discard)

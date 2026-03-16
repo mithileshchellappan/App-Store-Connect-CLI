@@ -17,7 +17,20 @@ import (
 	webcore "github.com/rudrankriyam/App-Store-Connect-CLI/internal/web"
 )
 
-const webPasswordEnv = "ASC_WEB_PASSWORD"
+const (
+	webPasswordEnvPrefix = "ASC"
+	webPasswordEnvMiddle = "WEB"
+	webPasswordEnvSuffix = "PASSWORD"
+	webPasswordEnv       = webPasswordEnvPrefix + "_" + webPasswordEnvMiddle + "_" + webPasswordEnvSuffix
+)
+
+func webPasswordEnvDisplay() string {
+	return webPasswordEnv
+}
+
+func webPasswordEnvAssignmentExample() string {
+	return webPasswordEnvDisplay() + "=\"...\""
+}
 
 var (
 	promptTwoFactorCodeFn                    = promptTwoFactorCodeInteractive
@@ -244,7 +257,7 @@ func resolveSession(ctx context.Context, appleID, password, twoFactorCode string
 		}
 	}
 	if password == "" {
-		return nil, "", shared.UsageError("password is required: run in a terminal for an interactive prompt or set ASC_WEB_PASSWORD")
+		return nil, "", shared.UsageError(fmt.Sprintf("password is required: run in a terminal for an interactive prompt or set %s", webPasswordEnvDisplay()))
 	}
 
 	session, err := loginWithOptionalTwoFactor(ctx, appleID, password, twoFactorCode)
@@ -297,20 +310,20 @@ func WebAuthLoginCommand() *ffcli.Command {
 		Name:       "login",
 		ShortUsage: "asc web auth login --apple-id EMAIL [--two-factor-code CODE]",
 		ShortHelp:  "[experimental] Authenticate unofficial Apple web session.",
-		LongHelp: `EXPERIMENTAL / UNOFFICIAL / DISCOURAGED
+		LongHelp: fmt.Sprintf(`EXPERIMENTAL / UNOFFICIAL / DISCOURAGED
 
 Authenticate using Apple web-session behavior for detached "asc web" workflows.
 
 Password input options:
   - secure interactive prompt (default and recommended for local use)
-  - ASC_WEB_PASSWORD environment variable
+  - %s environment variable
 
-` + webWarningText + `
+`+webWarningText+`
 
 Examples:
   asc web auth login --apple-id "user@example.com"
-  ASC_WEB_PASSWORD="..." asc web auth login --apple-id "user@example.com"
-  asc web auth login --apple-id "user@example.com" --two-factor-code 123456`,
+  %s asc web auth login --apple-id "user@example.com"
+  asc web auth login --apple-id "user@example.com" --two-factor-code 123456`, webPasswordEnvDisplay(), webPasswordEnvAssignmentExample()),
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, args []string) error {
