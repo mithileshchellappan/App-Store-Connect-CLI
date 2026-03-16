@@ -231,6 +231,9 @@ func resolveAppCreateSession(ctx context.Context, appleID, password, twoFactorCo
 			}
 		}
 	}
+	if !webPasswordProvided(password) {
+		return nil, "", shared.UsageError(fmt.Sprintf("password is required: run in a terminal for an interactive prompt or set %s", webPasswordEnvDisplay()))
+	}
 
 	session, err := loginWithOptionalTwoFactor(ctx, appleID, password, twoFactorCode)
 	if err != nil {

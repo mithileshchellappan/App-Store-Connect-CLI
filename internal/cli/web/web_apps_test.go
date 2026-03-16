@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"errors"
+	"flag"
 	"strings"
 	"testing"
 
@@ -207,6 +208,56 @@ func TestPromptAppsCreatePasswordPreservesWhitespace(t *testing.T) {
 	}
 	if password != "  prompted-password  " {
 		t.Fatalf("expected prompted password %q, got %q", "  prompted-password  ", password)
+	}
+}
+
+func TestResolveAppCreateSessionPromptedWhitespacePasswordReturnsUsageError(t *testing.T) {
+	origTryResume := tryResumeSessionFn
+	origTryResumeLast := tryResumeLastFn
+	origWebLogin := webLoginFn
+	origAskOne := appCreateAskOneFn
+	origCanPrompt := appCreateCanPromptInteractivelyFn
+	t.Cleanup(func() {
+		tryResumeSessionFn = origTryResume
+		tryResumeLastFn = origTryResumeLast
+		webLoginFn = origWebLogin
+		appCreateAskOneFn = origAskOne
+		appCreateCanPromptInteractivelyFn = origCanPrompt
+	})
+
+	tryResumeSessionFn = func(ctx context.Context, username string) (*webcore.AuthSession, bool, error) {
+		return nil, false, nil
+	}
+	tryResumeLastFn = func(ctx context.Context) (*webcore.AuthSession, bool, error) {
+		return nil, false, nil
+	}
+	appCreateCanPromptInteractivelyFn = func() bool { return true }
+	appCreateAskOneFn = func(p survey.Prompt, response interface{}, _ ...survey.AskOpt) error {
+		prompt, ok := p.(*survey.Password)
+		if !ok {
+			t.Fatalf("expected password prompt, got %T", p)
+		}
+		if prompt.Message != "Apple ID password:" {
+			t.Fatalf("unexpected prompt message %q", prompt.Message)
+		}
+		target, ok := response.(*string)
+		if !ok {
+			t.Fatalf("expected *string response, got %T", response)
+		}
+		*target = "   "
+		return nil
+	}
+	webLoginFn = func(ctx context.Context, creds webcore.LoginCredentials) (*webcore.AuthSession, error) {
+		t.Fatal("did not expect login attempt with whitespace-only prompted password")
+		return nil, nil
+	}
+
+	_, _, err := resolveAppCreateSession(context.Background(), "user@example.com", "", "")
+	if err == nil {
+		t.Fatal("expected usage error for whitespace-only prompted password")
+	}
+	if !errors.Is(err, flag.ErrHelp) {
+		t.Fatalf("expected ErrHelp usage error, got %v", err)
 	}
 }
 
