@@ -25,7 +25,10 @@ var (
 		return shared.ResolveAppIDWithExactLookup(ctx, client, appID)
 	}
 	waitForBuildByNumberOrUploadFailureFn = shared.WaitForBuildByNumberOrUploadFailure
-	waitForBuildProcessingFn              = func(ctx context.Context, client *asc.Client, buildID string, pollInterval time.Duration) (*asc.BuildResponse, error) {
+	resolveBuildUploadIDFn                = func(ctx context.Context, client *asc.Client, appID, version, buildNumber, platform string, exportStartedAt time.Time, pollInterval time.Duration) (string, error) {
+		return waitForBuildUploadID(ctx, client, appID, version, buildNumber, platform, exportStartedAt, pollInterval)
+	}
+	waitForBuildProcessingFn = func(ctx context.Context, client *asc.Client, buildID string, pollInterval time.Duration) (*asc.BuildResponse, error) {
 		return client.WaitForBuildProcessing(ctx, buildID, pollInterval)
 	}
 	resolveXcodeExportWaitTimeoutFn = func() time.Duration {
@@ -227,6 +230,7 @@ Examples:
 				return shared.UsageError("--wait requires ExportOptions.plist with destination=upload")
 			}
 
+			exportStartedAt := time.Now()
 			result, err := runExport(ctx, localxcode.ExportOptions{
 				ArchivePath:    strings.TrimSpace(*archivePath),
 				ExportOptions:  exportOptionsPath,
@@ -266,8 +270,15 @@ Examples:
 				if err != nil {
 					return fmt.Errorf("xcode export: infer archive platform for --wait: %w", err)
 				}
+				uploadID, err := resolveBuildUploadIDFn(waitCtx, client, appID, result.Version, result.BuildNumber, platform, exportStartedAt, *pollInterval)
+				if err != nil {
+					return fmt.Errorf("xcode export: resolve build upload for --wait: %w", err)
+				}
+				if strings.TrimSpace(uploadID) == "" {
+					return fmt.Errorf("xcode export: failed to resolve build upload for version %q build %q", result.Version, result.BuildNumber)
+				}
 				fmt.Fprintf(os.Stderr, "Waiting for build %s (%s) to appear in App Store Connect...\n", result.BuildNumber, result.Version)
-				buildResp, err := waitForBuildByNumberOrUploadFailureFn(waitCtx, client, appID, "", result.Version, result.BuildNumber, platform, *pollInterval)
+				buildResp, err := waitForBuildByNumberOrUploadFailureFn(waitCtx, client, appID, uploadID, result.Version, result.BuildNumber, platform, *pollInterval)
 				if err != nil {
 					return fmt.Errorf("xcode export: %w", err)
 				}
@@ -302,6 +313,98 @@ Examples:
 			)
 		},
 	}
+}
+
+func waitForBuildUploadID(ctx context.Context, client *asc.Client, appID, version, buildNumber, platform string, exportStartedAt time.Time, pollInterval time.Duration) (string, error) {
+	if client == nil {
+		return "", fmt.Errorf("client is required")
+	}
+	if pollInterval <= 0 {
+		pollInterval = shared.PublishDefaultPollInterval
+	}
+
+	return asc.PollUntil(ctx, pollInterval, func(ctx context.Context) (string, bool, error) {
+		return findRecentBuildUploadID(ctx, client, appID, version, buildNumber, platform, exportStartedAt)
+	})
+}
+
+func findRecentBuildUploadID(ctx context.Context, client *asc.Client, appID, version, buildNumber, platform string, exportStartedAt time.Time) (string, bool, error) {
+	resp, err := client.GetBuildUploads(ctx, appID,
+		asc.WithBuildUploadsCFBundleShortVersionStrings([]string{version}),
+		asc.WithBuildUploadsCFBundleVersions([]string{buildNumber}),
+		asc.WithBuildUploadsPlatforms([]string{platform}),
+		asc.WithBuildUploadsSort("-uploadedDate"),
+		asc.WithBuildUploadsLimit(10),
+	)
+	if err != nil {
+		return "", false, err
+	}
+
+	bestID := ""
+	bestObservedAt := time.Time{}
+	bestHasObservedAt := false
+	for _, upload := range resp.Data {
+		observedAt, hasObservedAt := buildUploadObservedAt(upload.Attributes)
+		if hasObservedAt && !exportStartedAt.IsZero() && observedAt.Before(exportStartedAt) {
+			continue
+		}
+		if bestID == "" || isMoreRecentBuildUploadCandidate(observedAt, hasObservedAt, bestObservedAt, bestHasObservedAt, upload.ID, bestID) {
+			bestID = strings.TrimSpace(upload.ID)
+			bestObservedAt = observedAt
+			bestHasObservedAt = hasObservedAt
+		}
+	}
+	if strings.TrimSpace(bestID) == "" {
+		return "", false, nil
+	}
+	return bestID, true, nil
+}
+
+func buildUploadObservedAt(attr asc.BuildUploadAttributes) (time.Time, bool) {
+	candidates := []string{}
+	if attr.UploadedDate != nil {
+		candidates = append(candidates, strings.TrimSpace(*attr.UploadedDate))
+	}
+	if attr.CreatedDate != nil {
+		candidates = append(candidates, strings.TrimSpace(*attr.CreatedDate))
+	}
+
+	var latest time.Time
+	found := false
+	for _, candidate := range candidates {
+		if candidate == "" {
+			continue
+		}
+		for _, layout := range []string{time.RFC3339Nano, time.RFC3339} {
+			parsed, err := time.Parse(layout, candidate)
+			if err != nil {
+				continue
+			}
+			if !found || parsed.After(latest) {
+				latest = parsed
+				found = true
+			}
+			break
+		}
+	}
+	return latest, found
+}
+
+func isMoreRecentBuildUploadCandidate(candidate time.Time, candidateHasTime bool, current time.Time, currentHasTime bool, candidateID, currentID string) bool {
+	switch {
+	case candidateHasTime && !currentHasTime:
+		return true
+	case !candidateHasTime && currentHasTime:
+		return false
+	case candidateHasTime && currentHasTime:
+		if candidate.After(current) {
+			return true
+		}
+		if candidate.Before(current) {
+			return false
+		}
+	}
+	return strings.TrimSpace(candidateID) > strings.TrimSpace(currentID)
 }
 
 func archiveResultRows(result *localxcode.ArchiveResult) [][]string {

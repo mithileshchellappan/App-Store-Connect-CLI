@@ -141,12 +141,27 @@ func TestXcodeExportWaitPollsForUploadedBuild(t *testing.T) {
 		}
 		return "123456789", nil
 	}
+	resolveBuildUploadIDFn = func(_ context.Context, _ *asc.Client, appID, version, buildNumber, platform string, exportStartedAt time.Time, pollInterval time.Duration) (string, error) {
+		if appID != "123456789" {
+			t.Fatalf("expected resolved app ID for upload lookup, got %q", appID)
+		}
+		if version != "1.2.3" || buildNumber != "42" || platform != "IOS" {
+			t.Fatalf("unexpected upload lookup params: version=%q build=%q platform=%q", version, buildNumber, platform)
+		}
+		if pollInterval != 5*time.Second {
+			t.Fatalf("expected 5s poll interval, got %s", pollInterval)
+		}
+		if exportStartedAt.IsZero() {
+			t.Fatal("expected export start time for upload lookup")
+		}
+		return "upload-123", nil
+	}
 	waitForBuildByNumberOrUploadFailureFn = func(_ context.Context, _ *asc.Client, appID, uploadID, version, buildNumber, platform string, pollInterval time.Duration) (*asc.BuildResponse, error) {
 		if appID != "123456789" {
 			t.Fatalf("expected resolved app ID, got %q", appID)
 		}
-		if uploadID != "" {
-			t.Fatalf("expected no upload ID for xcode export wait, got %q", uploadID)
+		if uploadID != "upload-123" {
+			t.Fatalf("expected upload-123 upload ID for xcode export wait, got %q", uploadID)
 		}
 		if version != "1.2.3" || buildNumber != "42" || platform != "IOS" {
 			t.Fatalf("unexpected wait lookup params: version=%q build=%q platform=%q", version, buildNumber, platform)
@@ -251,6 +266,9 @@ func TestXcodeExportWaitRejectsNilProcessedBuildResponse(t *testing.T) {
 	resolveAppIDWithExactLookupFn = func(context.Context, *asc.Client, string) (string, error) {
 		return "123456789", nil
 	}
+	resolveBuildUploadIDFn = func(context.Context, *asc.Client, string, string, string, string, time.Time, time.Duration) (string, error) {
+		return "upload-123", nil
+	}
 	waitForBuildByNumberOrUploadFailureFn = func(context.Context, *asc.Client, string, string, string, string, string, time.Duration) (*asc.BuildResponse, error) {
 		return &asc.BuildResponse{
 			Data: asc.Resource[asc.BuildAttributes]{
@@ -286,6 +304,52 @@ func TestXcodeExportWaitRejectsNilProcessedBuildResponse(t *testing.T) {
 	}
 }
 
+func TestXcodeExportWaitRejectsMissingBuildUploadID(t *testing.T) {
+	restore := overrideXcodeCommandTestHooks(t)
+	defer restore()
+
+	isDirectUploadExportOptionsFn = func(string) bool { return true }
+	runExport = func(context.Context, localxcode.ExportOptions) (*localxcode.ExportResult, error) {
+		return &localxcode.ExportResult{
+			ArchivePath: "/tmp/Demo.xcarchive",
+			BundleID:    "com.example.demo",
+			Version:     "1.2.3",
+			BuildNumber: "42",
+		}, nil
+	}
+	inferArchivePlatformFn = func(string) (string, error) { return "IOS", nil }
+	getASCClientFn = func() (*asc.Client, error) { return &asc.Client{}, nil }
+	resolveAppIDWithExactLookupFn = func(context.Context, *asc.Client, string) (string, error) {
+		return "123456789", nil
+	}
+	resolveBuildUploadIDFn = func(context.Context, *asc.Client, string, string, string, string, time.Time, time.Duration) (string, error) {
+		return "", nil
+	}
+
+	cmd := XcodeExportCommand()
+	cmd.FlagSet.SetOutput(io.Discard)
+	if err := cmd.FlagSet.Parse([]string{
+		"--archive-path", "Demo.xcarchive",
+		"--export-options", "ExportOptions.plist",
+		"--ipa-path", "Demo.ipa",
+		"--wait",
+	}); err != nil {
+		t.Fatalf("failed to parse flags: %v", err)
+	}
+
+	var runErr error
+	_, _ = captureCommandOutput(t, func() error {
+		runErr = cmd.Exec(context.Background(), nil)
+		return runErr
+	})
+	if runErr == nil {
+		t.Fatal("expected error for missing build upload ID")
+	}
+	if !strings.Contains(runErr.Error(), "failed to resolve build upload for version \"1.2.3\" build \"42\"") {
+		t.Fatalf("expected missing build upload error, got %v", runErr)
+	}
+}
+
 func overrideXcodeCommandTestHooks(t *testing.T) func() {
 	t.Helper()
 
@@ -295,6 +359,7 @@ func overrideXcodeCommandTestHooks(t *testing.T) func() {
 	originalInferArchivePlatform := inferArchivePlatformFn
 	originalGetASCClient := getASCClientFn
 	originalResolveAppID := resolveAppIDWithExactLookupFn
+	originalResolveBuildUploadID := resolveBuildUploadIDFn
 	originalWaitForDiscovery := waitForBuildByNumberOrUploadFailureFn
 	originalWaitForProcessing := waitForBuildProcessingFn
 	originalWaitTimeout := resolveXcodeExportWaitTimeoutFn
@@ -306,6 +371,7 @@ func overrideXcodeCommandTestHooks(t *testing.T) func() {
 		inferArchivePlatformFn = originalInferArchivePlatform
 		getASCClientFn = originalGetASCClient
 		resolveAppIDWithExactLookupFn = originalResolveAppID
+		resolveBuildUploadIDFn = originalResolveBuildUploadID
 		waitForBuildByNumberOrUploadFailureFn = originalWaitForDiscovery
 		waitForBuildProcessingFn = originalWaitForProcessing
 		resolveXcodeExportWaitTimeoutFn = originalWaitTimeout
