@@ -2,6 +2,7 @@ package pricing
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -579,7 +580,7 @@ Examples:
 
 // PricingAvailabilityTerritoryAvailabilitiesCommand returns the availability territory-availabilities subcommand.
 func PricingAvailabilityTerritoryAvailabilitiesCommand() *ffcli.Command {
-	return shared.BuildPaginatedListCommand(shared.PaginatedListCommandConfig{
+	cmd := shared.BuildPaginatedListCommand(shared.PaginatedListCommandConfig{
 		FlagSetName: "pricing availability territory-availabilities",
 		Name:        "territory-availabilities",
 		ShortUsage:  "asc pricing availability territory-availabilities --availability AVAILABILITY_ID [--limit N] [--next URL] [--paginate]",
@@ -606,6 +607,26 @@ Examples:
 			return client.GetTerritoryAvailabilities(ctx, availabilityID, opts...)
 		},
 	})
+
+	originalExec := cmd.Exec
+	cmd.Exec = func(ctx context.Context, args []string) error {
+		err := originalExec(ctx, args)
+		if err == nil || errors.Is(err, flag.ErrHelp) {
+			return err
+		}
+		if isPricingAvailabilityTerritoryAvailabilitiesUsageError(err) {
+			return shared.UsageError(err.Error())
+		}
+		return err
+	}
+
+	return cmd
+}
+
+func isPricingAvailabilityTerritoryAvailabilitiesUsageError(err error) bool {
+	message := err.Error()
+	return strings.HasPrefix(message, "pricing availability territory-availabilities: --limit must be between 1 and ") ||
+		strings.HasPrefix(message, "pricing availability territory-availabilities: --next ")
 }
 
 // PricingAvailabilitySetCommand returns the availability set subcommand.
