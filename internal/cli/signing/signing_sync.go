@@ -12,6 +12,7 @@ import (
 	"github.com/peterbourgon/ff/v3/ffcli"
 
 	signingpkg "github.com/rudrankriyam/App-Store-Connect-CLI/internal/signing"
+	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/urlsanitize"
 
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/shared"
 )
@@ -47,7 +48,7 @@ Examples:
 
   asc signing sync pull --bundle-id com.example.app --profile-type IOS_APP_STORE \
     --repo git@github.com:team/certs.git --password "$MATCH_PASSWORD" \
-    --output ./signing`,
+    --output-dir ./signing`,
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
@@ -210,7 +211,7 @@ func syncPushCommand() *ffcli.Command {
 
 			result := SyncResult{
 				Operation:   "push",
-				RepoURL:     repo,
+				RepoURL:     sanitizeRepoURLForOutput(repo),
 				BundleID:    bundle,
 				ProfileType: profType,
 				Files:       files,
@@ -282,7 +283,7 @@ func syncPullCommand() *ffcli.Command {
 				fmt.Fprintln(os.Stderr, "No encrypted signing files found in repo")
 				result := SyncResult{
 					Operation: "pull",
-					RepoURL:   repo,
+					RepoURL:   sanitizeRepoURLForOutput(repo),
 					Files:     []string{},
 				}
 				return shared.PrintOutput(result, *output.Output, *output.Pretty)
@@ -319,12 +320,16 @@ func syncPullCommand() *ffcli.Command {
 
 			result := SyncResult{
 				Operation: "pull",
-				RepoURL:   repo,
+				RepoURL:   sanitizeRepoURLForOutput(repo),
 				Files:     files,
 			}
 			return shared.PrintOutput(result, *output.Output, *output.Pretty)
 		},
 	}
+}
+
+func sanitizeRepoURLForOutput(raw string) string {
+	return urlsanitize.SanitizeURLForLog(raw, urlsanitize.DefaultSignedQueryKeys, urlsanitize.DefaultSensitiveQueryKeys)
 }
 
 func certDirectoryName(profileType string) string {
