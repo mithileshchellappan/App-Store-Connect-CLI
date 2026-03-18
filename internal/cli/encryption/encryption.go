@@ -1,11 +1,14 @@
 package encryption
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/peterbourgon/ff/v3/ffcli"
@@ -350,9 +353,17 @@ Examples:
 				return shared.UsageError("encryption declarations exempt-declare does not accept positional arguments")
 			}
 
+			visited := map[string]bool{}
+			fs.Visit(func(f *flag.Flag) {
+				visited[f.Name] = true
+			})
+
 			plistValue := strings.TrimSpace(*plistPath)
 
-			if plistValue != "" {
+			if visited["plist"] {
+				if plistValue == "" {
+					return shared.UsageError("--plist must not be empty")
+				}
 				return updatePlistExemption(plistValue)
 			}
 
@@ -377,18 +388,34 @@ For details, see:
 }
 
 func updatePlistExemption(plistPath string) error {
-	info, err := os.Lstat(plistPath)
-	if err != nil {
-		return fmt.Errorf("encryption declarations exempt-declare: %w", err)
-	}
-	if info.IsDir() {
-		return fmt.Errorf("encryption declarations exempt-declare: %q is a directory", plistPath)
-	}
-	if info.Mode()&os.ModeSymlink != 0 {
-		return fmt.Errorf("encryption declarations exempt-declare: refusing to read symlink %q", plistPath)
+	displayPath := strings.TrimSpace(plistPath)
+	if displayPath == "" {
+		return fmt.Errorf("encryption declarations exempt-declare: plist path is required")
 	}
 
-	data, err := os.ReadFile(plistPath)
+	safePath, err := validatePlistPathNoSymlinkComponents(displayPath)
+	if err != nil {
+		return err
+	}
+
+	file, err := shared.OpenExistingNoFollow(safePath)
+	if err != nil {
+		return fmt.Errorf("encryption declarations exempt-declare: failed to read: %w", err)
+	}
+	defer file.Close()
+
+	info, err := file.Stat()
+	if err != nil {
+		return fmt.Errorf("encryption declarations exempt-declare: failed to stat: %w", err)
+	}
+	if info.IsDir() {
+		return fmt.Errorf("encryption declarations exempt-declare: %q is a directory", displayPath)
+	}
+	if !info.Mode().IsRegular() {
+		return fmt.Errorf("encryption declarations exempt-declare: refusing to read non-regular file %q", displayPath)
+	}
+
+	data, err := io.ReadAll(file)
 	if err != nil {
 		return fmt.Errorf("encryption declarations exempt-declare: failed to read: %w", err)
 	}
@@ -404,7 +431,7 @@ func updatePlistExemption(plistPath string) error {
 	}
 
 	if current, ok := payload["ITSAppUsesNonExemptEncryption"].(bool); ok && !current {
-		fmt.Fprintf(os.Stderr, "Info.plist already sets ITSAppUsesNonExemptEncryption=false: %s\n", plistPath)
+		fmt.Fprintf(os.Stderr, "Info.plist already sets ITSAppUsesNonExemptEncryption=false: %s\n", displayPath)
 		return nil
 	}
 
@@ -416,17 +443,83 @@ func updatePlistExemption(plistPath string) error {
 		return fmt.Errorf("encryption declarations exempt-declare: failed to encode plist: %w", err)
 	}
 
-	if err := os.WriteFile(plistPath, updated, info.Mode()); err != nil {
+	if _, err := shared.WriteFileNoSymlinkOverwrite(
+		safePath,
+		bytes.NewReader(updated),
+		info.Mode().Perm(),
+		".asc-plist-*.tmp",
+		".asc-plist-*.bak",
+	); err != nil {
 		return fmt.Errorf("encryption declarations exempt-declare: failed to write: %w", err)
 	}
 
 	if existed {
-		fmt.Fprintf(os.Stderr, "Updated ITSAppUsesNonExemptEncryption=false in %s\n", plistPath)
+		fmt.Fprintf(os.Stderr, "Updated ITSAppUsesNonExemptEncryption=false in %s\n", displayPath)
 		return nil
 	}
 
-	fmt.Fprintf(os.Stderr, "Added ITSAppUsesNonExemptEncryption=false to %s\n", plistPath)
+	fmt.Fprintf(os.Stderr, "Added ITSAppUsesNonExemptEncryption=false to %s\n", displayPath)
 	return nil
+}
+
+func validatePlistPathNoSymlinkComponents(plistPath string) (string, error) {
+	absPath, err := filepath.Abs(plistPath)
+	if err != nil {
+		return "", fmt.Errorf("encryption declarations exempt-declare: failed to resolve plist path: %w", err)
+	}
+
+	cleaned := filepath.Clean(absPath)
+	volume := filepath.VolumeName(cleaned)
+	rest := strings.TrimPrefix(cleaned, volume)
+	current := volume
+	if strings.HasPrefix(rest, string(os.PathSeparator)) {
+		current += string(os.PathSeparator)
+	}
+
+	parts := strings.Split(strings.TrimPrefix(rest, string(os.PathSeparator)), string(os.PathSeparator))
+	for i, part := range parts {
+		if part == "" || part == "." {
+			continue
+		}
+
+		current = filepath.Join(current, part)
+		info, err := os.Lstat(current)
+		if err != nil {
+			return "", fmt.Errorf("encryption declarations exempt-declare: %w", err)
+		}
+		if info.Mode()&os.ModeSymlink != 0 {
+			if i == len(parts)-1 {
+				return "", fmt.Errorf("encryption declarations exempt-declare: refusing to read symlink %q", cleaned)
+			}
+			if isAllowedPlistSymlinkComponent(current) {
+				continue
+			}
+			return "", fmt.Errorf("encryption declarations exempt-declare: refusing to follow symlink component %q", current)
+		}
+		if i < len(parts)-1 && !info.IsDir() {
+			return "", fmt.Errorf("encryption declarations exempt-declare: path component %q is not a directory", current)
+		}
+	}
+
+	return cleaned, nil
+}
+
+func isAllowedPlistSymlinkComponent(path string) bool {
+	if runtime.GOOS != "darwin" {
+		return false
+	}
+
+	switch filepath.Clean(path) {
+	case "/var", "/tmp", "/etc":
+		resolved, err := filepath.EvalSymlinks(path)
+		if err != nil {
+			return false
+		}
+		expected := filepath.Join("/private", strings.TrimPrefix(filepath.Clean(path), "/"))
+		return filepath.Clean(resolved) == expected
+	default:
+		return false
+	}
 }
 
 // EncryptionDeclarationsAssignBuildsCommand returns the declarations assign-builds subcommand.

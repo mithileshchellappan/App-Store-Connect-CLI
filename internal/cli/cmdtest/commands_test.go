@@ -2682,6 +2682,12 @@ func TestEncryptionValidationErrors(t *testing.T) {
 			wantHelp: true,
 		},
 		{
+			name:     "encryption declarations exempt-declare empty plist",
+			args:     []string{"encryption", "declarations", "exempt-declare", "--plist", ""},
+			wantErr:  "--plist must not be empty",
+			wantHelp: true,
+		},
+		{
 			name:     "encryption declarations assign-builds missing id",
 			args:     []string{"encryption", "declarations", "assign-builds", "--build", "BUILD_ID"},
 			wantErr:  "--id is required",
