@@ -601,6 +601,8 @@ func findPreReleaseVersionIDsForBuildsList(
 	appID string,
 	version string,
 ) ([]string, error) {
+	version = strings.TrimSpace(version)
+
 	firstPage, err := client.GetPreReleaseVersions(
 		ctx,
 		appID,
@@ -615,6 +617,12 @@ func findPreReleaseVersionIDsForBuildsList(
 	seen := make(map[string]struct{}, len(firstPage.Data))
 	appendIDs := func(page *asc.PreReleaseVersionsResponse) {
 		for _, preReleaseVersion := range page.Data {
+			// ASC's version filter can return dotted-version near-matches like
+			// 1.1 and 1.1.0 together, so enforce exact matching client-side
+			// before converting pre-release versions into build filters.
+			if strings.TrimSpace(preReleaseVersion.Attributes.Version) != version {
+				continue
+			}
 			id := strings.TrimSpace(preReleaseVersion.ID)
 			if id == "" {
 				continue
