@@ -191,3 +191,78 @@ func TestSubmitCancelByVersionIDMissingLegacySubmissionReturnsClearError(t *test
 		t.Fatalf("expected empty stdout, got %q", stdout)
 	}
 }
+
+func TestSubmitCancelByVersionIDIgnoresHistoricalCompleteReviewSubmission(t *testing.T) {
+	setupSubmitCancelAuth(t)
+
+	originalTransport := http.DefaultTransport
+	t.Cleanup(func() {
+		http.DefaultTransport = originalTransport
+	})
+
+	requests := make([]string, 0, 3)
+	http.DefaultTransport = submitCancelRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+		requests = append(requests, req.Method+" "+req.URL.RequestURI())
+
+		switch {
+		case req.Method == http.MethodGet && req.URL.Path == "/v1/appStoreVersions/version-456" && req.URL.Query().Get("include") == "app":
+			return submitCancelJSONResponse(http.StatusOK, `{
+				"data": {
+					"type": "appStoreVersions",
+					"id": "version-456",
+					"attributes": {"platform": "IOS", "versionString": "1.0"},
+					"relationships": {"app": {"data": {"type": "apps", "id": "app-1"}}}
+				}
+			}`)
+		case req.Method == http.MethodGet && req.URL.Path == "/v1/apps/app-1/reviewSubmissions":
+			return submitCancelJSONResponse(http.StatusOK, `{
+				"data": [{
+					"type": "reviewSubmissions",
+					"id": "historical-submission",
+					"attributes": {
+						"state": "COMPLETE",
+						"submittedDate": "2026-03-15T11:00:00Z"
+					},
+					"relationships": {
+						"appStoreVersionForReview": {
+							"data": {"type": "appStoreVersions", "id": "version-456"}
+						}
+					}
+				}]
+			}`)
+		case req.Method == http.MethodGet && req.URL.Path == "/v1/appStoreVersions/version-456/appStoreVersionSubmission":
+			return submitCancelJSONResponse(http.StatusNotFound, `{"errors":[{"status":"404","code":"NOT_FOUND","title":"Not Found"}]}`)
+		default:
+			return nil, fmt.Errorf("unexpected request: %s %s", req.Method, req.URL.RequestURI())
+		}
+	})
+
+	root := RootCommand("1.2.3")
+	root.FlagSet.SetOutput(io.Discard)
+
+	stdout, _ := captureOutput(t, func() {
+		if err := root.Parse([]string{"submit", "cancel", "--version-id", "version-456", "--confirm"}); err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+		err := root.Run(context.Background())
+		if err == nil {
+			t.Fatal("expected error, got nil")
+		}
+		if !strings.Contains(err.Error(), `no active submission found for version "version-456"`) {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	if stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", stdout)
+	}
+
+	wantRequests := []string{
+		"GET /v1/appStoreVersions/version-456?include=app",
+		"GET /v1/apps/app-1/reviewSubmissions?include=appStoreVersionForReview&limit=200",
+		"GET /v1/appStoreVersions/version-456/appStoreVersionSubmission",
+	}
+	if !reflect.DeepEqual(requests, wantRequests) {
+		t.Fatalf("unexpected requests: got %v want %v", requests, wantRequests)
+	}
+}

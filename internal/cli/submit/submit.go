@@ -571,6 +571,18 @@ func reviewSubmissionStatePriority(state asc.ReviewSubmissionState) int {
 	}
 }
 
+func isPotentiallyCancellableReviewSubmissionState(state asc.ReviewSubmissionState) bool {
+	switch state {
+	case asc.ReviewSubmissionStateInReview,
+		asc.ReviewSubmissionStateWaitingForReview,
+		asc.ReviewSubmissionStateUnresolvedIssues,
+		asc.ReviewSubmissionStateReadyForReview:
+		return true
+	default:
+		return false
+	}
+}
+
 func parseReviewSubmissionSubmittedDate(value string) (time.Time, bool) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
@@ -662,16 +674,27 @@ Examples:
 					if findErr != nil {
 						fmt.Fprintf(os.Stderr, "Warning: modern review submission lookup failed: %v (falling back to legacy)\n", findErr)
 					} else if submission != nil {
+						if !isPotentiallyCancellableReviewSubmissionState(submission.Attributes.SubmissionState) {
+							submission = nil
+						}
+					}
+					if submission != nil {
 						_, cancelErr := client.CancelReviewSubmission(requestCtx, submission.ID)
 						if cancelErr != nil {
-							return fmt.Errorf("submit cancel: failed to cancel submission %s: %w", submission.ID, cancelErr)
+							if isExpectedNonCancellableReviewSubmissionError(cancelErr) {
+								submission = nil
+							} else {
+								return fmt.Errorf("submit cancel: failed to cancel submission %s: %w", submission.ID, cancelErr)
+							}
 						}
-						resolvedSubmissionID = submission.ID
-						result := &asc.AppStoreVersionSubmissionCancelResult{
-							ID:        resolvedSubmissionID,
-							Cancelled: true,
+						if submission != nil {
+							resolvedSubmissionID = submission.ID
+							result := &asc.AppStoreVersionSubmissionCancelResult{
+								ID:        resolvedSubmissionID,
+								Cancelled: true,
+							}
+							return shared.PrintOutput(result, *output.Output, *output.Pretty)
 						}
-						return shared.PrintOutput(result, *output.Output, *output.Pretty)
 					}
 				}
 
