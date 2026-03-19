@@ -8,10 +8,15 @@ import (
 	"time"
 
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/asc"
+	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/xcode"
 )
 
 // PublishDefaultPollInterval is the default polling interval for build discovery.
 const PublishDefaultPollInterval = 30 * time.Second
+
+type buildUploadFailureDiagnosticsFunc func(context.Context, string, *asc.BuildUploadResponse) (string, error)
+
+var buildUploadFailureDiagnosticsFn buildUploadFailureDiagnosticsFunc = diagnoseBuildUploadFailure
 
 // ContextWithTimeoutDuration creates a context with a specific timeout.
 func ContextWithTimeoutDuration(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
@@ -42,7 +47,7 @@ func WaitForBuildByNumberOrUploadFailure(ctx context.Context, client *asc.Client
 				return nil, false, err
 			}
 			if err := buildUploadFailureError(upload); err != nil {
-				return nil, false, err
+				return nil, false, enrichBuildUploadFailure(ctx, appID, upload, err)
 			}
 			buildID, err := buildIDForUpload(upload)
 			if err != nil {
@@ -167,6 +172,102 @@ func buildUploadFailureError(upload *asc.BuildUploadResponse) error {
 		return fmt.Errorf("build upload %q failed with state %s", upload.Data.ID, state)
 	}
 	return fmt.Errorf("build upload %q failed with state %s: %s", upload.Data.ID, state, details)
+}
+
+func enrichBuildUploadFailure(ctx context.Context, appID string, upload *asc.BuildUploadResponse, baseErr error) error {
+	if baseErr == nil {
+		return nil
+	}
+	details, err := buildUploadFailureDiagnosticsFn(ctx, appID, upload)
+	if err != nil {
+		return baseErr
+	}
+	details = strings.TrimSpace(details)
+	if details == "" || strings.Contains(baseErr.Error(), details) {
+		return baseErr
+	}
+	return fmt.Errorf("%w; App Store Connect processing details: %s", baseErr, details)
+}
+
+func diagnoseBuildUploadFailure(ctx context.Context, appID string, upload *asc.BuildUploadResponse) (string, error) {
+	if upload == nil {
+		return "", nil
+	}
+
+	appID = strings.TrimSpace(appID)
+	buildNumber := strings.TrimSpace(upload.Data.Attributes.CFBundleVersion)
+	if appID == "" || buildNumber == "" {
+		return "", nil
+	}
+
+	creds, err := ResolveAuthCredentials("")
+	if err != nil {
+		return "", err
+	}
+	keyPath, err := buildStatusPrivateKeyPath(creds)
+	if err != nil {
+		return "", err
+	}
+
+	result, err := xcode.BuildStatus(ctx, xcode.BuildStatusOptions{
+		AppleID:            appID,
+		BundleVersion:      buildNumber,
+		BundleShortVersion: strings.TrimSpace(upload.Data.Attributes.CFBundleShortVersionString),
+		Platform:           string(upload.Data.Attributes.Platform),
+		APIKey:             strings.TrimSpace(creds.KeyID),
+		APIIssuer:          strings.TrimSpace(creds.IssuerID),
+		P8FilePath:         keyPath,
+	})
+	if err != nil {
+		return "", err
+	}
+	return joinDiagnosticDetails(result.ProcessingErrors), nil
+}
+
+func buildStatusPrivateKeyPath(creds ResolvedAuthCredentials) (string, error) {
+	if path := strings.TrimSpace(creds.KeyPath); path != "" {
+		return path, nil
+	}
+	if pem := strings.TrimSpace(creds.KeyPEM); pem != "" {
+		normalized := normalizePrivateKeyValue(pem)
+		cacheKey := tempPrivateKeyCacheKey("raw", normalized)
+		if path := cachedTempPrivateKeyPath(cacheKey); path != "" {
+			return path, nil
+		}
+		return writeTempPrivateKey([]byte(normalized), cacheKey)
+	}
+	return "", nil
+}
+
+func joinDiagnosticDetails(values []string) string {
+	seen := make(map[string]struct{}, len(values))
+	parts := make([]string, 0, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		parts = append(parts, trimmed)
+	}
+	return strings.Join(parts, "; ")
+}
+
+// SetBuildUploadFailureDiagnosticsForTesting overrides build failure enrichment.
+// Tests only.
+func SetBuildUploadFailureDiagnosticsForTesting(fn func(context.Context, string, *asc.BuildUploadResponse) (string, error)) func() {
+	previous := buildUploadFailureDiagnosticsFn
+	if fn == nil {
+		buildUploadFailureDiagnosticsFn = diagnoseBuildUploadFailure
+	} else {
+		buildUploadFailureDiagnosticsFn = fn
+	}
+	return func() {
+		buildUploadFailureDiagnosticsFn = previous
+	}
 }
 
 func buildUploadStateDetails(details []asc.StateDetail) string {

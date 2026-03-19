@@ -181,3 +181,47 @@ func TestWaitForBuildByNumberOrUploadFailureReturnsBuildLinkedFromUpload(t *test
 		t.Fatalf("expected linked build ID build-123, got %q", buildResp.Data.ID)
 	}
 }
+
+func TestWaitForBuildByNumberOrUploadFailureIncludesProcessingDiagnostics(t *testing.T) {
+	restoreDiagnostics := SetBuildUploadFailureDiagnosticsForTesting(func(context.Context, string, *asc.BuildUploadResponse) (string, error) {
+		return `Invalid Siri Support. App Intent description "Searches Apple Music" cannot contain "apple"`, nil
+	})
+	t.Cleanup(restoreDiagnostics)
+
+	client := newBuildWaitTestClient(t, func(req *http.Request) (*http.Response, error) {
+		if req.Method != http.MethodGet {
+			return nil, fmt.Errorf("expected GET, got %s", req.Method)
+		}
+		if req.URL.Path != "/v1/buildUploads/upload-current" {
+			return nil, fmt.Errorf("unexpected path: %s", req.URL.Path)
+		}
+		return buildWaitJSONResponse(`{
+			"data": {
+				"type": "buildUploads",
+				"id": "upload-current",
+				"attributes": {
+					"cfBundleShortVersionString": "1.2.3",
+					"cfBundleVersion": "42",
+					"platform": "IOS",
+					"state": {
+						"state": "FAILED",
+						"errors": [
+							{"code": "90626"}
+						]
+					}
+				}
+			}
+		}`)
+	})
+
+	_, err := WaitForBuildByNumberOrUploadFailure(context.Background(), client, "app-1", "upload-current", "1.2.3", "42", "IOS", time.Millisecond)
+	if err == nil {
+		t.Fatal("expected build upload failure, got nil")
+	}
+	if !strings.Contains(err.Error(), `build upload "upload-current" failed with state FAILED: 90626`) {
+		t.Fatalf("expected original upload failure details, got %v", err)
+	}
+	if !strings.Contains(err.Error(), `Invalid Siri Support. App Intent description "Searches Apple Music" cannot contain "apple"`) {
+		t.Fatalf("expected enriched processing details, got %v", err)
+	}
+}

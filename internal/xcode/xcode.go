@@ -2,6 +2,7 @@ package xcode
 
 import (
 	"archive/zip"
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"unicode"
 
 	"howett.net/plist"
 )
@@ -72,6 +74,24 @@ type ValidateOptions struct {
 type ValidateResult struct {
 	IPAPath   string `json:"ipa_path"`
 	Validated bool   `json:"validated"`
+}
+
+type BuildStatusOptions struct {
+	AppleID            string
+	BundleVersion      string
+	BundleShortVersion string
+	Platform           string
+	APIKey             string
+	APIIssuer          string
+	P8FilePath         string
+	LogWriter          io.Writer
+}
+
+type BuildStatusResult struct {
+	BuildStatus      string   `json:"build_status,omitempty"`
+	DeliveryUUID     string   `json:"delivery_uuid,omitempty"`
+	ImportStatus     string   `json:"import_status,omitempty"`
+	ProcessingErrors []string `json:"processing_errors,omitempty"`
 }
 
 type bundleInfo struct {
@@ -221,6 +241,33 @@ func Validate(ctx context.Context, opts ValidateOptions) (*ValidateResult, error
 	}, nil
 }
 
+func BuildStatus(ctx context.Context, opts BuildStatusOptions) (*BuildStatusResult, error) {
+	opts = normalizeBuildStatusOptions(opts)
+	if err := validateBuildStatusOptions(opts); err != nil {
+		return nil, err
+	}
+	if err := ensureXcodeAvailable(ctx); err != nil {
+		return nil, err
+	}
+	if _, err := lookPathFn("xcrun"); err != nil {
+		if errors.Is(err, exec.ErrNotFound) {
+			return nil, fmt.Errorf("xcrun not available; install Xcode and ensure the active developer directory is configured")
+		}
+		return nil, fmt.Errorf("locate xcrun: %w", err)
+	}
+	if opts.P8FilePath != "" {
+		if err := validateExistingFile(opts.P8FilePath, "--p8-file-path"); err != nil {
+			return nil, err
+		}
+	}
+
+	output, err := runAltoolAndCapture(ctx, buildBuildStatusCommand(opts), opts.LogWriter, "build-status")
+	if err != nil {
+		return nil, err
+	}
+	return parseBuildStatusOutput(output), nil
+}
+
 // IsDirectUploadMode reports whether ExportOptions.plist uploads directly to
 // App Store Connect instead of producing a local IPA artifact.
 func IsDirectUploadMode(exportOptionsPlistPath string) bool {
@@ -309,6 +356,19 @@ func validateValidateOptions(opts ValidateOptions) error {
 	return nil
 }
 
+func validateBuildStatusOptions(opts BuildStatusOptions) error {
+	if opts.AppleID == "" {
+		return fmt.Errorf("--apple-id is required")
+	}
+	if opts.BundleVersion == "" {
+		return fmt.Errorf("--bundle-version is required")
+	}
+	if (opts.APIKey == "") != (opts.APIIssuer == "") {
+		return fmt.Errorf("--api-key and --api-issuer must be provided together")
+	}
+	return nil
+}
+
 func validateWorkspaceProjectPair(workspacePath, projectPath string) error {
 	hasWorkspace := workspacePath != ""
 	hasProject := projectPath != ""
@@ -338,6 +398,17 @@ func normalizeValidateOptions(opts ValidateOptions) ValidateOptions {
 	opts.IPAPath = strings.TrimSpace(opts.IPAPath)
 	opts.APIKey = strings.TrimSpace(opts.APIKey)
 	opts.APIIssuer = strings.TrimSpace(opts.APIIssuer)
+	return opts
+}
+
+func normalizeBuildStatusOptions(opts BuildStatusOptions) BuildStatusOptions {
+	opts.AppleID = strings.TrimSpace(opts.AppleID)
+	opts.BundleVersion = strings.TrimSpace(opts.BundleVersion)
+	opts.BundleShortVersion = strings.TrimSpace(opts.BundleShortVersion)
+	opts.Platform = strings.TrimSpace(opts.Platform)
+	opts.APIKey = strings.TrimSpace(opts.APIKey)
+	opts.APIIssuer = strings.TrimSpace(opts.APIIssuer)
+	opts.P8FilePath = strings.TrimSpace(opts.P8FilePath)
 	return opts
 }
 
@@ -523,6 +594,33 @@ func buildValidateCommand(opts ValidateOptions, platform string) []string {
 	return args
 }
 
+func buildBuildStatusCommand(opts BuildStatusOptions) []string {
+	platform := mapAppStorePlatformToAltoolType(opts.Platform)
+	if platform == "" {
+		platform = "ios"
+	}
+	args := []string{
+		"altool",
+		"--build-status",
+		"--apple-id", opts.AppleID,
+		"--bundle-version", opts.BundleVersion,
+		"--platform", platform,
+	}
+	if opts.BundleShortVersion != "" {
+		args = append(args, "--bundle-short-version-string", opts.BundleShortVersion)
+	}
+	if opts.APIKey != "" {
+		args = append(args, "--apiKey", opts.APIKey)
+	}
+	if opts.APIIssuer != "" {
+		args = append(args, "--apiIssuer", opts.APIIssuer)
+	}
+	if opts.P8FilePath != "" {
+		args = append(args, "--p8-file-path", opts.P8FilePath)
+	}
+	return args
+}
+
 func mapAppStorePlatformToAltoolType(value string) string {
 	switch strings.ToUpper(strings.TrimSpace(value)) {
 	case "IOS":
@@ -559,6 +657,138 @@ func runXcodebuild(ctx context.Context, args []string, logWriter io.Writer) erro
 
 func runAltoolValidate(ctx context.Context, args []string, logWriter io.Writer) error {
 	return runCommandWithTail(ctx, "xcrun", args, logWriter, "validate", "xcrun altool")
+}
+
+func runAltoolAndCapture(ctx context.Context, args []string, logWriter io.Writer, action string) (string, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	cmd := commandContextFn(ctx, "xcrun", args...)
+	var stdout strings.Builder
+	outputTail := newTailBuffer(xcodebuildErrorTailLimit)
+	stdoutWriter := io.Writer(&stdout)
+	stderrWriter := io.Writer(outputTail)
+	if logWriter != nil {
+		stdoutWriter = io.MultiWriter(logWriter, &stdout)
+		stderrWriter = io.MultiWriter(logWriter, outputTail)
+	}
+	cmd.Stdout = stdoutWriter
+	cmd.Stderr = stderrWriter
+	if err := cmd.Run(); err != nil {
+		detail := strings.TrimSpace(outputTail.String())
+		if detail == "" {
+			detail = strings.TrimSpace(stdout.String())
+		}
+		if detail != "" {
+			if outputTail.Truncated() {
+				return "", fmt.Errorf("xcrun altool %s failed (showing last %d bytes): %s", action, xcodebuildErrorTailLimit, detail)
+			}
+			return "", fmt.Errorf("xcrun altool %s failed: %s", action, detail)
+		}
+		return "", fmt.Errorf("xcrun altool %s failed: %w", action, err)
+	}
+	return stdout.String(), nil
+}
+
+func parseBuildStatusOutput(output string) *BuildStatusResult {
+	result := &BuildStatusResult{}
+	scanner := bufio.NewScanner(strings.NewReader(output))
+	inProcessingErrors := false
+
+	for scanner.Scan() {
+		line := normalizeBuildStatusLine(scanner.Text())
+		if line == "" {
+			continue
+		}
+		if inProcessingErrors {
+			if key, value, ok := parseBuildStatusField(line); ok {
+				inProcessingErrors = false
+				assignBuildStatusField(result, key, value)
+				continue
+			}
+			if detail := parseBuildStatusProcessingError(line); detail != "" {
+				result.ProcessingErrors = append(result.ProcessingErrors, detail)
+			}
+			continue
+		}
+		if line == "PROCESSING-ERRORS:" {
+			inProcessingErrors = true
+			continue
+		}
+		if key, value, ok := parseBuildStatusField(line); ok {
+			assignBuildStatusField(result, key, value)
+		}
+	}
+
+	return result
+}
+
+func normalizeBuildStatusLine(raw string) string {
+	line := strings.TrimSpace(raw)
+	if line == "" {
+		return ""
+	}
+	if strings.HasPrefix(line, "=") {
+		line = strings.TrimSpace(strings.TrimLeft(line, "= "))
+	}
+	return line
+}
+
+func parseBuildStatusField(line string) (string, string, bool) {
+	index := strings.Index(line, ":")
+	if index <= 0 {
+		return "", "", false
+	}
+	key := strings.TrimSpace(line[:index])
+	value := strings.TrimSpace(line[index+1:])
+	if key == "" {
+		return "", "", false
+	}
+	for _, r := range key {
+		if !unicode.IsUpper(r) && !unicode.IsDigit(r) && r != '-' {
+			return "", "", false
+		}
+	}
+	return key, value, true
+}
+
+func assignBuildStatusField(result *BuildStatusResult, key, value string) {
+	if result == nil {
+		return
+	}
+	switch key {
+	case "BUILD-STATUS":
+		result.BuildStatus = value
+	case "DELIVERY-UUID":
+		result.DeliveryUUID = value
+	case "IMPORT-STATUS":
+		result.ImportStatus = value
+	}
+}
+
+func parseBuildStatusProcessingError(line string) string {
+	key, value, ok := parseBuildStatusMetadataField(line)
+	if ok {
+		switch strings.ToLower(key) {
+		case "server_warning", "code":
+			return ""
+		case "description":
+			return value
+		}
+	}
+	return strings.TrimSpace(line)
+}
+
+func parseBuildStatusMetadataField(line string) (string, string, bool) {
+	index := strings.Index(line, ":")
+	if index <= 0 {
+		return "", "", false
+	}
+	key := strings.TrimSpace(line[:index])
+	if key == "" {
+		return "", "", false
+	}
+	return key, strings.TrimSpace(line[index+1:]), true
 }
 
 func runCommandWithTail(ctx context.Context, name string, args []string, logWriter io.Writer, action string, commandLabel string) error {
