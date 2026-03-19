@@ -168,6 +168,11 @@
     "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/c9/fa/8b/c9fa8b9f-1ec9-3612-2cb6-a0dbb610468d/AppIcon-0-0-85-220-0-0-5-0-2x-0-0-0.png/512x512bb.png"
   },
   {
+    "app": "DevTutor: Learn Swift, SwiftUl",
+    "link": "https://apps.apple.com/us/app/devtutor-learn-swift-swiftul/id6471227008?uo=4",
+    "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple211/v4/a0/5e/d3/a05ed356-a8d1-47ec-b464-f1422a717a75/AppIcon-0-0-1x_U007epad-0-0-0-1-0-85-220.png/512x512bb.jpg"
+  },
+  {
     "app": "Don't Spiral: ROCD & Anxiety",
     "link": "https://apps.apple.com/us/app/dont-spiral-rocd-anxiety/id6758227509?uo=4",
     "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/c6/e9/77/c6e977ac-bc3b-5f1c-fbdb-e7f46ae3e467/AppIcon-0-0-1x_U007ephone-0-1-85-220.png/512x512bb.jpg"
@@ -427,6 +432,11 @@
     "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/19/ce/4c/19ce4c8e-a1b5-2c3e-e44f-66011b347558/AppIcon-0-1x_U007epad-0-1-0-85-220-0.png/512x512bb.jpg"
   },
   {
+    "app": "Musicer: Simple music player",
+    "link": "https://apps.apple.com/us/app/musicer-simple-music-player/id6745227444?mt=12&uo=4",
+    "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/a0/aa/b2/a0aab285-9678-bfb9-a1dc-eff837ccef12/AppIcon-0-0-85-220-0-5-0-2x-0-0-0.png/512x512bb.png"
+  },
+  {
     "app": "Neurona: Binaural Beats",
     "link": "https://apps.apple.com/us/app/neurona-binaural-beats/id6757725304?uo=4",
     "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/1c/77/66/1c776632-25a0-9af7-38ac-2d6c31d42826/icon_composed-0-0-1x_U007epad-0-1-sRGB-85-220.png/512x512bb.jpg"
@@ -559,6 +569,11 @@
     "app": "Protocol Zero: Sleep Sounds",
     "link": "https://apps.apple.com/us/app/protocol-zero-sleep-sounds/id6755014746?uo=4",
     "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/38/1c/5b/381c5b87-8ab7-7351-138b-0cef5c4d5084/AppIcon-1x_U007ephone-0-1-85-220-0.jpeg/512x512bb.jpg"
+  },
+  {
+    "app": "Quick RSS - RSS Reader",
+    "link": "https://apps.apple.com/us/app/quick-rss-rss-reader/id6670696072?uo=4",
+    "icon": "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/d6/55/7f/d6557fd2-7a41-2057-7ca4-0b67c1c0638c/AppIcon-0-0-1x_U007epad-0-1-85-220.png/512x512bb.jpg"
   },
   {
     "app": "Quietude",
