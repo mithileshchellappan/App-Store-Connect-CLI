@@ -366,11 +366,13 @@ func (c *Client) AddBetaGroupsToBuildWithNotify(ctx context.Context, buildID str
 	}
 
 	path := fmt.Sprintf("/v1/builds/%s/relationships/betaGroups", buildID)
-	if notify {
-		path += "?notify=true"
-	}
 	if _, err := c.do(ctx, "POST", path, body); err != nil {
 		return err
+	}
+	if notify {
+		if _, err := c.CreateBuildBetaNotification(ctx, buildID); err != nil {
+			return err
+		}
 	}
 	return nil
 }
