@@ -3,11 +3,13 @@ package web
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
 
+	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/shared"
 	webcore "github.com/rudrankriyam/App-Store-Connect-CLI/internal/web"
 )
 
@@ -311,5 +313,85 @@ func TestWebReviewSubscriptionsAttachRequiresConfirm(t *testing.T) {
 	})
 	if !strings.Contains(stderr, "--confirm is required") {
 		t.Fatalf("expected confirm guidance in stderr, got %q", stderr)
+	}
+}
+
+func TestWebReviewSubscriptionsAttachFailsFastForMissingMetadata(t *testing.T) {
+	labels := stubWebProgressLabels(t)
+
+	origResolveSession := resolveSessionFn
+	t.Cleanup(func() { resolveSessionFn = origResolveSession })
+
+	resolveSessionFn = func(ctx context.Context, appleID, password, twoFactorCode string) (*webcore.AuthSession, string, error) {
+		return &webcore.AuthSession{
+			Client: &http.Client{
+				Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+					if req.Method != http.MethodGet || req.URL.Path != "/iris/v1/apps/app-1/subscriptionGroups" {
+						t.Fatalf("unexpected request: %s %s", req.Method, req.URL.Path)
+					}
+					body := `{
+						"data": [{
+							"id": "group-1",
+							"type": "subscriptionGroups",
+							"attributes": {"referenceName": "Premium"},
+							"relationships": {
+								"subscriptions": {"data": [{"type": "subscriptions", "id": "sub-1"}]}
+							}
+						}],
+						"included": [{
+							"id": "sub-1",
+							"type": "subscriptions",
+							"attributes": {
+								"productId": "com.example.monthly",
+								"name": "Monthly",
+								"state": "MISSING_METADATA",
+								"isAppStoreReviewInProgress": false,
+								"submitWithNextAppStoreVersion": false
+							}
+						}]
+					}`
+					return &http.Response{
+						StatusCode: http.StatusOK,
+						Header:     http.Header{"Content-Type": []string{"application/json"}},
+						Body:       io.NopCloser(strings.NewReader(body)),
+						Request:    req,
+					}, nil
+				}),
+			},
+		}, "cache", nil
+	}
+
+	cmd := WebReviewSubscriptionsAttachCommand()
+	if err := cmd.FlagSet.Parse([]string{
+		"--app", "app-1",
+		"--subscription-id", "sub-1",
+		"--confirm",
+	}); err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+
+	_, stderr := captureOutput(t, func() {
+		err := cmd.Exec(context.Background(), nil)
+		if err == nil {
+			t.Fatal("expected missing-metadata preflight error")
+		}
+		var reported shared.ReportedError
+		if !errors.As(err, &reported) {
+			t.Fatalf("expected ReportedError, got %T: %v", err, err)
+		}
+	})
+
+	if !strings.Contains(stderr, "is MISSING_METADATA") {
+		t.Fatalf("expected missing metadata preflight explanation, got %q", stderr)
+	}
+	if !strings.Contains(stderr, `asc validate subscriptions --app "app-1"`) {
+		t.Fatalf("expected validate subscriptions hint, got %q", stderr)
+	}
+	if !strings.Contains(stderr, `asc subscriptions images create --subscription-id "sub-1" --file "./image.png"`) {
+		t.Fatalf("expected promotional image hint, got %q", stderr)
+	}
+	wantLabels := []string{"Loading review subscriptions"}
+	if strings.Join(*labels, "|") != strings.Join(wantLabels, "|") {
+		t.Fatalf("expected labels %v, got %v", wantLabels, *labels)
 	}
 }

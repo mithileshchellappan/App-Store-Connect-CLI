@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 
@@ -49,6 +50,47 @@ func reviewSubscriptionName(subscription webcore.ReviewSubscription) string {
 
 func reviewSubscriptionBool(value bool) string {
 	return strconv.FormatBool(value)
+}
+
+func reviewSubscriptionAttachPreflight(appID string, subscription webcore.ReviewSubscription) error {
+	state := strings.ToUpper(strings.TrimSpace(subscription.State))
+	if state != "MISSING_METADATA" {
+		return nil
+	}
+
+	subscriptionID := strings.TrimSpace(subscription.ID)
+	if subscriptionID == "" {
+		subscriptionID = "SUB_ID"
+	}
+
+	fmt.Fprintln(os.Stderr, "")
+	fmt.Fprintf(
+		os.Stderr,
+		"Attach preflight: subscription %q (%s) is %s, so Apple will not attach it to the next app version review yet.\n",
+		reviewSubscriptionName(subscription),
+		reviewSubscriptionValue(subscriptionID),
+		state,
+	)
+	fmt.Fprintf(
+		os.Stderr,
+		"Hint: run `asc validate subscriptions --app \"%s\"` to inspect readiness.\n",
+		reviewSubscriptionValue(strings.TrimSpace(appID)),
+	)
+	fmt.Fprintln(os.Stderr, "Hint: Apple only allows this attach flow after the subscription reaches READY_TO_SUBMIT.")
+	fmt.Fprintln(os.Stderr, "Hint: Check localizations, pricing coverage, and the App Store review screenshot.")
+	fmt.Fprintf(
+		os.Stderr,
+		"Hint: In live testing, a subscription promotional image also mattered even though App Store Connect surfaces it as a recommendation. Upload one with `asc subscriptions images create --subscription-id \"%s\" --file \"./image.png\"` if it is missing.\n",
+		reviewSubscriptionValue(subscriptionID),
+	)
+
+	return shared.NewReportedError(
+		fmt.Errorf(
+			"web review subscriptions attach: subscription %q is %s; Apple only allows attach once it reaches READY_TO_SUBMIT",
+			subscriptionID,
+			state,
+		),
+	)
 }
 
 func countAttachedReviewSubscriptions(subscriptions []webcore.ReviewSubscription) int {
@@ -269,6 +311,10 @@ func WebReviewSubscriptionsAttachCommand() *ffcli.Command {
 				Subscription: *selected,
 			}
 			if !selected.SubmitWithNextAppStoreVersion {
+				if err := reviewSubscriptionAttachPreflight(trimmedAppID, *selected); err != nil {
+					return err
+				}
+
 				submission, err := withWebSpinnerValue("Attaching subscription to next app version", func() (webcore.ReviewSubscriptionSubmission, error) {
 					return client.CreateSubscriptionSubmission(requestCtx, trimmedSubscriptionID)
 				})
