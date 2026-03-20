@@ -19,9 +19,10 @@ type buildBetaGroupsMutationClient interface {
 
 // ResolvedBetaGroup captures the canonical ID and metadata for a beta group.
 type ResolvedBetaGroup struct {
-	ID              string
-	Name            string
-	IsInternalGroup bool
+	ID                   string
+	Name                 string
+	IsInternalGroup      bool
+	HasAccessToAllBuilds bool
 }
 
 func (g ResolvedBetaGroup) NameForDisplay() string {
@@ -40,15 +41,17 @@ type ResolveBetaGroupsOptions struct {
 
 // AddBuildBetaGroupsOptions controls how resolved groups are assigned to a build.
 type AddBuildBetaGroupsOptions struct {
-	SkipInternal bool
-	Notify       bool
+	SkipInternal              bool
+	SkipInternalWithAllBuilds bool
+	Notify                    bool
 }
 
 // AddBuildBetaGroupsResult reports the final add/skipped group sets.
 type AddBuildBetaGroupsResult struct {
-	AddedGroupIDs         []string
-	SkippedInternalGroups []ResolvedBetaGroup
-	NotificationAction    asc.BuildBetaGroupsNotificationAction
+	AddedGroupIDs                  []string
+	SkippedInternalGroups          []ResolvedBetaGroup
+	SkippedInternalAllBuildsGroups []ResolvedBetaGroup
+	NotificationAction             asc.BuildBetaGroupsNotificationAction
 }
 
 // ResolveBetaGroups lists an app's beta groups and resolves the provided IDs or names.
@@ -140,9 +143,10 @@ func ResolveBetaGroupsFromList(inputGroups []string, groups *asc.BetaGroupsRespo
 			return nil, fmt.Errorf("resolved beta group %q not found in app group list", resolvedID)
 		}
 		resolvedGroups = append(resolvedGroups, ResolvedBetaGroup{
-			ID:              resolvedID,
-			Name:            strings.TrimSpace(group.Attributes.Name),
-			IsInternalGroup: group.Attributes.IsInternalGroup,
+			ID:                   resolvedID,
+			Name:                 strings.TrimSpace(group.Attributes.Name),
+			IsInternalGroup:      group.Attributes.IsInternalGroup,
+			HasAccessToAllBuilds: group.Attributes.HasAccessToAllBuilds,
 		})
 	}
 
@@ -153,9 +157,14 @@ func ResolveBetaGroupsFromList(inputGroups []string, groups *asc.BetaGroupsRespo
 func AddBuildBetaGroups(ctx context.Context, client buildBetaGroupsMutationClient, buildID string, groups []ResolvedBetaGroup, opts AddBuildBetaGroupsOptions) (*AddBuildBetaGroupsResult, error) {
 	groupIDsToAdd := make([]string, 0, len(groups))
 	skippedInternalGroups := make([]ResolvedBetaGroup, 0, len(groups))
+	skippedInternalAllBuildsGroups := make([]ResolvedBetaGroup, 0, len(groups))
 	for _, group := range groups {
 		if group.IsInternalGroup && opts.SkipInternal {
 			skippedInternalGroups = append(skippedInternalGroups, group)
+			continue
+		}
+		if group.IsInternalGroup && group.HasAccessToAllBuilds && opts.SkipInternalWithAllBuilds {
+			skippedInternalAllBuildsGroups = append(skippedInternalAllBuildsGroups, group)
 			continue
 		}
 		groupIDsToAdd = append(groupIDsToAdd, group.ID)
@@ -163,9 +172,10 @@ func AddBuildBetaGroups(ctx context.Context, client buildBetaGroupsMutationClien
 
 	if len(groupIDsToAdd) == 0 {
 		return &AddBuildBetaGroupsResult{
-			AddedGroupIDs:         []string{},
-			SkippedInternalGroups: skippedInternalGroups,
-			NotificationAction:    asc.BuildBetaGroupsNotificationActionNone,
+			AddedGroupIDs:                  []string{},
+			SkippedInternalGroups:          skippedInternalGroups,
+			SkippedInternalAllBuildsGroups: skippedInternalAllBuildsGroups,
+			NotificationAction:             asc.BuildBetaGroupsNotificationActionNone,
 		}, nil
 	}
 
@@ -175,9 +185,10 @@ func AddBuildBetaGroups(ctx context.Context, client buildBetaGroupsMutationClien
 	}
 
 	return &AddBuildBetaGroupsResult{
-		AddedGroupIDs:         groupIDsToAdd,
-		SkippedInternalGroups: skippedInternalGroups,
-		NotificationAction:    notificationAction,
+		AddedGroupIDs:                  groupIDsToAdd,
+		SkippedInternalGroups:          skippedInternalGroups,
+		SkippedInternalAllBuildsGroups: skippedInternalAllBuildsGroups,
+		NotificationAction:             notificationAction,
 	}, nil
 }
 

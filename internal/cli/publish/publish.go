@@ -231,7 +231,10 @@ Examples:
 			}
 
 			addResult, err := shared.AddBuildBetaGroups(requestCtx, client, buildResp.Data.ID, resolvedGroups, shared.AddBuildBetaGroupsOptions{
-				Notify: *notify,
+				// Apple requires Xcode Cloud builds to be added to internal groups manually,
+				// so only skip redundant internal-group adds for builds uploaded by this command.
+				SkipInternalWithAllBuilds: uploadMode,
+				Notify:                    *notify,
 			})
 			if err != nil {
 				return fmt.Errorf("publish testflight: failed to add groups: %w", err)
@@ -243,11 +246,20 @@ Examples:
 				notified = &value
 			}
 
+			for _, group := range addResult.SkippedInternalAllBuildsGroups {
+				fmt.Fprintf(
+					os.Stderr,
+					"Skipped internal group %q (%s) because it already receives all builds\n",
+					group.NameForDisplay(),
+					group.ID,
+				)
+			}
+
 			result := &asc.TestFlightPublishResult{
 				BuildID:            buildResp.Data.ID,
 				BuildVersion:       resolvedVersionValue,
 				BuildNumber:        resolvedBuildNumberValue,
-				GroupIDs:           addResult.AddedGroupIDs,
+				GroupIDs:           resolvedPublishBetaGroupIDs(resolvedGroups),
 				Uploaded:           uploaded,
 				ProcessingState:    buildResp.Data.Attributes.ProcessingState,
 				Notified:           notified,
