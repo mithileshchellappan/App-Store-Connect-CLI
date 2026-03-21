@@ -155,10 +155,16 @@ func BuildReadinessReport(ctx context.Context, opts ReadinessOptions) (validatio
 	availabilityID := ""
 	availableTerritories := 0
 	availabilityFetchSkipReason := ""
+	pricingCoverageSkipReason := ""
 	availabilityID, availableTerritories, err = fetchAvailableTerritories(requestCtx, client, opts.AppID)
 	if err != nil {
 		if reason, ok := readinessAvailabilitySkipReason(err); ok {
 			availabilityFetchSkipReason = reason
+			availabilityID = ""
+			availableTerritories = 0
+			if coverageReason, coverageOK := availabilityCheckSkipReason(err); coverageOK {
+				pricingCoverageSkipReason = coverageReason
+			}
 		} else {
 			return validation.Report{}, err
 		}
@@ -252,6 +258,7 @@ func BuildReadinessReport(ctx context.Context, opts ReadinessOptions) (validatio
 		AvailabilityID:              availabilityID,
 		AvailableTerritories:        availableTerritories,
 		AvailabilityFetchSkipReason: availabilityFetchSkipReason,
+		PricingCoverageSkipReason:   pricingCoverageSkipReason,
 		ScreenshotSets:              screenshotSets,
 		Subscriptions:               subscriptions,
 		SubscriptionFetchSkipReason: subscriptionFetchSkipReason,

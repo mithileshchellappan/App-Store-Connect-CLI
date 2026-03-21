@@ -1069,6 +1069,74 @@ func TestSubmitCreateLocalizationPreflightDoesNotConsumeSubmitTimeoutBudget(t *t
 	}
 }
 
+func TestSubmitCreatePreparationDoesNotConsumeSubmitTimeoutBudget(t *testing.T) {
+	setupSubmitCreateAuth(t)
+	t.Setenv("ASC_TIMEOUT", "100ms")
+
+	originalTransport := http.DefaultTransport
+	t.Cleanup(func() {
+		http.DefaultTransport = originalTransport
+	})
+
+	http.DefaultTransport = submitCreateRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+		switch {
+		case req.Method == http.MethodGet && req.URL.Path == "/v1/apps/app-1/appStoreVersions":
+			query := req.URL.Query()
+			if strings.Contains(query.Get("filter[appStoreState]"), "READY_FOR_SALE") {
+				return submitCreateJSONResponse(http.StatusOK, `{"data":[]}`)
+			}
+			return submitCreateJSONResponse(http.StatusOK, `{"data":[{"type":"appStoreVersions","id":"version-1","attributes":{"versionString":"1.0","platform":"IOS"}}]}`)
+
+		case req.Method == http.MethodGet && req.URL.Path == "/v1/appStoreVersions/version-1/appStoreVersionLocalizations":
+			return submitCreateJSONResponse(http.StatusOK, `{"data":[{"type":"appStoreVersionLocalizations","id":"loc-en","attributes":{"locale":"en-US","description":"Description","keywords":"keyword","supportUrl":"https://example.com/support","whatsNew":"Bug fixes"}}]}`)
+
+		case req.Method == http.MethodGet && req.URL.Path == "/v1/apps/app-1/subscriptionGroups":
+			return submitCreateJSONResponse(http.StatusOK, `{"data":[],"links":{}}`)
+
+		case req.Method == http.MethodGet && req.URL.Path == "/v1/apps/app-1/reviewSubmissions":
+			if err := sleepWithContext(req.Context()); err != nil {
+				return nil, err
+			}
+			return submitCreateJSONResponse(http.StatusOK, `{"data":[],"links":{}}`)
+
+		case req.Method == http.MethodPatch && req.URL.Path == "/v1/appStoreVersions/version-1/relationships/build":
+			return submitCreateJSONResponse(http.StatusNoContent, "")
+
+		case req.Method == http.MethodPost && req.URL.Path == "/v1/reviewSubmissions":
+			return submitCreateJSONResponse(http.StatusCreated, `{"data":{"type":"reviewSubmissions","id":"new-sub-1","attributes":{"state":"READY_FOR_REVIEW","platform":"IOS"}}}`)
+
+		case req.Method == http.MethodPost && req.URL.Path == "/v1/reviewSubmissionItems":
+			return submitCreateJSONResponse(http.StatusCreated, `{"data":{"type":"reviewSubmissionItems","id":"item-1"}}`)
+
+		case req.Method == http.MethodPatch && req.URL.Path == "/v1/reviewSubmissions/new-sub-1":
+			if err := sleepWithContext(req.Context()); err != nil {
+				return nil, err
+			}
+			return submitCreateJSONResponse(http.StatusOK, `{"data":{"type":"reviewSubmissions","id":"new-sub-1","attributes":{"state":"WAITING_FOR_REVIEW","submittedDate":"2026-02-22T00:00:00Z"}}}`)
+
+		default:
+			return nil, fmt.Errorf("unexpected request: %s %s", req.Method, req.URL.Path)
+		}
+	})
+
+	root := RootCommand("1.2.3")
+	root.FlagSet.SetOutput(io.Discard)
+
+	if err := root.Parse([]string{
+		"submit", "create",
+		"--app", "app-1",
+		"--version", "1.0",
+		"--build", "build-1",
+		"--platform", "IOS",
+		"--confirm",
+	}); err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if err := root.Run(context.Background()); err != nil {
+		t.Fatalf("expected submit create to succeed with fresh submission-preparation timeout budget, got %v", err)
+	}
+}
+
 func TestSubmitCreateRecoversFromAlreadyAddedError(t *testing.T) {
 	setupSubmitCreateAuth(t)
 
@@ -1461,6 +1529,19 @@ func TestSubmitCreatePaginatesReadyForReviewSubmissionsBeforeCreatingNewOne(t *t
 					}
 				}],
 				"links": {}
+			}`)
+
+		case req.Method == http.MethodGet && req.URL.Path == "/v1/reviewSubmissions/existing-empty-page-2/items":
+			return submitCreateJSONResponse(http.StatusOK, `{
+				"data": [{
+					"type": "reviewSubmissionItems",
+					"id": "version-item",
+					"relationships": {
+						"appStoreVersion": {
+							"data": {"type": "appStoreVersions", "id": "version-1"}
+						}
+					}
+				}]
 			}`)
 
 		case req.Method == http.MethodPost && req.URL.Path == "/v1/reviewSubmissions":

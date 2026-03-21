@@ -77,3 +77,27 @@ func TestValidateIncludesPricingAndAvailabilitySkipWarnings(t *testing.T) {
 		t.Fatalf("expected availability.unverified in unified validate, got %+v", report.Checks)
 	}
 }
+
+func TestValidateAvailabilitySkipSuppressesPartialCoverageAndAddsCoverageSkipCheck(t *testing.T) {
+	report := Validate(Input{
+		AppID:                       "app-1",
+		VersionID:                   "ver-1",
+		AvailabilityFetchSkipReason: "availability access unavailable",
+		PricingCoverageSkipReason:   "subscription pricing coverage verification was skipped because availability access was unavailable",
+		AvailableTerritories:        175,
+		Subscriptions: []Subscription{
+			{
+				ID:         "sub-1",
+				State:      "APPROVED",
+				PriceCount: 1,
+			},
+		},
+	}, false)
+
+	if hasCheckID(report.Checks, "subscriptions.pricing.partial_territory_coverage") {
+		t.Fatalf("did not expect partial coverage check when availability is unverified, got %+v", report.Checks)
+	}
+	if !hasCheckID(report.Checks, "subscriptions.pricing_coverage.unverified") {
+		t.Fatalf("expected pricing coverage skip check in unified validate, got %+v", report.Checks)
+	}
+}

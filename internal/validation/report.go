@@ -4,6 +4,10 @@ package validation
 func Validate(input Input, strict bool) Report {
 	activeMonetization := hasActiveMonetization(input.Subscriptions, input.IAPs)
 	reviewRelevantSubscriptions := hasReviewRelevantSubscriptions(input.Subscriptions)
+	availableTerritories := input.AvailableTerritories
+	if input.PricingCoverageSkipReason != "" {
+		availableTerritories = 0
+	}
 
 	checks := make([]CheckResult, 0)
 	checks = append(checks, metadataLengthChecks(input.VersionLocalizations, input.AppInfoLocalizations)...)
@@ -20,7 +24,8 @@ func Validate(input Input, strict bool) Report {
 	checks = append(checks, subscriptionReviewReadinessChecks(input.Subscriptions)...)
 	checks = append(checks, subscriptionPricingVerificationChecks(input.Subscriptions)...)
 	checks = append(checks, subscriptionMetadataDiagnostics(input.Subscriptions)...)
-	checks = append(checks, subscriptionPricingCoverageChecks(input.Subscriptions, input.AvailableTerritories)...)
+	checks = append(checks, subscriptionPricingCoverageSkipChecks(input.AppID, input.PricingCoverageSkipReason)...)
+	checks = append(checks, subscriptionPricingCoverageChecks(input.Subscriptions, availableTerritories)...)
 	checks = append(checks, iapFetchChecks(input.IAPFetchSkipReason)...)
 	checks = append(checks, iapReviewReadinessChecks(input.IAPs)...)
 	checks = append(checks, ageRatingChecks(input.AgeRatingDeclaration)...)

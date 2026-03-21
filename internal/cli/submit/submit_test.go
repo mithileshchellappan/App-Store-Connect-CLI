@@ -1021,6 +1021,64 @@ func TestSubmitCancelCommand_ByVersionIDIgnoresStaleEnvAppIDForModernLookup(t *t
 	}
 }
 
+func TestSubmitCancelCommand_ByVersionIDExplicitAppMismatchFailsFast(t *testing.T) {
+	setupSubmitAuth(t)
+
+	originalTransport := http.DefaultTransport
+	t.Cleanup(func() {
+		http.DefaultTransport = originalTransport
+	})
+
+	requests := make([]string, 0, 2)
+	http.DefaultTransport = submitRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+		requests = append(requests, req.Method+" "+req.URL.RequestURI())
+
+		switch {
+		case req.Method == http.MethodGet && req.URL.Path == "/v1/appStoreVersions/version-123":
+			if got := req.URL.Query().Get("include"); got != "app" {
+				return nil, fmt.Errorf("expected include=app, got %q", got)
+			}
+			return submitJSONResponse(http.StatusOK, `{
+				"data": {
+					"type": "appStoreVersions",
+					"id": "version-123",
+					"attributes": {"platform": "IOS", "versionString": "1.0"},
+					"relationships": {"app": {"data": {"type": "apps", "id": "app-actual"}}}
+				}
+			}`)
+		case req.Method == http.MethodGet && req.URL.Path == "/v1/apps/app-actual/reviewSubmissions":
+			t.Fatalf("did not expect lookup against version-owned app when explicit --app mismatches")
+		case req.Method == http.MethodGet && req.URL.Path == "/v1/apps/app-expected/reviewSubmissions":
+			t.Fatalf("did not expect modern lookup to continue after explicit --app mismatch")
+		case req.Method == http.MethodGet && req.URL.Path == "/v1/appStoreVersions/version-123/appStoreVersionSubmission":
+			t.Fatalf("did not expect legacy fallback after explicit --app mismatch")
+		}
+
+		return nil, fmt.Errorf("unexpected request: %s %s", req.Method, req.URL.RequestURI())
+	})
+
+	cmd := SubmitCancelCommand()
+	cmd.FlagSet.SetOutput(io.Discard)
+	if err := cmd.FlagSet.Parse([]string{"--version-id", "version-123", "--app", "app-expected", "--confirm"}); err != nil {
+		t.Fatalf("failed to parse flags: %v", err)
+	}
+
+	err := cmd.Exec(context.Background(), nil)
+	if err == nil {
+		t.Fatal("expected explicit --app mismatch to fail, got nil")
+	}
+	if !strings.Contains(err.Error(), `version "version-123" belongs to app "app-actual", not "app-expected"`) {
+		t.Fatalf("expected mismatch error, got %v", err)
+	}
+
+	wantRequests := []string{
+		"GET /v1/appStoreVersions/version-123?include=app",
+	}
+	if !reflect.DeepEqual(requests, wantRequests) {
+		t.Fatalf("unexpected requests: got %v want %v", requests, wantRequests)
+	}
+}
+
 func TestSubmitCancelCommand_ByVersionIDVersionLookupErrorFallsBackToLegacy(t *testing.T) {
 	setupSubmitAuth(t)
 
@@ -2353,8 +2411,141 @@ func TestPrepareReviewSubmissionForCreateDoesNotReuseSubmissionThatBecameCanceli
 	}
 }
 
-func TestPrepareReviewSubmissionForCreatePaginatesReadyForReviewLookups(t *testing.T) {
+func TestPrepareReviewSubmissionForCreateCancelsMixedTargetVersionSubmission(t *testing.T) {
 	requests := make([]string, 0, 4)
+	client := newSubmitTestClient(t, submitRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+		requests = append(requests, req.Method+" "+req.URL.RequestURI())
+
+		switch {
+		case req.Method == http.MethodGet && req.URL.Path == "/v1/apps/app-1/reviewSubmissions":
+			return submitJSONResponse(http.StatusOK, `{
+				"data": [{
+					"type": "reviewSubmissions",
+					"id": "mixed-submission",
+					"attributes": {
+						"state": "READY_FOR_REVIEW",
+						"platform": "IOS"
+					},
+					"relationships": {
+						"appStoreVersionForReview": {
+							"data": {"type": "appStoreVersions", "id": "version-1"}
+						}
+					}
+				}]
+			}`)
+		case req.Method == http.MethodGet && req.URL.Path == "/v1/reviewSubmissions/mixed-submission/items":
+			if got := req.URL.Query().Get("limit"); got != "200" {
+				return nil, fmt.Errorf("expected limit=200, got %q", got)
+			}
+			return submitJSONResponse(http.StatusOK, `{
+				"data": [
+					{
+						"type": "reviewSubmissionItems",
+						"id": "version-item",
+						"relationships": {
+							"appStoreVersion": {
+								"data": {"type": "appStoreVersions", "id": "version-1"}
+							}
+						}
+					},
+					{
+						"type": "reviewSubmissionItems",
+						"id": "other-item"
+					}
+				]
+			}`)
+		case req.Method == http.MethodPatch && req.URL.Path == "/v1/reviewSubmissions/mixed-submission":
+			return submitJSONResponse(http.StatusOK, `{"data":{"type":"reviewSubmissions","id":"mixed-submission"}}`)
+		default:
+			return nil, fmt.Errorf("unexpected request: %s %s", req.Method, req.URL.RequestURI())
+		}
+	}))
+
+	stderr := captureSubmitStderr(t, func() {
+		got := prepareReviewSubmissionForCreate(context.Background(), client, "app-1", "IOS", "version-1")
+		if got.reuseSubmissionID != "" {
+			t.Fatalf("expected mixed-item submission not to be reused, got %#v", got)
+		}
+		if got.reuseSubmissionHasVersion {
+			t.Fatalf("expected mixed-item submission not to be marked as reusable target version, got %#v", got)
+		}
+		if _, ok := got.canceledSubmissionIDs["mixed-submission"]; !ok {
+			t.Fatalf("expected mixed-item submission to be canceled, got %#v", got.canceledSubmissionIDs)
+		}
+	})
+
+	wantRequests := []string{
+		"GET /v1/apps/app-1/reviewSubmissions?filter%5Bplatform%5D=IOS&filter%5Bstate%5D=READY_FOR_REVIEW&include=appStoreVersionForReview&limit=200",
+		"GET /v1/reviewSubmissions/mixed-submission/items?limit=200",
+		"PATCH /v1/reviewSubmissions/mixed-submission",
+	}
+	if !reflect.DeepEqual(requests, wantRequests) {
+		t.Fatalf("unexpected requests: got %v want %v", requests, wantRequests)
+	}
+	if strings.Contains(stderr, "Reusing existing review submission mixed-submission") {
+		t.Fatalf("did not expect reuse message, got %q", stderr)
+	}
+	if !strings.Contains(stderr, "Canceled stale review submission mixed-submission") {
+		t.Fatalf("expected stale submission cancellation message, got %q", stderr)
+	}
+}
+
+func TestPrepareReviewSubmissionForCreateTreatsEmptyItemsAsMissingVersion(t *testing.T) {
+	requests := make([]string, 0, 3)
+	client := newSubmitTestClient(t, submitRoundTripFunc(func(req *http.Request) (*http.Response, error) {
+		requests = append(requests, req.Method+" "+req.URL.RequestURI())
+
+		switch {
+		case req.Method == http.MethodGet && req.URL.Path == "/v1/apps/app-1/reviewSubmissions":
+			return submitJSONResponse(http.StatusOK, `{
+				"data": [{
+					"type": "reviewSubmissions",
+					"id": "empty-items-submission",
+					"attributes": {
+						"state": "READY_FOR_REVIEW",
+						"platform": "IOS"
+					},
+					"relationships": {
+						"appStoreVersionForReview": {
+							"data": {"type": "appStoreVersions", "id": "version-1"}
+						}
+					}
+				}]
+			}`)
+		case req.Method == http.MethodGet && req.URL.Path == "/v1/reviewSubmissions/empty-items-submission/items":
+			return submitJSONResponse(http.StatusOK, `{"data":[],"links":{}}`)
+		default:
+			return nil, fmt.Errorf("unexpected request: %s %s", req.Method, req.URL.RequestURI())
+		}
+	}))
+
+	stderr := captureSubmitStderr(t, func() {
+		got := prepareReviewSubmissionForCreate(context.Background(), client, "app-1", "IOS", "version-1")
+		if got.reuseSubmissionID != "empty-items-submission" {
+			t.Fatalf("expected empty-items submission to be reused, got %#v", got)
+		}
+		if got.reuseSubmissionHasVersion {
+			t.Fatalf("expected empty-items submission to require re-attaching the version, got %#v", got)
+		}
+		if got.canceledSubmissionIDs != nil {
+			t.Fatalf("did not expect canceled submissions when reusable empty submission exists, got %#v", got.canceledSubmissionIDs)
+		}
+	})
+
+	wantRequests := []string{
+		"GET /v1/apps/app-1/reviewSubmissions?filter%5Bplatform%5D=IOS&filter%5Bstate%5D=READY_FOR_REVIEW&include=appStoreVersionForReview&limit=200",
+		"GET /v1/reviewSubmissions/empty-items-submission/items?limit=200",
+	}
+	if !reflect.DeepEqual(requests, wantRequests) {
+		t.Fatalf("unexpected requests: got %v want %v", requests, wantRequests)
+	}
+	if !strings.Contains(stderr, "Reusing existing review submission empty-items-submission") {
+		t.Fatalf("expected reuse message for empty-items submission, got %q", stderr)
+	}
+}
+
+func TestPrepareReviewSubmissionForCreatePaginatesReadyForReviewLookups(t *testing.T) {
+	requests := make([]string, 0, 5)
 	client := newSubmitTestClient(t, submitRoundTripFunc(func(req *http.Request) (*http.Response, error) {
 		requests = append(requests, req.Method+" "+req.URL.RequestURI())
 
@@ -2382,6 +2573,18 @@ func TestPrepareReviewSubmissionForCreatePaginatesReadyForReviewLookups(t *testi
 					}
 				}],
 				"links": {}
+			}`)
+		case req.Method == http.MethodGet && req.URL.Path == "/v1/reviewSubmissions/existing-submission/items":
+			return submitJSONResponse(http.StatusOK, `{
+				"data": [{
+					"type": "reviewSubmissionItems",
+					"id": "version-item",
+					"relationships": {
+						"appStoreVersion": {
+							"data": {"type": "appStoreVersions", "id": "version-1"}
+						}
+					}
+				}]
 			}`)
 		default:
 			return nil, fmt.Errorf("unexpected request: %s %s", req.Method, req.URL.RequestURI())

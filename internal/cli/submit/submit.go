@@ -140,10 +140,12 @@ Examples:
 
 			runSubmitCreateSubscriptionPreflight(ctx, client, resolvedAppID)
 
+			preparationCtx, preparationCancel := shared.ContextWithTimeout(ctx)
+			preparedSubmission := prepareReviewSubmissionForCreate(preparationCtx, client, resolvedAppID, effectivePlatform, resolvedVersionID)
+			preparationCancel()
+
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()
-
-			preparedSubmission := prepareReviewSubmissionForCreate(requestCtx, client, resolvedAppID, effectivePlatform, resolvedVersionID)
 
 			var createdSubmissionID string
 			submissionIDToSubmit := strings.TrimSpace(preparedSubmission.reuseSubmissionID)
@@ -814,6 +816,9 @@ Examples:
 				versionResp, vErr := client.GetAppStoreVersion(requestCtx, resolvedVersionID, asc.WithAppStoreVersionInclude([]string{"app"}))
 				if vErr == nil {
 					if aid, aidErr := resolveAppIDFromVersionResponse(versionResp); aidErr == nil {
+						if explicitAppID != "" && explicitAppID != aid {
+							return fmt.Errorf("submit cancel: version %q belongs to app %q, not %q", resolvedVersionID, aid, explicitAppID)
+						}
 						resolvedAppID = aid
 					}
 				}
@@ -1209,11 +1214,18 @@ func prepareReviewSubmissionForCreate(
 			continue
 		}
 		if currentVersionID := reviewSubmissionAppStoreVersionID(&sub); targetVersionID != "" && currentVersionID == targetVersionID {
-			fmt.Fprintf(os.Stderr, "Reusing existing review submission %s because the target version is already attached.\n", sub.ID)
-			result.reuseSubmissionID = strings.TrimSpace(sub.ID)
-			result.reuseSubmissionHasVersion = true
-			result.canceledSubmissionIDs = nil
-			return result
+			reusable, hasVersion, reuseErr := reviewSubmissionCanBeReusedForCreate(ctx, client, &sub, targetVersionID)
+			if reuseErr != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed to inspect review submission %s before reuse: %v\n", sub.ID, reuseErr)
+				continue
+			}
+			if reusable {
+				fmt.Fprintf(os.Stderr, "Reusing existing review submission %s because the target version is already attached.\n", sub.ID)
+				result.reuseSubmissionID = strings.TrimSpace(sub.ID)
+				result.reuseSubmissionHasVersion = hasVersion
+				result.canceledSubmissionIDs = nil
+				return result
+			}
 		}
 	}
 
@@ -1272,6 +1284,35 @@ type reviewSubmissionItemSummary struct {
 	hasOtherItems    bool
 }
 
+func reviewSubmissionCanBeReusedForCreate(
+	ctx context.Context,
+	client *asc.Client,
+	submission *asc.ReviewSubmissionResource,
+	targetVersionID string,
+) (reusable bool, hasVersion bool, err error) {
+	if submission == nil {
+		return false, false, nil
+	}
+
+	submissionID := strings.TrimSpace(submission.ID)
+	if submissionID == "" {
+		return false, false, nil
+	}
+
+	itemSummary, err := summarizeReviewSubmissionItems(ctx, client, submissionID, targetVersionID)
+	if err != nil {
+		return false, false, err
+	}
+	if itemSummary.hasItems {
+		if itemSummary.hasTargetVersion && !itemSummary.hasOtherItems {
+			return true, true, nil
+		}
+		return false, false, nil
+	}
+
+	return true, false, nil
+}
+
 func reusableReviewSubmissionForCreate(
 	ctx context.Context,
 	client *asc.Client,
@@ -1294,23 +1335,12 @@ func reusableReviewSubmissionForCreate(
 		return "", false, nil
 	}
 
-	resolvedVersionID := reviewSubmissionAppStoreVersionID(refreshed)
-	if resolvedVersionID != "" {
-		if targetVersionID != "" && resolvedVersionID == targetVersionID {
-			return submissionID, true, nil
-		}
-		return "", false, nil
-	}
-
-	itemSummary, err := summarizeReviewSubmissionItems(ctx, client, submissionID, targetVersionID)
+	reusable, hasVersion, err := reviewSubmissionCanBeReusedForCreate(ctx, client, refreshed, targetVersionID)
 	if err != nil {
 		return "", false, err
 	}
-	if !itemSummary.hasItems {
-		return submissionID, false, nil
-	}
-	if itemSummary.hasTargetVersion && !itemSummary.hasOtherItems {
-		return submissionID, true, nil
+	if reusable {
+		return submissionID, hasVersion, nil
 	}
 	return "", false, nil
 }

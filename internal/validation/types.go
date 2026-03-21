@@ -59,6 +59,7 @@ type Input struct {
 	AvailabilityID              string
 	AvailableTerritories        int
 	AvailabilityFetchSkipReason string
+	PricingCoverageSkipReason   string
 	ScreenshotSets              []ScreenshotSet
 	Subscriptions               []Subscription
 	SubscriptionFetchSkipReason string
