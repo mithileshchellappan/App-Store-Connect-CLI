@@ -71,28 +71,53 @@ func NormalizeCountryCode(country string) (string, error) {
 	if normalized == "" {
 		return "", nil
 	}
-	if _, ok := CountryNames[normalized]; !ok {
+	if len(normalized) != 2 {
 		return "", fmt.Errorf("unsupported country code: %s", strings.TrimSpace(country))
+	}
+	for _, r := range normalized {
+		if r < 'a' || r > 'z' {
+			return "", fmt.Errorf("unsupported country code: %s", strings.TrimSpace(country))
+		}
 	}
 	return normalized, nil
 }
 
+func canonicalizeLookupID(id string) string {
+	trimmed := strings.TrimSpace(id)
+	if trimmed == "" {
+		return ""
+	}
+	parsed, err := strconv.ParseInt(trimmed, 10, 64)
+	if err != nil {
+		return trimmed
+	}
+	return strconv.FormatInt(parsed, 10)
+}
+
 // LookupApps fetches public App Store metadata for one or more app IDs.
 func (c *Client) LookupApps(ctx context.Context, ids []string, opts LookupOptions) (map[string]App, error) {
-	trimmedIDs := make([]string, 0, len(ids))
+	requestedIDs := make([]string, 0, len(ids))
+	queryIDs := make([]string, 0, len(ids))
+	seenQueryIDs := make(map[string]struct{}, len(ids))
 	for _, id := range ids {
 		trimmed := strings.TrimSpace(id)
 		if trimmed == "" {
 			continue
 		}
-		trimmedIDs = append(trimmedIDs, trimmed)
+		requestedIDs = append(requestedIDs, trimmed)
+		canonicalID := canonicalizeLookupID(trimmed)
+		if _, ok := seenQueryIDs[canonicalID]; ok {
+			continue
+		}
+		seenQueryIDs[canonicalID] = struct{}{}
+		queryIDs = append(queryIDs, canonicalID)
 	}
-	if len(trimmedIDs) == 0 {
+	if len(queryIDs) == 0 {
 		return nil, fmt.Errorf("app ID is required")
 	}
 
 	query := url.Values{}
-	query.Set("id", strings.Join(trimmedIDs, ","))
+	query.Set("id", strings.Join(queryIDs, ","))
 	country, err := NormalizeCountryCode(opts.Country)
 	if err != nil {
 		return nil, err
@@ -122,12 +147,24 @@ func (c *Client) LookupApps(ctx context.Context, ids []string, opts LookupOption
 		return nil, fmt.Errorf("failed to parse lookup response: %w", err)
 	}
 
-	apps := make(map[string]App, len(lookup.Results))
+	appsByCanonicalID := make(map[string]App, len(lookup.Results))
 	for _, result := range lookup.Results {
 		if result.TrackID == 0 {
 			continue
 		}
-		apps[strconv.FormatInt(result.TrackID, 10)] = buildApp(result, country)
+		appsByCanonicalID[strconv.FormatInt(result.TrackID, 10)] = buildApp(result, country)
+	}
+
+	apps := make(map[string]App, len(appsByCanonicalID)+len(requestedIDs))
+	for canonicalID, app := range appsByCanonicalID {
+		apps[canonicalID] = app
+	}
+	for _, requestedID := range requestedIDs {
+		app, ok := appsByCanonicalID[canonicalizeLookupID(requestedID)]
+		if !ok {
+			continue
+		}
+		apps[requestedID] = app
 	}
 	return apps, nil
 }
@@ -138,6 +175,7 @@ func (c *Client) LookupApp(ctx context.Context, appID string, opts LookupOptions
 	if appID == "" {
 		return nil, fmt.Errorf("app ID is required")
 	}
+	canonicalAppID := canonicalizeLookupID(appID)
 
 	apps, err := c.LookupApps(ctx, []string{appID}, opts)
 	if err != nil {
@@ -145,6 +183,9 @@ func (c *Client) LookupApp(ctx context.Context, appID string, opts LookupOptions
 	}
 
 	app, ok := apps[appID]
+	if !ok && canonicalAppID != appID {
+		app, ok = apps[canonicalAppID]
+	}
 	if !ok {
 		return nil, fmt.Errorf("app not found: %s", appID)
 	}

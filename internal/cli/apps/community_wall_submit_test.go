@@ -490,3 +490,30 @@ func TestFetchCommunityWallAppDetailsOmitsCountryFilter(t *testing.T) {
 		t.Fatalf("expected app details for requested ID, got %+v", details)
 	}
 }
+
+func TestFetchCommunityWallAppDetailsPreservesZeroPaddedRequestKey(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.URL.Path; got != "/lookup" {
+			t.Fatalf("expected /lookup path, got %q", got)
+		}
+		if got := r.URL.Query().Get("id"); got != "123" {
+			t.Fatalf("expected canonical id query, got %q", got)
+		}
+		_, _ = w.Write([]byte(`{"results":[{"trackId":123,"trackName":"Beta","trackViewUrl":"https://apps.apple.com/app/id123","artworkUrl100":"https://example.com/icon.png"}]}`))
+	}))
+	defer server.Close()
+
+	previousLookupURL := communityWallAppStoreLookupURL
+	communityWallAppStoreLookupURL = server.URL
+	t.Cleanup(func() {
+		communityWallAppStoreLookupURL = previousLookupURL
+	})
+
+	details, err := fetchCommunityWallAppDetails(context.Background(), []string{"00123"})
+	if err != nil {
+		t.Fatalf("fetch app details: %v", err)
+	}
+	if got := details["00123"].Name; got != "Beta" {
+		t.Fatalf("expected app details for zero-padded requested ID, got %+v", details)
+	}
+}

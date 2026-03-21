@@ -115,7 +115,7 @@ func TestAppsPublicValidationErrors(t *testing.T) {
 		},
 		{
 			name:    "view invalid country",
-			args:    []string{"apps", "public", "view", "--app", "123", "--country", "zz"},
+			args:    []string{"apps", "public", "view", "--app", "123", "--country", "usa"},
 			wantErr: "unsupported country code",
 		},
 		{
@@ -130,7 +130,7 @@ func TestAppsPublicValidationErrors(t *testing.T) {
 		},
 		{
 			name:    "search invalid country",
-			args:    []string{"apps", "public", "search", "--term", "focus", "--country", "zz"},
+			args:    []string{"apps", "public", "search", "--term", "focus", "--country", "usa"},
 			wantErr: "unsupported country code",
 		},
 	}
@@ -248,6 +248,71 @@ func TestAppsPublicAliasIsSilentAndMatchesCanonical(t *testing.T) {
 	}
 	if payload.CountryName != "United States" {
 		t.Fatalf("CountryName = %q, want United States", payload.CountryName)
+	}
+}
+
+func TestAppsPublicViewAcceptsZeroPaddedAppIDAndUnlistedCountry(t *testing.T) {
+	t.Setenv("ASC_BYPASS_KEYCHAIN", "1")
+
+	originalTransport := http.DefaultTransport
+	t.Cleanup(func() {
+		http.DefaultTransport = originalTransport
+	})
+
+	http.DefaultTransport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		if req.Method != http.MethodGet {
+			t.Fatalf("expected GET, got %s", req.Method)
+		}
+		if req.URL.Path != "/lookup" {
+			t.Fatalf("expected /lookup, got %s", req.URL.Path)
+		}
+		if got := req.URL.Query().Get("id"); got != "123" {
+			t.Fatalf("expected canonical id=123, got %q", got)
+		}
+		if got := req.URL.Query().Get("country"); got != "kz" {
+			t.Fatalf("expected country=kz, got %q", got)
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Body: io.NopCloser(strings.NewReader(`{
+				"resultCount": 1,
+				"results": [{
+					"trackId": 123,
+					"trackName": "Alpha",
+					"bundleId": "com.example.alpha",
+					"trackViewUrl": "https://apps.apple.com/kz/app/alpha/id123",
+					"artworkUrl512": "https://example.com/icon.png",
+					"sellerName": "Alpha Inc",
+					"primaryGenreName": "Games",
+					"version": "1.0.0",
+					"description": "Alpha description",
+					"formattedPrice": "Free",
+					"currency": "KZT",
+					"averageUserRating": 4.5,
+					"userRatingCount": 12
+				}]
+			}`)),
+			Header: http.Header{"Content-Type": []string{"application/json"}},
+		}, nil
+	})
+
+	stdout, stderr, runErr := runCommand(t, []string{"apps", "public", "view", "--app", "00123", "--country", "kz", "--output", "json"})
+	if runErr != nil {
+		t.Fatalf("run error: %v", runErr)
+	}
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+
+	var payload itunes.App
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("unmarshal view payload: %v", err)
+	}
+	if payload.AppID != 123 {
+		t.Fatalf("AppID = %d, want 123", payload.AppID)
+	}
+	if payload.Country != "KZ" {
+		t.Fatalf("Country = %q, want KZ", payload.Country)
 	}
 }
 

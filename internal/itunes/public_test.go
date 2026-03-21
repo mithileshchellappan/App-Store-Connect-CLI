@@ -18,7 +18,15 @@ func TestNormalizeCountryCode(t *testing.T) {
 		t.Fatalf("NormalizeCountryCode() = %q, want us", country)
 	}
 
-	if _, err := NormalizeCountryCode("zz"); err == nil {
+	country, err = NormalizeCountryCode(" kz ")
+	if err != nil {
+		t.Fatalf("NormalizeCountryCode() error: %v", err)
+	}
+	if country != "kz" {
+		t.Fatalf("NormalizeCountryCode() = %q, want kz", country)
+	}
+
+	if _, err := NormalizeCountryCode("usa"); err == nil {
 		t.Fatal("expected invalid country code error")
 	}
 }
@@ -128,6 +136,35 @@ func TestLookupAppIncludesCountryWhenProvided(t *testing.T) {
 	}
 	if app.CountryName != "United States" {
 		t.Fatalf("CountryName = %q, want United States", app.CountryName)
+	}
+}
+
+func TestLookupAppMatchesZeroPaddedRequestedID(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/lookup" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("id"); got != "123" {
+			t.Fatalf("expected canonical id=123, got %q", got)
+		}
+		writeBody(t, w, `{
+			"resultCount": 1,
+			"results": [{
+				"trackId": 123,
+				"trackName": "Alpha",
+				"trackViewUrl": "https://apps.apple.com/us/app/alpha/id123"
+			}]
+		}`)
+	}))
+	defer server.Close()
+
+	client := &Client{BaseURL: server.URL, HTTPClient: server.Client()}
+	app, err := client.LookupApp(context.Background(), "00123", LookupOptions{})
+	if err != nil {
+		t.Fatalf("LookupApp() error: %v", err)
+	}
+	if app.AppID != 123 {
+		t.Fatalf("AppID = %d, want 123", app.AppID)
 	}
 }
 
@@ -250,5 +287,38 @@ func TestGetRatingsHistogramRequestHeader(t *testing.T) {
 	}
 	if ratings.Histogram[5] != 10 {
 		t.Fatalf("Histogram[5] = %d, want 10", ratings.Histogram[5])
+	}
+}
+
+func TestGetRatingsAllowsCountryOutsideHistogramStorefrontMap(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/lookup" {
+			t.Fatalf("unexpected path %s", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("country"); got != "kz" {
+			t.Fatalf("expected lookup country=kz, got %q", got)
+		}
+		writeBody(t, w, `{
+			"resultCount": 1,
+			"results": [{
+				"trackId": 123,
+				"trackName": "Alpha",
+				"averageUserRating": 4.5,
+				"userRatingCount": 12
+			}]
+		}`)
+	}))
+	defer server.Close()
+
+	client := &Client{BaseURL: server.URL, HTTPClient: server.Client()}
+	ratings, err := client.GetRatings(context.Background(), "123", "kz")
+	if err != nil {
+		t.Fatalf("GetRatings() error: %v", err)
+	}
+	if ratings.Country != "KZ" {
+		t.Fatalf("Country = %q, want KZ", ratings.Country)
+	}
+	if len(ratings.Histogram) != 0 {
+		t.Fatalf("expected empty histogram, got %+v", ratings.Histogram)
 	}
 }
