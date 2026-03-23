@@ -33,36 +33,36 @@ func TestParseSalesReportMetrics(t *testing.T) {
 	}, "\n")
 
 	compressed := gzipText(t, report)
-	metrics, err := ParseSalesReportMetrics(bytes.NewReader(compressed), salesScope{
-		AppID:  "1500196580",
-		AppSKU: "Chromism12345",
+	metrics, err := parseSalesReportMetrics(bytes.NewReader(compressed), salesScope{
+		appID:  "1500196580",
+		appSKU: "Chromism12345",
 	})
 	if err != nil {
-		t.Fatalf("ParseSalesReportMetrics error: %v", err)
+		t.Fatalf("parseSalesReportMetrics error: %v", err)
 	}
 
-	if metrics.RowCount != 3 {
-		t.Fatalf("expected RowCount=3, got %d", metrics.RowCount)
+	if metrics.rowCount != 3 {
+		t.Fatalf("expected rowCount=3, got %d", metrics.rowCount)
 	}
-	if !metrics.UnitsColumnPresent || metrics.UnitsTotal != 15 {
+	if !metrics.unitsColumnPresent || metrics.unitsTotal != 15 {
 		t.Fatalf("unexpected units totals: %+v", metrics)
 	}
-	if metrics.DownloadUnitsTotal != 10 {
+	if metrics.downloadUnitsTotal != 10 {
 		t.Fatalf("unexpected download units totals: %+v", metrics)
 	}
-	if metrics.MonetizedUnitsTotal != 5 {
+	if metrics.monetizedUnitsTotal != 5 {
 		t.Fatalf("unexpected monetized units totals: %+v", metrics)
 	}
-	if !metrics.DeveloperProceedsColumnPresent || metrics.DeveloperProceedsTotal != 2 {
+	if !metrics.developerProceedsColumnPresent || metrics.developerProceedsTotal != 2 {
 		t.Fatalf("unexpected developer proceeds totals: %+v", metrics)
 	}
-	if !metrics.CustomerPriceColumnPresent || metrics.CustomerPriceTotal != 3 {
+	if !metrics.customerPriceColumnPresent || metrics.customerPriceTotal != 3 {
 		t.Fatalf("unexpected customer price totals: %+v", metrics)
 	}
-	if !metrics.SubscriptionColumnPresent || metrics.SubscriptionRows != 2 || metrics.SubscriptionUnitsTotal != 5 {
+	if !metrics.subscriptionColumnPresent || metrics.subscriptionRows != 2 || metrics.subscriptionUnitsTotal != 5 {
 		t.Fatalf("unexpected subscription totals: %+v", metrics)
 	}
-	if metrics.RenewalRows != 1 || metrics.RenewalUnitsTotal != 3 || metrics.RenewalDeveloperProceeds != 0.75 {
+	if metrics.renewalRows != 1 || metrics.renewalUnitsTotal != 3 || metrics.renewalDeveloperProceeds != 0.75 {
 		t.Fatalf("unexpected renewal totals: %+v", metrics)
 	}
 }
