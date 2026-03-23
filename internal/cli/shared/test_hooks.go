@@ -2,14 +2,35 @@ package shared
 
 import (
 	"os"
-	"path/filepath"
 )
 
-// ResetTierCacheForTest clears the local tier cache for tests.
+// ResetTierCacheForTest routes tier-cache reads and writes to an isolated temp dir for tests.
 func ResetTierCacheForTest() {
-	home, err := os.UserHomeDir()
-	if err != nil {
+	tierCacheDirOverrideMu.Lock()
+	override := tierCacheDirOverride
+	if override == "" {
+		tempDir, err := os.MkdirTemp("", "asc-tier-cache-*")
+		if err != nil {
+			tierCacheDirOverrideMu.Unlock()
+			return
+		}
+		override = tempDir
+		tierCacheDirOverride = override
+	}
+	tierCacheDirOverrideMu.Unlock()
+
+	_ = os.RemoveAll(override)
+	_ = os.MkdirAll(override, 0o755)
+}
+
+func resetTierCacheDirOverrideForTest() {
+	tierCacheDirOverrideMu.Lock()
+	override := tierCacheDirOverride
+	tierCacheDirOverride = ""
+	tierCacheDirOverrideMu.Unlock()
+
+	if override == "" {
 		return
 	}
-	_ = os.RemoveAll(filepath.Join(home, ".asc", "cache"))
+	_ = os.RemoveAll(override)
 }
