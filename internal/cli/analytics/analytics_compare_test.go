@@ -295,6 +295,41 @@ func TestAggregateSalesMetrics(t *testing.T) {
 	}
 }
 
+func TestAggregateSalesMetrics_RequiresFullColumnCoverage(t *testing.T) {
+	a := insights.SalesMetrics{
+		RowCount:                       2,
+		UnitsColumnPresent:             true,
+		DeveloperProceedsColumnPresent: true,
+		CustomerPriceColumnPresent:     true,
+		SubscriptionColumnPresent:      true,
+		UnitsTotal:                     10,
+		DeveloperProceedsTotal:         8.50,
+		CustomerPriceTotal:             12.00,
+	}
+	b := insights.SalesMetrics{
+		RowCount:                       3,
+		UnitsColumnPresent:             true,
+		DeveloperProceedsColumnPresent: false,
+		CustomerPriceColumnPresent:     false,
+		SubscriptionColumnPresent:      false,
+		UnitsTotal:                     20,
+	}
+
+	result := aggregateSalesMetrics(a, b)
+	if !result.UnitsColumnPresent {
+		t.Fatal("expected units column to remain available when every report includes it")
+	}
+	if result.DeveloperProceedsColumnPresent {
+		t.Fatal("expected developer proceeds column to be unavailable when a report is missing it")
+	}
+	if result.CustomerPriceColumnPresent {
+		t.Fatal("expected customer price column to be unavailable when a report is missing it")
+	}
+	if result.SubscriptionColumnPresent {
+		t.Fatal("expected subscription column to be unavailable when a report is missing it")
+	}
+}
+
 func TestBuildCompareMetrics(t *testing.T) {
 	baseline := insights.SalesMetrics{
 		RowCount:                       5,
@@ -395,6 +430,46 @@ func TestBuildCompareMetrics_ExplainsZeroBaselineDeltaPercent(t *testing.T) {
 		return
 	}
 	t.Fatal("expected download_units metric in output")
+}
+
+func TestFetchAndAggregate_SingleReportKeepsAvailableColumns(t *testing.T) {
+	client := newCompareTestClient(t, func(req *http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     make(http.Header),
+			Body: io.NopCloser(bytes.NewReader(gzipCompareText(t, compareSalesReportTSV(
+				"123",
+				"APP",
+			)))),
+			Request: req,
+		}, nil
+	})
+
+	metrics, found, err := fetchAndAggregate(
+		context.Background(),
+		client,
+		"V",
+		insights.SalesScope{AppID: "123", AppSKU: "APP"},
+		[]string{"2026-01-01"},
+		asc.SalesReportTypeSales,
+		asc.SalesReportSubTypeSummary,
+		asc.SalesReportFrequencyDaily,
+	)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if found != 1 {
+		t.Fatalf("expected 1 found report, got %d", found)
+	}
+	if !metrics.UnitsColumnPresent {
+		t.Fatal("expected units column to be available")
+	}
+	if !metrics.DeveloperProceedsColumnPresent {
+		t.Fatal("expected developer proceeds column to be available")
+	}
+	if !metrics.CustomerPriceColumnPresent {
+		t.Fatal("expected customer price column to be available")
+	}
 }
 
 func TestFetchAndAggregate_ReturnsParseError(t *testing.T) {

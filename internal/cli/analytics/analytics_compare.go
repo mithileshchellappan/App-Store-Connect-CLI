@@ -228,8 +228,13 @@ func fetchAndAggregate(ctx context.Context, client *asc.Client, vendor string, s
 			return aggregate, found, fmt.Errorf("parse report %s: %w", date, parseErr)
 		}
 
+		// Seed from the first parsed report so availability flags reflect real coverage.
+		if found == 0 {
+			aggregate = metrics
+		} else {
+			aggregate = aggregateSalesMetrics(aggregate, metrics)
+		}
 		found++
-		aggregate = aggregateSalesMetrics(aggregate, metrics)
 	}
 
 	if found == 0 {
@@ -273,10 +278,10 @@ func summarizeMissingReportDates(dates []string) string {
 func aggregateSalesMetrics(a, b insights.SalesMetrics) insights.SalesMetrics {
 	return insights.SalesMetrics{
 		RowCount:                       a.RowCount + b.RowCount,
-		UnitsColumnPresent:             a.UnitsColumnPresent || b.UnitsColumnPresent,
-		DeveloperProceedsColumnPresent: a.DeveloperProceedsColumnPresent || b.DeveloperProceedsColumnPresent,
-		CustomerPriceColumnPresent:     a.CustomerPriceColumnPresent || b.CustomerPriceColumnPresent,
-		SubscriptionColumnPresent:      a.SubscriptionColumnPresent || b.SubscriptionColumnPresent,
+		UnitsColumnPresent:             a.UnitsColumnPresent && b.UnitsColumnPresent,
+		DeveloperProceedsColumnPresent: a.DeveloperProceedsColumnPresent && b.DeveloperProceedsColumnPresent,
+		CustomerPriceColumnPresent:     a.CustomerPriceColumnPresent && b.CustomerPriceColumnPresent,
+		SubscriptionColumnPresent:      a.SubscriptionColumnPresent && b.SubscriptionColumnPresent,
 		UnitsTotal:                     a.UnitsTotal + b.UnitsTotal,
 		DownloadUnitsTotal:             a.DownloadUnitsTotal + b.DownloadUnitsTotal,
 		MonetizedUnitsTotal:            a.MonetizedUnitsTotal + b.MonetizedUnitsTotal,
