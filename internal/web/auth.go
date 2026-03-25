@@ -48,7 +48,7 @@ const (
 
 	// Guardrails for unofficial web/iris calls.
 	webMinRequestIntervalEnv     = "ASC_WEB_MIN_REQUEST_INTERVAL"
-	defaultWebMinRequestInterval = 350 * time.Millisecond
+	defaultWebMinRequestInterval = 1 * time.Second
 	minimumWebMinRequestInterval = 200 * time.Millisecond
 )
 
