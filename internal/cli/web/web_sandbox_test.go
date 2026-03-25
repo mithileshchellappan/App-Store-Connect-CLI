@@ -28,6 +28,11 @@ func TestWebSandboxCreateValidationErrors(t *testing.T) {
 			wantErr: "--email must be a valid email address",
 		},
 		{
+			name:    "display name email is rejected",
+			args:    []string{"--first-name", "Jane", "--last-name", "Tester", "--email", "Jane Tester <jane@example.com>", "--password", "Passwordtest1", "--territory", "USA"},
+			wantErr: "--email must be a valid email address",
+		},
+		{
 			name:    "invalid password",
 			args:    []string{"--first-name", "Jane", "--last-name", "Tester", "--email", "jane@example.com", "--password", "password", "--territory", "USA"},
 			wantErr: "--password must be at least 8 characters and include uppercase, lowercase, and numeric characters",

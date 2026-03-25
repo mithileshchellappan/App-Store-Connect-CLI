@@ -110,3 +110,21 @@ func TestCreateSandboxAccountRejectsMissingFields(t *testing.T) {
 		t.Fatalf("expected last-name validation error, got %v", err)
 	}
 }
+
+func TestCreateSandboxAccountRejectsDisplayNameEmail(t *testing.T) {
+	client := &Client{httpClient: http.DefaultClient, baseURL: "https://example.test/iris/v1"}
+
+	err := client.CreateSandboxAccount(context.Background(), SandboxAccountCreateAttributes{
+		FirstName:       "Asc",
+		LastName:        "Probe",
+		AccountName:     "Asc Probe <asc-probe@example.com>",
+		AccountPassword: "Passwordtest1",
+		StoreFront:      "USA",
+	})
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+	if !strings.Contains(err.Error(), "account name must be a valid email address") {
+		t.Fatalf("expected account-name validation error, got %v", err)
+	}
+}

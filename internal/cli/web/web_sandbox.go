@@ -169,7 +169,8 @@ func normalizeWebSandboxEmail(value string) (string, error) {
 	if trimmed == "" {
 		return "", fmt.Errorf("--email is required")
 	}
-	if _, err := mail.ParseAddress(trimmed); err != nil {
+	parsedAddress, err := mail.ParseAddress(trimmed)
+	if err != nil || parsedAddress == nil || strings.TrimSpace(parsedAddress.Address) != trimmed {
 		return "", fmt.Errorf("--email must be a valid email address")
 	}
 	return trimmed, nil

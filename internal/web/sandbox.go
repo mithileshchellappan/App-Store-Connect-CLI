@@ -35,7 +35,8 @@ func normalizeSandboxAccountCreateAttributes(attrs SandboxAccountCreateAttribute
 	if attrs.AccountName == "" {
 		return attrs, fmt.Errorf("account name is required")
 	}
-	if _, err := mail.ParseAddress(attrs.AccountName); err != nil {
+	parsedAddress, err := mail.ParseAddress(attrs.AccountName)
+	if err != nil || parsedAddress == nil || strings.TrimSpace(parsedAddress.Address) != attrs.AccountName {
 		return attrs, fmt.Errorf("account name must be a valid email address")
 	}
 	if attrs.AccountPassword == "" {
