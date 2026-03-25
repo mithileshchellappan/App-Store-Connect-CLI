@@ -291,3 +291,53 @@ func TestSubmitTwoFactorCodeRequestsPhoneDeliveryBeforePreparedPhoneVerification
 		t.Fatal("expected session to remember that phone delivery was requested")
 	}
 }
+
+func TestSubmitTwoFactorCodeRejectsPreparedPhoneFlowWithoutPhoneID(t *testing.T) {
+	session := &stubSessionState{
+		method:    TwoFactorMethodPhone,
+		phoneMode: "sms",
+		requested: true,
+	}
+
+	requestedPhoneCode := false
+	submittedPhoneCode := false
+	finalized := false
+
+	err := SubmitTwoFactorCode(
+		context.Background(),
+		session,
+		"123456",
+		func(context.Context) (*AuthOptions, error) {
+			t.Fatal("did not expect auth options lookup for prepared phone session")
+			return nil, nil
+		},
+		func(context.Context, int, string) error {
+			requestedPhoneCode = true
+			return nil
+		},
+		func(context.Context, string) error {
+			t.Fatal("did not expect trusted-device submission for phone flow")
+			return nil
+		},
+		func(context.Context, string, int, string) error {
+			submittedPhoneCode = true
+			return nil
+		},
+		func(context.Context) error {
+			finalized = true
+			return nil
+		},
+	)
+	if !errors.Is(err, ErrNoTrustedPhoneNumbers) {
+		t.Fatalf("expected ErrNoTrustedPhoneNumbers, got %v", err)
+	}
+	if requestedPhoneCode {
+		t.Fatal("did not expect duplicate phone delivery request")
+	}
+	if submittedPhoneCode {
+		t.Fatal("did not expect malformed phone verification submission without phone id")
+	}
+	if finalized {
+		t.Fatal("did not expect finalize after rejected phone submission")
+	}
+}

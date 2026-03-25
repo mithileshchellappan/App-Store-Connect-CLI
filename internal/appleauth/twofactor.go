@@ -253,10 +253,10 @@ func SubmitTwoFactorCode(ctx context.Context, session SessionState, code string,
 		phoneID := session.TwoFactorPhoneID()
 		phoneMode := session.TwoFactorPhoneMode()
 		destination := session.TwoFactorDestination()
+		if phoneID == 0 {
+			return ErrNoTrustedPhoneNumbers
+		}
 		if !session.TwoFactorCodeRequested() {
-			if phoneID == 0 {
-				return ErrNoTrustedPhoneNumbers
-			}
 			if requestPhoneCode == nil {
 				return ErrNoTrustedPhoneNumbers
 			}
