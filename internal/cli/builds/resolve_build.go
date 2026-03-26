@@ -128,14 +128,14 @@ func validateResolveBuildOptions(opts ResolveBuildOptions) error {
 	if shared.ResolveAppID(appInput) == "" {
 		return shared.UsageError("--build-id or --app is required (or set ASC_APP_ID)")
 	}
-	if !opts.Latest && buildNumber == "" {
-		return shared.UsageError("--build-id, --latest, or --build-number is required")
-	}
 	if len(opts.ProcessingStateValues) > 0 && !opts.Latest {
 		return shared.UsageError("--processing-state requires --latest")
 	}
 	if opts.ExcludeExpired && !opts.Latest {
 		return shared.UsageError("--exclude-expired and --not-expired require --latest")
+	}
+	if !opts.Latest && buildNumber == "" {
+		return shared.UsageError("--build-id, --latest, or --build-number is required")
 	}
 	if platform != "" {
 		if _, err := shared.NormalizeAppStoreVersionPlatform(platform); err != nil {
