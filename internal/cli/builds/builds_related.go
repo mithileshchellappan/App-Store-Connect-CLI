@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/peterbourgon/ff/v3/ffcli"
@@ -24,7 +23,8 @@ func BuildsAppCommand() *ffcli.Command {
 		LongHelp: `View the app related to a build.
 
 Examples:
-  asc builds app view --build-id "BUILD_ID"`,
+  asc builds app view --build-id "BUILD_ID"
+  asc builds app view --app "123456789" --latest`,
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
@@ -40,32 +40,26 @@ Examples:
 func BuildsAppGetCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("app get", flag.ExitOnError)
 
-	buildID := fs.String("build-id", "", "Build ID")
-	legacyBuildID := bindHiddenStringFlag(fs, "build")
-	legacyID := bindHiddenStringFlag(fs, "id")
+	selectors := bindBuildSelectorFlags(fs, buildSelectorFlagOptions{includeLegacyID: true})
 	output := shared.BindOutputFlags(fs)
 
 	return &ffcli.Command{
 		Name:       "get",
-		ShortUsage: "asc builds app view --build-id \"BUILD_ID\"",
+		ShortUsage: "asc builds app view (--build-id BUILD_ID | --app APP --latest | --app APP --build-number BUILD_NUMBER [--version VERSION] [--platform PLATFORM])",
 		ShortHelp:  "View the app for a build.",
 		LongHelp: `View the app for a build.
 
 Examples:
-  asc builds app view --build-id "BUILD_ID"`,
+  asc builds app view --build-id "BUILD_ID"
+  asc builds app view --app "123456789" --latest`,
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, args []string) error {
-			if err := applyLegacyBuildIDAlias(buildID, legacyBuildID); err != nil {
+			if err := selectors.applyLegacyAliases(); err != nil {
 				return err
 			}
-			if err := applyLegacyIDAlias(buildID, legacyID); err != nil {
+			if err := selectors.validate(); err != nil {
 				return err
-			}
-			buildValue := strings.TrimSpace(*buildID)
-			if buildValue == "" {
-				fmt.Fprintln(os.Stderr, "Error: --build-id is required")
-				return flag.ErrHelp
 			}
 
 			client, err := shared.GetASCClient()
@@ -76,7 +70,12 @@ Examples:
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()
 
-			resp, err := client.GetBuildApp(requestCtx, buildValue)
+			buildID, err := selectors.resolveBuildID(requestCtx, client)
+			if err != nil {
+				return fmt.Errorf("builds app get: %w", err)
+			}
+
+			resp, err := client.GetBuildApp(requestCtx, buildID)
 			if err != nil {
 				return fmt.Errorf("builds app get: failed to fetch: %w", err)
 			}
@@ -97,7 +96,8 @@ func BuildsPreReleaseVersionCommand() *ffcli.Command {
 		LongHelp: `View the pre-release version related to a build.
 
 Examples:
-  asc builds pre-release-version view --build-id "BUILD_ID"`,
+  asc builds pre-release-version view --build-id "BUILD_ID"
+  asc builds pre-release-version view --app "123456789" --latest`,
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
@@ -113,32 +113,26 @@ Examples:
 func BuildsPreReleaseVersionGetCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("pre-release-version get", flag.ExitOnError)
 
-	buildID := fs.String("build-id", "", "Build ID")
-	legacyBuildID := bindHiddenStringFlag(fs, "build")
-	legacyID := bindHiddenStringFlag(fs, "id")
+	selectors := bindBuildSelectorFlags(fs, buildSelectorFlagOptions{includeLegacyID: true})
 	output := shared.BindOutputFlags(fs)
 
 	return &ffcli.Command{
 		Name:       "get",
-		ShortUsage: "asc builds pre-release-version view --build-id \"BUILD_ID\"",
+		ShortUsage: "asc builds pre-release-version view (--build-id BUILD_ID | --app APP --latest | --app APP --build-number BUILD_NUMBER [--version VERSION] [--platform PLATFORM])",
 		ShortHelp:  "View the pre-release version for a build.",
 		LongHelp: `View the pre-release version for a build.
 
 Examples:
-  asc builds pre-release-version view --build-id "BUILD_ID"`,
+  asc builds pre-release-version view --build-id "BUILD_ID"
+  asc builds pre-release-version view --app "123456789" --latest`,
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, args []string) error {
-			if err := applyLegacyBuildIDAlias(buildID, legacyBuildID); err != nil {
+			if err := selectors.applyLegacyAliases(); err != nil {
 				return err
 			}
-			if err := applyLegacyIDAlias(buildID, legacyID); err != nil {
+			if err := selectors.validate(); err != nil {
 				return err
-			}
-			buildValue := strings.TrimSpace(*buildID)
-			if buildValue == "" {
-				fmt.Fprintln(os.Stderr, "Error: --build-id is required")
-				return flag.ErrHelp
 			}
 
 			client, err := shared.GetASCClient()
@@ -149,7 +143,12 @@ Examples:
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()
 
-			resp, err := client.GetBuildPreReleaseVersion(requestCtx, buildValue)
+			buildID, err := selectors.resolveBuildID(requestCtx, client)
+			if err != nil {
+				return fmt.Errorf("builds pre-release-version get: %w", err)
+			}
+
+			resp, err := client.GetBuildPreReleaseVersion(requestCtx, buildID)
 			if err != nil {
 				return fmt.Errorf("builds pre-release-version get: failed to fetch: %w", err)
 			}
@@ -170,7 +169,8 @@ func BuildsIconsCommand() *ffcli.Command {
 		LongHelp: `List build icons for a build.
 
 Examples:
-  asc builds icons list --build-id "BUILD_ID"`,
+  asc builds icons list --build-id "BUILD_ID"
+  asc builds icons list --app "123456789" --latest`,
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
@@ -186,9 +186,7 @@ Examples:
 func BuildsIconsListCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("icons list", flag.ExitOnError)
 
-	buildID := fs.String("build-id", "", "Build ID")
-	legacyBuildID := bindHiddenStringFlag(fs, "build")
-	legacyID := bindHiddenStringFlag(fs, "id")
+	selectors := bindBuildSelectorFlags(fs, buildSelectorFlagOptions{includeLegacyID: true})
 	limit := fs.Int("limit", 0, "Maximum results per page (1-200)")
 	next := fs.String("next", "", "Fetch next page using a links.next URL")
 	paginate := fs.Bool("paginate", false, "Automatically fetch all pages (aggregate results)")
@@ -202,14 +200,12 @@ func BuildsIconsListCommand() *ffcli.Command {
 
 Examples:
   asc builds icons list --build-id "BUILD_ID"
-  asc builds icons list --build-id "BUILD_ID" --paginate`,
+  asc builds icons list --app "123456789" --latest
+  asc builds icons list --app "123456789" --latest --paginate`,
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, args []string) error {
-			if err := applyLegacyBuildIDAlias(buildID, legacyBuildID); err != nil {
-				return err
-			}
-			if err := applyLegacyIDAlias(buildID, legacyID); err != nil {
+			if err := selectors.applyLegacyAliases(); err != nil {
 				return err
 			}
 			if *limit != 0 && (*limit < 1 || *limit > 200) {
@@ -219,10 +215,11 @@ Examples:
 				return fmt.Errorf("builds icons list: %w", err)
 			}
 
-			buildValue := strings.TrimSpace(*buildID)
-			if buildValue == "" && strings.TrimSpace(*next) == "" {
-				fmt.Fprintln(os.Stderr, "Error: --build-id is required")
-				return flag.ErrHelp
+			nextValue := strings.TrimSpace(*next)
+			if nextValue == "" {
+				if err := selectors.validate(); err != nil {
+					return err
+				}
 			}
 
 			client, err := shared.GetASCClient()
@@ -233,23 +230,27 @@ Examples:
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()
 
+			buildID := ""
+			if nextValue == "" {
+				buildID, err = selectors.resolveBuildID(requestCtx, client)
+				if err != nil {
+					return fmt.Errorf("builds icons list: %w", err)
+				}
+			}
+
 			opts := []asc.BuildIconsOption{
 				asc.WithBuildIconsLimit(*limit),
 				asc.WithBuildIconsNextURL(*next),
 			}
 
 			if *paginate {
-				if buildValue == "" {
-					fmt.Fprintln(os.Stderr, "Error: --build-id is required")
-					return flag.ErrHelp
-				}
 				paginateOpts := append(opts, asc.WithBuildIconsLimit(200))
 				resp, err := shared.PaginateWithSpinner(requestCtx,
 					func(ctx context.Context) (asc.PaginatedResponse, error) {
-						return client.GetBuildIcons(ctx, buildValue, paginateOpts...)
+						return client.GetBuildIcons(ctx, buildID, paginateOpts...)
 					},
 					func(ctx context.Context, nextURL string) (asc.PaginatedResponse, error) {
-						return client.GetBuildIcons(ctx, buildValue, asc.WithBuildIconsNextURL(nextURL))
+						return client.GetBuildIcons(ctx, buildID, asc.WithBuildIconsNextURL(nextURL))
 					},
 				)
 				if err != nil {
@@ -258,7 +259,7 @@ Examples:
 				return shared.PrintOutput(resp, *output.Output, *output.Pretty)
 			}
 
-			resp, err := client.GetBuildIcons(requestCtx, buildValue, opts...)
+			resp, err := client.GetBuildIcons(requestCtx, buildID, opts...)
 			if err != nil {
 				return fmt.Errorf("builds icons list: failed to fetch: %w", err)
 			}
@@ -279,7 +280,8 @@ func BuildsBetaAppReviewSubmissionCommand() *ffcli.Command {
 		LongHelp: `View beta app review submission for a build.
 
 Examples:
-  asc builds beta-app-review-submission view --build-id "BUILD_ID"`,
+  asc builds beta-app-review-submission view --build-id "BUILD_ID"
+  asc builds beta-app-review-submission view --app "123456789" --latest`,
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
@@ -295,32 +297,26 @@ Examples:
 func BuildsBetaAppReviewSubmissionGetCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("beta-app-review-submission get", flag.ExitOnError)
 
-	buildID := fs.String("build-id", "", "Build ID")
-	legacyBuildID := bindHiddenStringFlag(fs, "build")
-	legacyID := bindHiddenStringFlag(fs, "id")
+	selectors := bindBuildSelectorFlags(fs, buildSelectorFlagOptions{includeLegacyID: true})
 	output := shared.BindOutputFlags(fs)
 
 	return &ffcli.Command{
 		Name:       "get",
-		ShortUsage: "asc builds beta-app-review-submission view --build-id \"BUILD_ID\"",
+		ShortUsage: "asc builds beta-app-review-submission view (--build-id BUILD_ID | --app APP --latest | --app APP --build-number BUILD_NUMBER [--version VERSION] [--platform PLATFORM])",
 		ShortHelp:  "View beta app review submission for a build.",
 		LongHelp: `View beta app review submission for a build.
 
 Examples:
-  asc builds beta-app-review-submission view --build-id "BUILD_ID"`,
+  asc builds beta-app-review-submission view --build-id "BUILD_ID"
+  asc builds beta-app-review-submission view --app "123456789" --latest`,
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, args []string) error {
-			if err := applyLegacyBuildIDAlias(buildID, legacyBuildID); err != nil {
+			if err := selectors.applyLegacyAliases(); err != nil {
 				return err
 			}
-			if err := applyLegacyIDAlias(buildID, legacyID); err != nil {
+			if err := selectors.validate(); err != nil {
 				return err
-			}
-			buildValue := strings.TrimSpace(*buildID)
-			if buildValue == "" {
-				fmt.Fprintln(os.Stderr, "Error: --build-id is required")
-				return flag.ErrHelp
 			}
 
 			client, err := shared.GetASCClient()
@@ -331,7 +327,12 @@ Examples:
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()
 
-			resp, err := client.GetBuildBetaAppReviewSubmission(requestCtx, buildValue)
+			buildID, err := selectors.resolveBuildID(requestCtx, client)
+			if err != nil {
+				return fmt.Errorf("builds beta-app-review-submission get: %w", err)
+			}
+
+			resp, err := client.GetBuildBetaAppReviewSubmission(requestCtx, buildID)
 			if err != nil {
 				return fmt.Errorf("builds beta-app-review-submission get: failed to fetch: %w", err)
 			}
@@ -352,7 +353,8 @@ func BuildsBuildBetaDetailCommand() *ffcli.Command {
 		LongHelp: `View build beta detail for a build.
 
 Examples:
-  asc builds build-beta-detail view --build-id "BUILD_ID"`,
+  asc builds build-beta-detail view --build-id "BUILD_ID"
+  asc builds build-beta-detail view --app "123456789" --latest`,
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
@@ -368,32 +370,26 @@ Examples:
 func BuildsBuildBetaDetailGetCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("build-beta-detail get", flag.ExitOnError)
 
-	buildID := fs.String("build-id", "", "Build ID")
-	legacyBuildID := bindHiddenStringFlag(fs, "build")
-	legacyID := bindHiddenStringFlag(fs, "id")
+	selectors := bindBuildSelectorFlags(fs, buildSelectorFlagOptions{includeLegacyID: true})
 	output := shared.BindOutputFlags(fs)
 
 	return &ffcli.Command{
 		Name:       "get",
-		ShortUsage: "asc builds build-beta-detail view --build-id \"BUILD_ID\"",
+		ShortUsage: "asc builds build-beta-detail view (--build-id BUILD_ID | --app APP --latest | --app APP --build-number BUILD_NUMBER [--version VERSION] [--platform PLATFORM])",
 		ShortHelp:  "View build beta detail for a build.",
 		LongHelp: `View build beta detail for a build.
 
 Examples:
-  asc builds build-beta-detail view --build-id "BUILD_ID"`,
+  asc builds build-beta-detail view --build-id "BUILD_ID"
+  asc builds build-beta-detail view --app "123456789" --latest`,
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, args []string) error {
-			if err := applyLegacyBuildIDAlias(buildID, legacyBuildID); err != nil {
+			if err := selectors.applyLegacyAliases(); err != nil {
 				return err
 			}
-			if err := applyLegacyIDAlias(buildID, legacyID); err != nil {
+			if err := selectors.validate(); err != nil {
 				return err
-			}
-			buildValue := strings.TrimSpace(*buildID)
-			if buildValue == "" {
-				fmt.Fprintln(os.Stderr, "Error: --build-id is required")
-				return flag.ErrHelp
 			}
 
 			client, err := shared.GetASCClient()
@@ -404,7 +400,12 @@ Examples:
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()
 
-			resp, err := client.GetBuildBuildBetaDetail(requestCtx, buildValue)
+			buildID, err := selectors.resolveBuildID(requestCtx, client)
+			if err != nil {
+				return fmt.Errorf("builds build-beta-detail get: %w", err)
+			}
+
+			resp, err := client.GetBuildBuildBetaDetail(requestCtx, buildID)
 			if err != nil {
 				return fmt.Errorf("builds build-beta-detail get: failed to fetch: %w", err)
 			}

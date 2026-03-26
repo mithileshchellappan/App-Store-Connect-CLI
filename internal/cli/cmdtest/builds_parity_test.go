@@ -58,7 +58,7 @@ func TestBuildsParityValidationErrors(t *testing.T) {
 		{
 			name:    "builds links missing build",
 			args:    []string{"builds", "links", "view", "--type", "app"},
-			wantErr: "--build-id is required",
+			wantErr: "--build-id or --app is required",
 		},
 		{
 			name:    "builds links invalid type",
@@ -73,7 +73,7 @@ func TestBuildsParityValidationErrors(t *testing.T) {
 		{
 			name:    "builds metrics beta-usages missing build id",
 			args:    []string{"builds", "metrics", "beta-usages"},
-			wantErr: "--build-id is required",
+			wantErr: "--build-id or --app is required",
 		},
 		{
 			name:    "builds metrics beta-usages invalid limit",
@@ -83,12 +83,12 @@ func TestBuildsParityValidationErrors(t *testing.T) {
 		{
 			name:    "builds individual-testers list missing build id",
 			args:    []string{"builds", "individual-testers", "list"},
-			wantErr: "--build-id is required",
+			wantErr: "--build-id or --app is required",
 		},
 		{
 			name:    "builds individual-testers add missing build id",
 			args:    []string{"builds", "individual-testers", "add", "--tester", "TESTER_ID"},
-			wantErr: "--build-id is required",
+			wantErr: "--build-id or --app is required",
 		},
 		{
 			name:    "builds individual-testers add missing tester",
@@ -98,7 +98,7 @@ func TestBuildsParityValidationErrors(t *testing.T) {
 		{
 			name:    "builds individual-testers remove missing build id",
 			args:    []string{"builds", "individual-testers", "remove", "--tester", "TESTER_ID"},
-			wantErr: "--build-id is required",
+			wantErr: "--build-id or --app is required",
 		},
 		{
 			name:    "builds individual-testers remove missing tester",
@@ -148,7 +148,7 @@ func TestBuildsParityValidationErrors(t *testing.T) {
 		{
 			name:    "builds app-encryption-declaration view missing build id",
 			args:    []string{"builds", "app-encryption-declaration", "view"},
-			wantErr: "--build-id is required",
+			wantErr: "--build-id or --app is required",
 		},
 	}
 
@@ -320,27 +320,27 @@ func TestParityRelatedCommandsValidationErrors(t *testing.T) {
 		{
 			name:    "builds app get missing build id",
 			args:    []string{"builds", "app", "get"},
-			wantErr: "--build-id is required",
+			wantErr: "--build-id or --app is required",
 		},
 		{
 			name:    "builds pre-release-version get missing build id",
 			args:    []string{"builds", "pre-release-version", "get"},
-			wantErr: "--build-id is required",
+			wantErr: "--build-id or --app is required",
 		},
 		{
 			name:    "builds icons list missing build id",
 			args:    []string{"builds", "icons", "list"},
-			wantErr: "--build-id is required",
+			wantErr: "--build-id or --app is required",
 		},
 		{
 			name:    "builds beta-app-review-submission get missing build id",
 			args:    []string{"builds", "beta-app-review-submission", "get"},
-			wantErr: "--build-id is required",
+			wantErr: "--build-id or --app is required",
 		},
 		{
 			name:    "builds build-beta-detail get missing build id",
 			args:    []string{"builds", "build-beta-detail", "get"},
-			wantErr: "--build-id is required",
+			wantErr: "--build-id or --app is required",
 		},
 		{
 			name:    "beta-groups app get missing group-id",
