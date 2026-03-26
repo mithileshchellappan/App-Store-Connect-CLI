@@ -24,7 +24,7 @@ func BuildsMetricsCommand() *ffcli.Command {
 		LongHelp: `Fetch build metrics.
 
 Examples:
-  asc builds metrics beta-usages --build "BUILD_ID"`,
+  asc builds metrics beta-usages --build-id "BUILD_ID"`,
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
@@ -40,23 +40,27 @@ Examples:
 func BuildsMetricsBetaUsagesCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("metrics beta-usages", flag.ExitOnError)
 
-	buildID := fs.String("build", "", "Build ID")
+	buildID := fs.String("build-id", "", "Build ID")
+	legacyBuildID := bindHiddenStringFlag(fs, "build")
 	limit := fs.Int("limit", 0, "Maximum results per page (1-200)")
 	next := fs.String("next", "", "Fetch next page using a links.next URL")
 	output := shared.BindOutputFlags(fs)
 
 	return &ffcli.Command{
 		Name:       "beta-usages",
-		ShortUsage: "asc builds metrics beta-usages --build \"BUILD_ID\" [flags]",
+		ShortUsage: "asc builds metrics beta-usages --build-id \"BUILD_ID\" [flags]",
 		ShortHelp:  "Fetch beta build usage metrics for a build.",
 		LongHelp: `Fetch beta build usage metrics for a build.
 
 Examples:
-  asc builds metrics beta-usages --build "BUILD_ID"
-  asc builds metrics beta-usages --build "BUILD_ID" --limit 50`,
+  asc builds metrics beta-usages --build-id "BUILD_ID"
+  asc builds metrics beta-usages --build-id "BUILD_ID" --limit 50`,
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, args []string) error {
+			if err := applyLegacyBuildIDAlias(buildID, legacyBuildID); err != nil {
+				return err
+			}
 			if *limit != 0 && (*limit < 1 || *limit > 200) {
 				fmt.Fprintln(os.Stderr, "Error: --limit must be between 1 and 200")
 				return flag.ErrHelp
@@ -67,7 +71,7 @@ Examples:
 
 			buildValue := strings.TrimSpace(*buildID)
 			if buildValue == "" && strings.TrimSpace(*next) == "" {
-				fmt.Fprintln(os.Stderr, "Error: --build is required")
+				fmt.Fprintln(os.Stderr, "Error: --build-id is required")
 				return flag.ErrHelp
 			}
 

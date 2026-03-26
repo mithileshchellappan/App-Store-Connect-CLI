@@ -43,8 +43,8 @@ func BuildsRelationshipsCommand() *ffcli.Command {
 		LongHelp: `View build relationship linkages.
 
 Examples:
-  asc builds links view --build "BUILD_ID" --type "app"
-  asc builds links view --build "BUILD_ID" --type "betaBuildLocalizations" --paginate`,
+  asc builds links view --build-id "BUILD_ID" --type "app"
+  asc builds links view --build-id "BUILD_ID" --type "betaBuildLocalizations" --paginate`,
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
@@ -60,7 +60,8 @@ Examples:
 func BuildsRelationshipsGetCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("links view", flag.ExitOnError)
 
-	buildID := fs.String("build", "", "Build ID")
+	buildID := fs.String("build-id", "", "Build ID")
+	legacyBuildID := bindHiddenStringFlag(fs, "build")
 	relType := fs.String("type", "", "Relationship type: "+strings.Join(buildRelationshipList(), ", "))
 	limit := fs.Int("limit", 0, "Maximum results per page (1-200)")
 	next := fs.String("next", "", "Fetch next page using a links.next URL")
@@ -69,16 +70,19 @@ func BuildsRelationshipsGetCommand() *ffcli.Command {
 
 	return &ffcli.Command{
 		Name:       "view",
-		ShortUsage: "asc builds links view --build \"BUILD_ID\" --type \"RELATIONSHIP\" [flags]",
+		ShortUsage: "asc builds links view --build-id \"BUILD_ID\" --type \"RELATIONSHIP\" [flags]",
 		ShortHelp:  "View relationship linkages for a build.",
 		LongHelp: `View relationship linkages for a build.
 
 Examples:
-  asc builds links view --build "BUILD_ID" --type "app"
-  asc builds links view --build "BUILD_ID" --type "individualTesters" --paginate`,
+  asc builds links view --build-id "BUILD_ID" --type "app"
+  asc builds links view --build-id "BUILD_ID" --type "individualTesters" --paginate`,
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, args []string) error {
+			if err := applyLegacyBuildIDAlias(buildID, legacyBuildID); err != nil {
+				return err
+			}
 			if *limit != 0 && (*limit < 1 || *limit > 200) {
 				return fmt.Errorf("builds links view: --limit must be between 1 and 200")
 			}
@@ -101,7 +105,7 @@ Examples:
 			buildValue := strings.TrimSpace(*buildID)
 			nextValue := strings.TrimSpace(*next)
 			if buildValue == "" && nextValue == "" {
-				fmt.Fprintln(os.Stderr, "Error: --build is required")
+				fmt.Fprintln(os.Stderr, "Error: --build-id is required")
 				return flag.ErrHelp
 			}
 
