@@ -1541,6 +1541,16 @@ func TestSubscriptionsValidationErrors(t *testing.T) {
 			wantErr: "--subscription-period must be one of",
 		},
 		{
+			name:    "subscriptions update invalid group-level zero",
+			args:    []string{"subscriptions", "update", "--id", "SUB_ID", "--group-level", "0"},
+			wantErr: "--group-level must be a positive integer",
+		},
+		{
+			name:    "subscriptions update invalid group-level negative",
+			args:    []string{"subscriptions", "update", "--id", "SUB_ID", "--group-level", "-1"},
+			wantErr: "--group-level must be a positive integer",
+		},
+		{
 			name:    "subscriptions delete missing confirm",
 			args:    []string{"subscriptions", "delete", "--id", "SUB_ID"},
 			wantErr: "--confirm is required",
