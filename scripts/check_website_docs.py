@@ -78,6 +78,17 @@ def iter_navigation_pages(node: object) -> list[str]:
     return pages
 
 
+def iter_redirects(config: dict) -> list[tuple[str, str]]:
+    redirects = []
+    for item in config.get("redirects", []):
+        if isinstance(item, dict):
+            source = item.get("source")
+            destination = item.get("destination")
+            if isinstance(source, str) and isinstance(destination, str):
+                redirects.append((source, destination))
+    return redirects
+
+
 def resolve_route(source_page_id: str, target: str) -> tuple[str, str]:
     if target.startswith("/"):
         normalized = target
@@ -97,6 +108,22 @@ def check_navigation(website_root: Path, page_ids: set[str]) -> list[str]:
     for page in iter_navigation_pages(config):
         if page not in page_ids:
             errors.append(f"docs.json references missing page {page!r}")
+    return errors
+
+
+def check_redirects(website_root: Path, routes: set[str]) -> list[str]:
+    errors: list[str] = []
+    config = load_docs_json(website_root)
+    seen_sources: set[str] = set()
+    for source, destination in iter_redirects(config):
+        if source in seen_sources:
+            errors.append(f"docs.json contains duplicate redirect source {source!r}")
+            continue
+        seen_sources.add(source)
+        if destination not in routes:
+            errors.append(
+                f"docs.json redirect destination {destination!r} does not resolve to a page"
+            )
     return errors
 
 
@@ -134,6 +161,7 @@ def main(argv: list[str] | None = None) -> int:
 
     errors = []
     errors.extend(check_navigation(website_root, page_ids))
+    errors.extend(check_redirects(website_root, routes))
     errors.extend(check_internal_links(website_root, routes))
     if errors:
         print("Website docs validation failed:", file=sys.stderr)

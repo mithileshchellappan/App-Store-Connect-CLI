@@ -46,7 +46,10 @@ class WebsiteDocsChecksTest(unittest.TestCase):
                     {
                         "navigation": {
                             "tabs": [{"groups": [{"pages": ["index", "guides/test"]}]}]
-                        }
+                        },
+                        "redirects": [
+                            {"source": "/old-test", "destination": "/guides/test"}
+                        ],
                     }
                 )
             )
@@ -55,6 +58,7 @@ class WebsiteDocsChecksTest(unittest.TestCase):
 
             page_ids, routes = check_website_docs.collect_site_state(website)
             self.assertEqual(check_website_docs.check_navigation(website, page_ids), [])
+            self.assertEqual(check_website_docs.check_redirects(website, routes), [])
             self.assertEqual(check_website_docs.check_internal_links(website, routes), [])
 
     def test_website_docs_report_missing_navigation_page(self) -> None:
@@ -82,6 +86,26 @@ class WebsiteDocsChecksTest(unittest.TestCase):
             errors = check_website_docs.check_internal_links(website, routes)
             self.assertEqual(len(errors), 1)
             self.assertIn("missing website route", errors[0])
+
+    def test_website_docs_report_missing_redirect_destination(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            website = Path(tmpdir)
+            (website / "docs.json").write_text(
+                json.dumps(
+                    {
+                        "navigation": {"tabs": [{"groups": [{"pages": ["index"]}]}]},
+                        "redirects": [
+                            {"source": "/old-index", "destination": "/missing-page"}
+                        ],
+                    }
+                )
+            )
+            (website / "index.mdx").write_text("# Home\n")
+
+            _, routes = check_website_docs.collect_site_state(website)
+            errors = check_website_docs.check_redirects(website, routes)
+            self.assertEqual(len(errors), 1)
+            self.assertIn("redirect destination", errors[0])
 
 
 class ReleaseDocsChecksTest(unittest.TestCase):

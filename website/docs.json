@@ -205,6 +205,72 @@
       "x": "https://x.com/rudrankriyam"
     }
   },
+  "redirects": [
+    {
+      "source": "/commands",
+      "destination": "/commands/overview"
+    },
+    {
+      "source": "/CONTRIBUTING",
+      "destination": "/resources/contributing"
+    },
+    {
+      "source": "/core-concepts/authentication",
+      "destination": "/authentication"
+    },
+    {
+      "source": "/api-reference/commands",
+      "destination": "/commands/overview"
+    },
+    {
+      "source": "/guides/workflows",
+      "destination": "/concepts/workflows"
+    },
+    {
+      "source": "/guides/authentication",
+      "destination": "/authentication"
+    },
+    {
+      "source": "/guides/ci-cd",
+      "destination": "/cicd/overview"
+    },
+    {
+      "source": "/getting-started/authentication",
+      "destination": "/authentication"
+    },
+    {
+      "source": "/guides/filtering-sorting",
+      "destination": "/concepts/pagination"
+    },
+    {
+      "source": "/api-reference/builds/list",
+      "destination": "/commands/builds"
+    },
+    {
+      "source": "/api-reference/bundle-ids/list",
+      "destination": "/commands/bundle-ids"
+    },
+    {
+      "source": "/api-reference/certificates/list",
+      "destination": "/commands/certificates"
+    },
+    {
+      "source": "/api-reference/devices/list",
+      "destination": "/commands/devices"
+    },
+    {
+      "source": "/api-reference/profiles/list",
+      "destination": "/commands/profiles"
+    },
+    {
+      "source": "/api-reference/app-info/list",
+      "destination": "/commands/app-info"
+    },
+    {
+      "source": "/api-reference/localizations/list",
+      "destination": "/commands/localizations"
+    }
+  ],
   "seo": {
     "metatags": {
       "canonical": "https://docs.asccli.sh"
