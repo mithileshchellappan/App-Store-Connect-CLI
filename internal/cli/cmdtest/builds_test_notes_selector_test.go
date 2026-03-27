@@ -2,6 +2,8 @@ package cmdtest
 
 import (
 	"context"
+	"errors"
+	"flag"
 	"io"
 	"net/http"
 	"path/filepath"
@@ -253,5 +255,61 @@ func TestBuildsTestNotesListLegacyBuildAliasWarnsAndMatchesCanonicalOutput(t *te
 	assertOnlyDeprecatedCommandWarnings(t, aliasStderr)
 	if canonicalStdout != aliasStdout {
 		t.Fatalf("expected canonical and alias output to match, canonical=%q alias=%q", canonicalStdout, aliasStdout)
+	}
+}
+
+func TestBuildsTestNotesRejectsConflictingBuildValues(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{
+			name: "list conflicting build values",
+			args: []string{"builds", "test-notes", "list", "--build-id", "BUILD_CANON", "--build", "BUILD_LEGACY"},
+		},
+		{
+			name: "view conflicting build values",
+			args: []string{"builds", "test-notes", "view", "--build-id", "BUILD_CANON", "--build", "BUILD_LEGACY"},
+		},
+		{
+			name: "create conflicting build values",
+			args: []string{"builds", "test-notes", "create", "--build-id", "BUILD_CANON", "--build", "BUILD_LEGACY"},
+		},
+		{
+			name: "update conflicting build values",
+			args: []string{"builds", "test-notes", "update", "--build-id", "BUILD_CANON", "--build", "BUILD_LEGACY"},
+		},
+		{
+			name: "delete conflicting build values",
+			args: []string{"builds", "test-notes", "delete", "--build-id", "BUILD_CANON", "--build", "BUILD_LEGACY"},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := RootCommand("1.2.3")
+			root.FlagSet.SetOutput(io.Discard)
+
+			var runErr error
+			stdout, stderr := captureOutput(t, func() {
+				if err := root.Parse(test.args); err != nil {
+					t.Fatalf("parse error: %v", err)
+				}
+				runErr = root.Run(context.Background())
+			})
+
+			if !errors.Is(runErr, flag.ErrHelp) {
+				t.Fatalf("expected ErrHelp, got %v", runErr)
+			}
+			if stdout != "" {
+				t.Fatalf("expected empty stdout, got %q", stdout)
+			}
+			if !strings.Contains(stderr, "Error: --build conflicts with --build-id; use only --build-id") {
+				t.Fatalf("expected conflicting build selector error, got %q", stderr)
+			}
+			if strings.Contains(stderr, buildsLegacyBuildWarning) {
+				t.Fatalf("expected conflict to fail before deprecation warning, got %q", stderr)
+			}
+		})
 	}
 }
