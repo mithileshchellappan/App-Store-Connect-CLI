@@ -20,11 +20,11 @@ def normalize_target(target: str, *, allow_root_relative: bool) -> str | None:
     target = target.strip()
     if not target or target.startswith("#"):
         return None
+    if target.startswith("<") and target.endswith(">"):
+        target = target[1:-1]
     if target.startswith("/") and not allow_root_relative:
         return None
     if target.startswith(IGNORED_PREFIXES):
         return None
-    if target.startswith("<") and target.endswith(">"):
-        target = target[1:-1]
     target = target.split("#", 1)[0].split("?", 1)[0]
     return target or None

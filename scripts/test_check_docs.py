@@ -9,6 +9,7 @@ from pathlib import Path
 import check_release_docs
 import check_repo_docs
 import check_website_docs
+import doc_links
 
 
 class RepoDocsChecksTest(unittest.TestCase):
@@ -34,6 +35,15 @@ class RepoDocsChecksTest(unittest.TestCase):
             errors = check_repo_docs.check_files(root, [source])
             self.assertEqual(len(errors), 1)
             self.assertIn("missing local docs target", errors[0])
+
+    def test_repo_docs_ignore_angle_bracket_external_links(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            source = root / "README.md"
+            source.write_text("[External](<https://example.com/docs>)\n")
+
+            errors = check_repo_docs.check_files(root, [source])
+            self.assertEqual(errors, [])
 
 
 class WebsiteDocsChecksTest(unittest.TestCase):
@@ -139,6 +149,27 @@ class WebsiteDocsChecksTest(unittest.TestCase):
             errors = check_website_docs.check_redirects(website, routes)
             self.assertEqual(len(errors), 1)
             self.assertIn("redirect destination", errors[0])
+
+    def test_website_docs_ignore_angle_bracket_external_links(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            website = Path(tmpdir)
+            (website / "docs.json").write_text(
+                json.dumps({"navigation": {"tabs": [{"groups": [{"pages": ["index"]}]}]}})
+            )
+            (website / "index.mdx").write_text("[External](<https://example.com/docs>)\n")
+
+            _, routes = check_website_docs.collect_site_state(website)
+            errors = check_website_docs.check_internal_links(website, routes)
+            self.assertEqual(errors, [])
+
+
+class DocLinksTest(unittest.TestCase):
+    def test_normalize_target_strips_angle_brackets_before_prefix_check(self) -> None:
+        normalized = doc_links.normalize_target(
+            "<https://example.com/docs>",
+            allow_root_relative=True,
+        )
+        self.assertIsNone(normalized)
 
 
 class ReleaseDocsChecksTest(unittest.TestCase):
