@@ -71,7 +71,7 @@ Example workflow file (.asc/workflow.json):
           "name": "resolve_build",
           "run": "asc builds info --app $APP_ID --latest --platform IOS --output json",
           "outputs": {
-            "BUILD_ID": "$.id"
+            "BUILD_ID": "$.data.id"
           }
         },
         {

@@ -2,6 +2,7 @@ package builds
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"strings"
@@ -11,6 +12,18 @@ import (
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/asc"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/shared"
 )
+
+type buildBetaAppReviewSubmissionNotFoundError struct {
+	buildID string
+}
+
+func (e buildBetaAppReviewSubmissionNotFoundError) Error() string {
+	return fmt.Sprintf("builds beta-app-review-submission view: no beta app review submission found for build %q", e.buildID)
+}
+
+func (e buildBetaAppReviewSubmissionNotFoundError) Unwrap() error {
+	return asc.ErrNotFound
+}
 
 // BuildsAppCommand returns the builds app command group.
 func BuildsAppCommand() *ffcli.Command {
@@ -340,6 +353,10 @@ Examples:
 
 			resp, err := client.GetBuildBetaAppReviewSubmission(requestCtx, buildID)
 			if err != nil {
+				var missingErr asc.MissingBuildBetaAppReviewSubmissionError
+				if errors.As(err, &missingErr) {
+					return buildBetaAppReviewSubmissionNotFoundError{buildID: buildID}
+				}
 				return fmt.Errorf("builds beta-app-review-submission view: failed to fetch: %w", err)
 			}
 
