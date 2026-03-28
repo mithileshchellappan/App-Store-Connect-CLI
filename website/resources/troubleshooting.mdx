@@ -1,0 +1,350 @@
+# Troubleshooting
+
+> Common issues and solutions for the App Store Connect CLI
+
+## Authentication Issues
+
+### Keychain Access Denied
+
+**Problem**: macOS keychain prompts appear repeatedly or access is denied.
+
+**Solution**:
+
+```bash  theme={null}
+# Bypass keychain and use environment variables
+export ASC_BYPASS_KEYCHAIN=1
+export ASC_KEY_ID="YOUR_KEY_ID"
+export ASC_ISSUER_ID="YOUR_ISSUER_ID"
+export ASC_PRIVATE_KEY_PATH="/path/to/AuthKey.p8"
+```
+
+Alternatively, use base64-encoded keys for headless environments:
+
+```bash  theme={null}
+export ASC_PRIVATE_KEY_B64="BASE64_ENCODED_KEY"
+```
+
+### Multiple Credential Sources Conflict
+
+**Problem**: Error message about credentials resolving from multiple sources.
+
+**Solution**: Enable strict auth mode to identify the conflict:
+
+```bash  theme={null}
+export ASC_STRICT_AUTH=true
+asc auth status
+```
+
+Then choose one credential source (keychain, config file, or environment variables) and remove the others.
+
+### JWT Token Expiration
+
+**Problem**: Authentication fails with token expiration errors.
+
+**Solution**: JWTs are automatically refreshed (valid for 10 minutes). If you see this error, check:
+
+* System clock is synchronized
+* API key hasn't been revoked in App Store Connect
+* Key ID and Issuer ID are correct
+
+Verify your credentials:
+
+```bash  theme={null}
+asc auth status
+```
+
+## API Rate Limiting
+
+### 429 Too Many Requests
+
+**Problem**: API returns HTTP 429 errors.
+
+**Solution**: The CLI automatically retries GET/HEAD requests. Configure retry behavior:
+
+```bash  theme={null}
+export ASC_MAX_RETRIES=5
+export ASC_BASE_DELAY=1s
+export ASC_MAX_DELAY=30s
+export ASC_RETRY_LOG=true
+```
+
+**Note**: POST/PATCH/DELETE requests are NOT automatically retried to prevent duplicate operations.
+
+### Request Timeouts
+
+**Problem**: Long-running operations time out.
+
+**Solution**: Increase timeout values:
+
+```bash  theme={null}
+# General timeout (default: 30s)
+export ASC_TIMEOUT=2m
+
+# Upload timeout for large files
+export ASC_UPLOAD_TIMEOUT=5m
+```
+
+For analytics operations with large datasets:
+
+```bash  theme={null}
+export ASC_TIMEOUT=5m
+asc analytics view --request-id "REQUEST_ID" --date "2024-01-01" --paginate
+```
+
+## Permission Errors
+
+### 403 Forbidden
+
+**Problem**: API returns 403 when accessing certain endpoints.
+
+**Solution**: Check your API key role at [https://appstoreconnect.apple.com/access/integrations/api](https://appstoreconnect.apple.com/access/integrations/api)
+
+Common permission requirements:
+
+* **Finance reports**: Admin or Finance role
+* **Customer reviews**: App Manager or higher
+* **Sales reports**: Sales or Admin role
+
+Generate a new key with appropriate permissions if needed.
+
+## Build and Upload Issues
+
+### PKG Upload Failures
+
+**Problem**: PKG files fail to upload with UTI errors.
+
+**Solution**: Ensure you're using the latest version of the CLI (0.36.3+). The UTI for PKG uploads was fixed to use `com.apple.pkg`.
+
+```bash  theme={null}
+asc builds upload --app "123456789" --ipa "/path/to/App.pkg"
+```
+
+### Build Processing Stuck
+
+**Problem**: Build upload succeeds but processing never completes.
+
+**Solution**: Check build status:
+
+```bash  theme={null}
+asc builds list --app "123456789" --limit 5
+```
+
+If the build shows `PROCESSING` for more than 30 minutes, check App Store Connect web UI for detailed processing errors.
+
+## Data Retrieval Issues
+
+### Missing Data on Paginated Results
+
+**Problem**: Not all results are returned when listing resources.
+
+**Solution**: Always use `--paginate` for complete results:
+
+```bash  theme={null}
+asc analytics view --request-id "REQUEST_ID" --date "2024-01-01" --paginate
+asc testflight feedback list --app "123456789" --paginate
+```
+
+### Incorrect Date Formats
+
+**Problem**: Analytics or finance reports fail with date format errors.
+
+**Solution**: Use the correct format for each report frequency:
+
+* **Daily/Weekly**: `YYYY-MM-DD` (e.g., `2024-01-15`)
+* **Monthly**: `YYYY-MM` (e.g., `2024-01`)
+* **Yearly**: `YYYY` (e.g., `2024`)
+
+Finance reports use Apple fiscal months, not calendar months.
+
+## Environment and Configuration
+
+### Config File Not Found
+
+**Problem**: CLI can't find configuration file.
+
+**Solution**: Check config file locations (in priority order):
+
+1. `./.asc/config.json` (repo-local)
+2. `~/.asc/config.json` (user home)
+
+Ensure file permissions are restrictive:
+
+```bash  theme={null}
+chmod 600 ~/.asc/config.json
+```
+
+### Environment Variable Priority
+
+**Problem**: Settings not taking effect.
+
+**Solution**: Priority order (highest to lowest):
+
+1. Command-line flags (e.g., `--output json`)
+2. Environment variables (e.g., `ASC_DEFAULT_OUTPUT`)
+3. Config file settings
+4. Default values (TTY-aware for output)
+
+## Debug Mode
+
+### Enable Debug Logging
+
+For detailed HTTP request/response logging:
+
+```bash  theme={null}
+export ASC_DEBUG=api
+asc apps list
+```
+
+This shows:
+
+* Request URLs and headers
+* Response status codes
+* Response bodies
+* Retry attempts
+
+## Testing Issues
+
+### Keychain Prompts During Tests
+
+**Problem**: Tests trigger macOS keychain prompts.
+
+**Solution**: Always run tests with keychain bypass:
+
+```bash  theme={null}
+ASC_BYPASS_KEYCHAIN=1 make test
+```
+
+### Integration Tests Skipped
+
+**Problem**: Integration tests don't run.
+
+**Solution**: Integration tests are opt-in. Set credentials and use:
+
+```bash  theme={null}
+export ASC_KEY_ID="YOUR_KEY_ID"
+export ASC_ISSUER_ID="YOUR_ISSUER_ID"
+export ASC_PRIVATE_KEY_PATH="/path/to/AuthKey.p8"
+export ASC_APP_ID="YOUR_APP_ID"
+
+make test-integration
+```
+
+## Platform-Specific Issues
+
+### macOS Keychain Integration
+
+**Problem**: Keychain storage fails on macOS.
+
+**Solution**: Grant terminal app access to keychain:
+
+1. Open Keychain Access.app
+2. Find "asc" entries
+3. Right-click → Get Info → Access Control
+4. Add your terminal app (Terminal.app, iTerm2, etc.)
+
+### Linux Missing Dependencies
+
+**Problem**: Build or runtime errors on Linux.
+
+**Solution**: Ensure Go 1.26+ is installed:
+
+```bash  theme={null}
+go version  # Should show 1.26 or higher
+```
+
+For keychain features, the CLI falls back to config files on Linux.
+
+## Common Error Messages
+
+### "oldString not found in content"
+
+**Problem**: Update or patch operation fails.
+
+**Solution**: This usually means:
+
+* Resource has been modified externally
+* Version conflict (resource changed since last fetch)
+
+Refetch the resource and retry:
+
+```bash  theme={null}
+asc apps info view --app "123456789" > current.json
+# Review current state, then update
+```
+
+### "Relationship invalid" Errors
+
+**Problem**: Setting relationships fails with validation errors.
+
+**Solution**: Common causes:
+
+* Related resource must be in specific state (e.g., live version for Game Center)
+* Relationship is replace-only (PATCH), not append
+* Related resource doesn't exist or is deleted
+
+Check API notes for endpoint-specific requirements:
+
+```bash  theme={null}
+cat docs/API_NOTES.md | grep -A5 "relationship"
+```
+
+## Getting Help
+
+### Use Built-in Help
+
+Always check command help first:
+
+```bash  theme={null}
+asc --help
+asc <command> --help
+asc <command> <subcommand> --help
+```
+
+### Report Issues
+
+If you've found a bug:
+
+1. Check existing issues: [https://github.com/rudrankriyam/App-Store-Connect-CLI/issues](https://github.com/rudrankriyam/App-Store-Connect-CLI/issues)
+2. Include:
+   * CLI version (`asc version`)
+   * Platform (macOS/Linux, architecture)
+   * Command run (sanitize sensitive data)
+   * Full error output with `ASC_DEBUG=api`
+3. For security issues, use private reporting: [https://github.com/rudrankriyam/App-Store-Connect-CLI/security/advisories/new](https://github.com/rudrankriyam/App-Store-Connect-CLI/security/advisories/new)
+
+## Performance Optimization
+
+### Slow List Operations
+
+**Problem**: Listing resources is slow.
+
+**Solution**:
+
+* Limit results when you don't need all data:
+  ```bash  theme={null}
+  asc builds list --app "123456789" --limit 10
+  ```
+
+* Use filters to reduce result set:
+  ```bash  theme={null}
+  asc builds list --app "123456789" --version "1.0.0"
+  ```
+
+* Sort by recent items first:
+  ```bash  theme={null}
+  asc testflight crashes list --app "123456789" --sort -createdDate --limit 20
+  ```
+
+### Large File Uploads
+
+**Problem**: Uploads timeout or fail.
+
+**Solution**:
+
+```bash  theme={null}
+# Set longer upload timeout
+export ASC_UPLOAD_TIMEOUT=10m
+
+# Monitor upload progress
+asc --debug builds upload --app "123456789" --ipa "/path/to/large.ipa"
+```

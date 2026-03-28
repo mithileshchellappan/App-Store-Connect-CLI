@@ -1,0 +1,330 @@
+# migrate
+
+> Migrate metadata from/to fastlane format
+
+Migrate metadata between fastlane's deliver tool and App Store Connect CLI.
+
+## Quick Start
+
+```bash  theme={null}
+asc migrate import --app "APP_ID" --version-id "VERSION_ID" --fastlane-dir ./fastlane
+asc migrate export --app "APP_ID" --version-id "VERSION_ID" --output-dir ./fastlane
+asc migrate validate --fastlane-dir ./fastlane
+```
+
+## Subcommands
+
+* `import` - Import metadata from fastlane directory structure
+* `export` - Export metadata to fastlane directory structure
+* `validate` - Validate fastlane metadata without uploading
+* `metadata` - Bridge to `asc metadata` commands
+
+## Commands
+
+### migrate import
+
+Import metadata from fastlane directory structure:
+
+```bash  theme={null}
+asc migrate import --app "APP_ID" --version-id "VERSION_ID" --fastlane-dir ./fastlane
+asc migrate import --app "APP_ID" --version-id "VERSION_ID" --fastlane-dir ./fastlane --dry-run
+```
+
+**Flags:**
+
+* `--app` - App Store Connect app ID (or `ASC_APP_ID`)
+* `--version-id` - App Store version ID (required unless Deliverfile app\_version + platform)
+* `--fastlane-dir` - Path to fastlane directory (optional)
+* `--dry-run` - Preview changes without uploading
+* `--output` - Output format: `json`, `table`, `markdown`
+* `--pretty` - Pretty-print JSON output
+
+**Fastlane directory structure:**
+
+```
+fastlane/
+├── Deliverfile
+├── metadata/
+│   ├── en-US/
+│   │   ├── name.txt            (App Info)
+│   │   ├── subtitle.txt        (App Info)
+│   │   ├── privacy_url.txt     (App Info)
+│   │   ├── description.txt     (Version)
+│   │   ├── keywords.txt        (Version)
+│   │   ├── release_notes.txt   (Version)
+│   │   ├── promotional_text.txt (Version)
+│   │   ├── support_url.txt     (Version)
+│   │   └── marketing_url.txt   (Version)
+│   ├── review_information/
+│   │   ├── first_name.txt
+│   │   ├── last_name.txt
+│   │   ├── email_address.txt
+│   │   ├── phone_number.txt
+│   │   ├── demo_user.txt
+│   │   ├── demo_password.txt
+│   │   ├── demo_required.txt
+│   │   └── notes.txt
+├── screenshots/
+│   ├── en-US/
+│   │   ├── iphone_65_1.png
+│   │   └── ...
+```
+
+### migrate export
+
+Export current App Store metadata to fastlane directory structure:
+
+```bash  theme={null}
+asc migrate export --app "APP_ID" --version-id "VERSION_ID" --output-dir ./fastlane
+```
+
+**Flags:**
+
+* `--app` - App Store Connect app ID (or `ASC_APP_ID`)
+* `--version-id` - App Store version ID (required)
+* `--output-dir` - Output directory for fastlane structure (required)
+* `--output` - Output format: `json`, `table`, `markdown`
+* `--pretty` - Pretty-print JSON output
+
+### migrate validate
+
+Validate fastlane metadata without making any API calls:
+
+```bash  theme={null}
+asc migrate validate --fastlane-dir ./fastlane
+asc migrate validate --fastlane-dir ./fastlane --output table
+```
+
+**Flags:**
+
+* `--fastlane-dir` - Path to fastlane directory (required)
+* `--output` - Output format: `json`, `table`, `markdown`
+* `--pretty` - Pretty-print JSON output
+
+**Character limits checked:**
+
+* Description: 4000 characters
+* Keywords: 100 characters
+* What's New (release notes): 4000 characters
+* Promotional Text: 170 characters
+* Name: 30 characters
+* Subtitle: 30 characters
+
+## Deliverfile Support
+
+The import command supports reading configuration from a `Deliverfile`:
+
+```ruby  theme={null}
+# Deliverfile
+app_identifier "com.example.myapp"
+app_version "1.2.3"
+platform "ios"
+
+skip_metadata false
+skip_screenshots false
+```
+
+**Supported fields:**
+
+* `app_identifier` - App bundle ID (used to resolve app ID)
+* `app_version` - App version string (used to resolve version ID)
+* `platform` - Platform: `ios`, `osx`, `appletvos`, `visionos`
+* `skip_metadata` - Skip metadata import
+* `skip_screenshots` - Skip screenshot import
+
+## Metadata Fields
+
+### App Info (App-level)
+
+* `name.txt` - App name
+* `subtitle.txt` - App subtitle
+* `privacy_url.txt` - Privacy policy URL
+
+### Version (Version-level)
+
+* `description.txt` - App description
+* `keywords.txt` - Keywords (comma-separated)
+* `release_notes.txt` - What's new / release notes
+* `promotional_text.txt` - Promotional text
+* `support_url.txt` - Support URL
+* `marketing_url.txt` - Marketing URL
+
+### Review Information
+
+* `first_name.txt` - Contact first name
+* `last_name.txt` - Contact last name
+* `email_address.txt` - Contact email
+* `phone_number.txt` - Contact phone
+* `demo_user.txt` - Demo account username
+* `demo_password.txt` - Demo account password
+* `demo_required.txt` - Demo account required (true/false)
+* `notes.txt` - Review notes
+
+## Examples
+
+### Import from Fastlane
+
+```bash  theme={null}
+# Preview import
+asc migrate import \
+  --app "123456789" \
+  --version-id "abc123" \
+  --fastlane-dir ./fastlane \
+  --dry-run
+
+# Import metadata
+asc migrate import \
+  --app "123456789" \
+  --version-id "abc123" \
+  --fastlane-dir ./fastlane
+```
+
+### Export to Fastlane
+
+```bash  theme={null}
+asc migrate export \
+  --app "123456789" \
+  --version-id "abc123" \
+  --output-dir ./fastlane
+```
+
+### Validate Before Import
+
+```bash  theme={null}
+# Validate fastlane metadata
+asc migrate validate --fastlane-dir ./fastlane --output table
+
+# If valid, import
+if asc migrate validate --fastlane-dir ./fastlane --output json | jq -e '.valid'; then
+  asc migrate import --app "APP_ID" --version-id "VERSION_ID" --fastlane-dir ./fastlane
+fi
+```
+
+### Migrate from Fastlane to asc metadata
+
+```bash  theme={null}
+# Export from fastlane format
+asc migrate export \
+  --app "APP_ID" \
+  --version-id "VERSION_ID" \
+  --output-dir ./fastlane
+
+# Import into asc metadata format
+asc migrate metadata pull \
+  --app "APP_ID" \
+  --version "1.2.3" \
+  --dir "./metadata"
+
+# Now use asc metadata commands
+asc metadata push --app "APP_ID" --version "1.2.3" --dir "./metadata" --dry-run
+```
+
+## Migration Workflow
+
+### From Fastlane to asc
+
+1. Validate current fastlane metadata:
+   ```bash  theme={null}
+   asc migrate validate --fastlane-dir ./fastlane
+   ```
+
+2. Import to App Store Connect:
+   ```bash  theme={null}
+   asc migrate import --app "APP_ID" --version-id "VERSION_ID" --fastlane-dir ./fastlane
+   ```
+
+3. Pull into asc metadata format:
+   ```bash  theme={null}
+   asc metadata pull --app "APP_ID" --version "1.2.3" --dir "./metadata"
+   ```
+
+4. Future updates use asc metadata:
+   ```bash  theme={null}
+   asc metadata push --app "APP_ID" --version "1.2.3" --dir "./metadata"
+   ```
+
+### From asc to Fastlane
+
+1. Export current metadata:
+   ```bash  theme={null}
+   asc migrate export --app "APP_ID" --version-id "VERSION_ID" --output-dir ./fastlane
+   ```
+
+2. Use with fastlane:
+   ```bash  theme={null}
+   fastlane deliver
+   ```
+
+## Screenshot Import
+
+The import command supports uploading screenshots from the fastlane directory:
+
+```
+screenshots/
+├── en-US/
+│   ├── iphone_65_1.png
+│   ├── iphone_65_2.png
+│   ├── ipad_129_1.png
+│   └── ...
+```
+
+**Supported display types:**
+
+* `iphone_65` - iPhone 6.5" (iPhone 14 Plus, etc.)
+* `iphone_61` - iPhone 6.1" (iPhone 14, etc.)
+* `iphone_58` - iPhone 5.8" (iPhone X, etc.)
+* `iphone_55` - iPhone 5.5" (iPhone 8 Plus, etc.)
+* `iphone_47` - iPhone 4.7" (iPhone 8, etc.)
+* `iphone_40` - iPhone 4" (iPhone SE 1st gen)
+* `iphone_35` - iPhone 3.5" (iPhone 4S)
+* `ipad_129` - iPad Pro 12.9"
+* `ipad_pro_11` - iPad Pro 11"
+* `ipad_105` - iPad 10.5"
+* `ipad_97` - iPad 9.7"
+* `applewatch` - Apple Watch
+* `appletv` - Apple TV
+* `mac` - Mac
+
+## Validation Issues
+
+**Example validation output:**
+
+```
+locale  field           severity  message                              length  limit
+en-US   description     error     exceeds 4000 character limit         4123    4000
+en-US   keywords        warning   keywords is empty (usually required)
+es-ES   promotionalText error     exceeds 170 character limit          185     170
+
+Error Count: 2
+Warn Count: 1
+Valid: false
+```
+
+## Locale Normalization
+
+Fastlane uses directory names like `en-US`, `es-ES`, `ja`, etc. The CLI automatically normalizes these to App Store Connect locale codes:
+
+* `en-US` → `en-US`
+* `es-ES` → `es-ES`
+* `ja` → `ja`
+* `zh-Hans` → `zh-Hans`
+* `zh-Hant` → `zh-Hant`
+
+## Skipped Items
+
+The import command skips non-locale directories and reports them:
+
+```json  theme={null}
+{
+  "skipped": [
+    {
+      "path": "metadata/review_information",
+      "reason": "special directory"
+    },
+    {
+      "path": "metadata/trade_representative_contact_information",
+      "reason": "skipped non-locale directory"
+    }
+  ]
+}
+```

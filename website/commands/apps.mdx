@@ -1,0 +1,280 @@
+# App Management Commands
+
+> List, create, and manage apps in App Store Connect
+
+## Overview
+
+App management commands allow you to list, create, retrieve, and update apps in App Store Connect.
+
+## Commands
+
+### `asc apps list`
+
+List apps from App Store Connect.
+
+<ParamField path="--bundle-id" type="string">
+  Filter by bundle ID(s), comma-separated
+</ParamField>
+
+<ParamField path="--name" type="string">
+  Filter by app name(s), comma-separated
+</ParamField>
+
+<ParamField path="--sku" type="string">
+  Filter by SKU(s), comma-separated
+</ParamField>
+
+<ParamField path="--sort" type="string">
+  Sort by: `name`, `-name`, `bundleId`, `-bundleId`
+</ParamField>
+
+<ParamField path="--limit" type="integer">
+  Maximum results per page (1-200)
+</ParamField>
+
+<ParamField path="--next" type="string">
+  Fetch next page using a links.next URL
+</ParamField>
+
+<ParamField path="--paginate" type="boolean" default="false">
+  Automatically fetch all pages (aggregate results)
+</ParamField>
+
+<ParamField path="--output" type="string" default="json">
+  Output format: `json`, `table`, `markdown`
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc apps list
+asc apps list --bundle-id "com.example.app"
+asc apps list --name "My App"
+asc apps list --limit 10
+asc apps list --sort name
+asc apps list --output table
+asc apps list --paginate
+```
+
+**Response:**
+
+```json  theme={null}
+{
+  "data": [
+    {
+      "id": "123456789",
+      "type": "apps",
+      "attributes": {
+        "name": "My App",
+        "bundleId": "com.example.app",
+        "sku": "MYAPP123",
+        "primaryLocale": "en-US"
+      }
+    }
+  ],
+  "links": {
+    "self": "https://api.appstoreconnect.apple.com/v1/apps?limit=10"
+  }
+}
+```
+
+***
+
+### `asc apps view`
+
+View app details by ID.
+
+<ParamField path="--id" type="string" required>
+  App Store Connect app ID
+</ParamField>
+
+<ParamField path="--output" type="string" default="json">
+  Output format: `json`, `table`
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc apps view --id "APP_ID"
+asc apps view --id "APP_ID" --output table
+```
+
+**Response:**
+
+```json  theme={null}
+{
+  "data": {
+    "id": "APP_ID",
+    "type": "apps",
+    "attributes": {
+      "name": "My App",
+      "bundleId": "com.example.app",
+      "sku": "MYAPP123",
+      "primaryLocale": "en-US",
+      "contentRightsDeclaration": "DOES_NOT_USE_THIRD_PARTY_CONTENT"
+    }
+  }
+}
+```
+
+***
+
+### `asc apps create`
+
+Create a new app in App Store Connect.
+
+<Note>
+  App creation requires Apple ID authentication (not API key). If 2FA is enabled, you may need to complete authentication in a browser first.
+</Note>
+
+<ParamField path="--name" type="string" required>
+  App name
+</ParamField>
+
+<ParamField path="--bundle-id" type="string" required>
+  Bundle ID (e.g., com.example.app)
+</ParamField>
+
+<ParamField path="--sku" type="string" required>
+  Unique SKU for the app
+</ParamField>
+
+<ParamField path="--primary-locale" type="string" default="en-US">
+  Primary locale (e.g., en-US, en-GB, de-DE)
+</ParamField>
+
+<ParamField path="--platform" type="string" default="IOS">
+  Platform: `IOS`, `MAC_OS`, `UNIVERSAL`
+</ParamField>
+
+<ParamField path="--apple-id" type="string">
+  Apple ID (email) for authentication
+</ParamField>
+
+<ParamField path="--password" type="string">
+  Apple ID password (will prompt if not provided)
+</ParamField>
+
+<ParamField path="--two-factor-code" type="string">
+  2FA verification code (if prompted)
+</ParamField>
+
+<ParamField path="--auto-rename" type="boolean" default="true">
+  Auto-retry with a unique app name when the chosen name is already in use
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc apps create
+asc apps create --name "My App" --bundle-id "com.example.myapp" --sku "MYAPP123"
+asc apps create --name "My App" --bundle-id "com.example.myapp" --sku "MYAPP123" --primary-locale "en-GB" --platform IOS
+asc apps create --apple-id "user@example.com" --password "APP_SPECIFIC_PASSWORD"
+```
+
+**Response:**
+
+```json  theme={null}
+{
+  "data": {
+    "id": "NEW_APP_ID",
+    "type": "apps",
+    "attributes": {
+      "name": "My App",
+      "bundleId": "com.example.myapp",
+      "sku": "MYAPP123",
+      "primaryLocale": "en-US"
+    }
+  }
+}
+```
+
+***
+
+### `asc apps update`
+
+Update an app's bundle ID, primary locale, or content rights declaration.
+
+<ParamField path="--id" type="string" required>
+  App Store Connect app ID
+</ParamField>
+
+<ParamField path="--bundle-id" type="string">
+  Update bundle ID
+</ParamField>
+
+<ParamField path="--primary-locale" type="string">
+  Update primary locale (e.g., en-US)
+</ParamField>
+
+<ParamField path="--content-rights" type="string">
+  Content rights declaration: `DOES_NOT_USE_THIRD_PARTY_CONTENT` or `USES_THIRD_PARTY_CONTENT`
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc apps update --id "APP_ID" --bundle-id "com.example.app"
+asc apps update --id "APP_ID" --primary-locale "en-US"
+asc apps update --id "APP_ID" --content-rights "DOES_NOT_USE_THIRD_PARTY_CONTENT"
+```
+
+**Response:**
+
+```json  theme={null}
+{
+  "data": {
+    "id": "APP_ID",
+    "type": "apps",
+    "attributes": {
+      "bundleId": "com.example.app",
+      "primaryLocale": "en-US",
+      "contentRightsDeclaration": "DOES_NOT_USE_THIRD_PARTY_CONTENT"
+    }
+  }
+}
+```
+
+***
+
+### `asc apps wall`
+
+Display a visual wall of app icons and metadata.
+
+**Examples:**
+
+```bash  theme={null}
+asc apps wall
+```
+
+***
+
+## Common Usage Patterns
+
+### List all apps and filter by bundle ID
+
+```bash  theme={null}
+asc apps list --bundle-id "com.example.app" --output table
+```
+
+### Create an app with minimal flags
+
+```bash  theme={null}
+asc apps create --name "My App" --bundle-id "com.example.myapp" --sku "MYAPP123"
+```
+
+### View app details
+
+```bash  theme={null}
+asc apps view --id "123456789" --output json
+```
+
+### Update app metadata
+
+```bash  theme={null}
+asc apps update --id "123456789" --primary-locale "en-GB"
+```
+
+## Environment Variables
+
+* `ASC_APP_ID` - Default app ID for commands that require `--app`

@@ -1,0 +1,215 @@
+# Environment variables
+
+> Configure the App Store Connect CLI using environment variables
+
+The App Store Connect CLI can be configured using environment variables. These variables provide defaults and override certain behaviors.
+
+## Authentication variables
+
+These variables configure API authentication credentials.
+
+<ParamField path="ASC_KEY_ID" type="string">
+  Your App Store Connect API key ID
+</ParamField>
+
+<ParamField path="ASC_ISSUER_ID" type="string">
+  Your App Store Connect API issuer ID
+</ParamField>
+
+<ParamField path="ASC_PRIVATE_KEY_PATH" type="string">
+  Path to your private key (.p8) file
+</ParamField>
+
+<ParamField path="ASC_PRIVATE_KEY" type="string">
+  Raw private key content (PEM format)
+</ParamField>
+
+<ParamField path="ASC_PRIVATE_KEY_B64" type="string">
+  Base64-encoded private key content (useful for CI/CD)
+</ParamField>
+
+<ParamField path="ASC_BYPASS_KEYCHAIN" type="boolean">
+  Ignore keychain and use config/env auth only
+
+  Set to `true`, `1`, `yes`, `y`, or `on` to bypass keychain lookup.
+</ParamField>
+
+<ParamField path="ASC_STRICT_AUTH" type="boolean">
+  Fail when credentials resolve from multiple sources
+
+  Set to `true`, `1`, `yes`, `y`, or `on` to enable strict mode.
+</ParamField>
+
+<ParamField path="ASC_PROFILE" type="string">
+  Use a named authentication profile from config or keychain
+</ParamField>
+
+## Operational variables
+
+These variables configure default values for apps, vendors, and other resources.
+
+<ParamField path="ASC_APP_ID" type="string">
+  Default app ID for commands that accept `--app`
+</ParamField>
+
+<ParamField path="ASC_VENDOR_NUMBER" type="string">
+  Vendor number for sales and financial reports
+</ParamField>
+
+## Timeout variables
+
+Configure request and upload timeouts.
+
+<ParamField path="ASC_TIMEOUT" type="string">
+  Request timeout (e.g., `90s`, `2m`, `120s`)
+
+  Default: `90s`
+</ParamField>
+
+<ParamField path="ASC_TIMEOUT_SECONDS" type="number">
+  Request timeout in seconds (alternative to `ASC_TIMEOUT`)
+
+  Example: `120` for 2 minutes
+</ParamField>
+
+<ParamField path="ASC_UPLOAD_TIMEOUT" type="string">
+  Upload timeout for large files (e.g., `60s`, `5m`)
+
+  Default: `60s`
+</ParamField>
+
+<ParamField path="ASC_UPLOAD_TIMEOUT_SECONDS" type="number">
+  Upload timeout in seconds (alternative to `ASC_UPLOAD_TIMEOUT`)
+</ParamField>
+
+## Retry and debugging variables
+
+Configure retry behavior and debug logging.
+
+<ParamField path="ASC_MAX_RETRIES" type="number">
+  Maximum number of retry attempts for transient errors
+
+  Default: `3`
+</ParamField>
+
+<ParamField path="ASC_BASE_DELAY" type="string">
+  Base delay for exponential backoff (e.g., `1s`, `500ms`)
+
+  Default: `1s`
+</ParamField>
+
+<ParamField path="ASC_MAX_DELAY" type="string">
+  Maximum delay between retries (e.g., `30s`, `1m`)
+
+  Default: `30s`
+</ParamField>
+
+<ParamField path="ASC_RETRY_LOG" type="boolean">
+  Enable retry logging to stderr
+
+  Set to `true`, `1`, `yes`, `y`, or `on` to enable.
+</ParamField>
+
+<ParamField path="ASC_DEBUG" type="string">
+  Enable debug logging
+
+  * Set to `true` for general debug logging
+  * Set to `api` for HTTP request/response logging (redacts sensitive values)
+</ParamField>
+
+## Output variables
+
+Configure default output formats.
+
+<ParamField path="ASC_DEFAULT_OUTPUT" type="string">
+  Default output format: `json`, `table`, `markdown`, or `md`
+
+  When unset, output is TTY-aware:
+
+  * Interactive terminals: `table`
+  * Pipes/files/CI: `json` (minified)
+
+  Explicit `--output` flags always override this variable.
+</ParamField>
+
+## Configuration path
+
+<ParamField path="ASC_CONFIG_PATH" type="string">
+  Path to the configuration file
+
+  Must be an absolute path. When set, overrides the default config resolution order.
+</ParamField>
+
+## Variable precedence
+
+Environment variables are resolved in this order:
+
+1. **Command-line flags** (highest priority)
+2. **Environment variables**
+3. **Config file** (`~/.asc/config.json` or `.asc/config.json`)
+4. **Keychain** (for credentials only)
+5. **Built-in defaults** (lowest priority)
+
+<Note>
+  When `ASC_STRICT_AUTH=true`, the CLI will fail if credentials are found in multiple sources (e.g., both environment variables and keychain).
+</Note>
+
+## Examples
+
+### Basic authentication
+
+```bash  theme={null}
+export ASC_KEY_ID="ABC123"
+export ASC_ISSUER_ID="DEF456"
+export ASC_PRIVATE_KEY_PATH="$HOME/.asc/AuthKey_ABC123.p8"
+
+asc apps list
+```
+
+### CI/CD authentication with base64-encoded key
+
+```bash  theme={null}
+export ASC_KEY_ID="ABC123"
+export ASC_ISSUER_ID="DEF456"
+export ASC_PRIVATE_KEY_B64="LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0t..."
+export ASC_BYPASS_KEYCHAIN="true"
+
+asc builds upload --app 123456789 --ipa MyApp.ipa
+```
+
+### Debug HTTP requests
+
+```bash  theme={null}
+export ASC_DEBUG="api"
+
+asc apps list
+```
+
+### Custom timeout for slow networks
+
+```bash  theme={null}
+export ASC_TIMEOUT="3m"
+export ASC_UPLOAD_TIMEOUT="10m"
+
+asc builds upload --app 123456789 --ipa LargeApp.ipa
+```
+
+### Force JSON output in all environments
+
+```bash  theme={null}
+export ASC_DEFAULT_OUTPUT="json"
+
+asc apps list  # Always outputs JSON, even in interactive terminals
+```
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Learn about authentication methods
+  </Card>
+
+  <Card title="Profiles" icon="user" href="/configuration/profiles">
+    Use named authentication profiles
+  </Card>
+</CardGroup>

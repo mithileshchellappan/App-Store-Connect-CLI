@@ -1,0 +1,400 @@
+# Pricing Commands
+
+> Manage app pricing and availability
+
+## Overview
+
+Pricing commands manage app pricing, price schedules, and territory availability.
+
+## Commands
+
+### `asc pricing territories list`
+
+List territories in App Store Connect.
+
+<ParamField path="--limit" type="integer">
+  Maximum results per page (1-200)
+</ParamField>
+
+<ParamField path="--next" type="string">
+  Next page URL from a previous response
+</ParamField>
+
+<ParamField path="--paginate" type="boolean" default="false">
+  Automatically fetch all pages
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc pricing territories list
+asc pricing territories list --paginate
+```
+
+**Response:**
+
+```json  theme={null}
+{
+  "data": [
+    {
+      "id": "USA",
+      "type": "territories",
+      "attributes": {
+        "currency": "USD"
+      }
+    },
+    {
+      "id": "GBR",
+      "type": "territories",
+      "attributes": {
+        "currency": "GBP"
+      }
+    }
+  ]
+}
+```
+
+***
+
+### `asc pricing price-points`
+
+List app price points for an app.
+
+<ParamField path="--app" type="string" required>
+  App Store Connect app ID (or `ASC_APP_ID` env variable)
+</ParamField>
+
+<ParamField path="--territory" type="string">
+  Filter by territory (e.g., USA)
+</ParamField>
+
+<ParamField path="--limit" type="integer">
+  Maximum results per page (1-200)
+</ParamField>
+
+<ParamField path="--next" type="string">
+  Next page URL from a previous response
+</ParamField>
+
+<ParamField path="--paginate" type="boolean" default="false">
+  Automatically fetch all pages
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc pricing price-points --app "123456789"
+asc pricing price-points --app "123456789" --territory "USA"
+asc pricing price-points --app "123456789" --paginate
+```
+
+**Response:**
+
+```json  theme={null}
+{
+  "data": [
+    {
+      "id": "PRICE_POINT_ID",
+      "type": "appPricePoints",
+      "attributes": {
+        "customerPrice": "0.99",
+        "proceeds": "0.70"
+      }
+    }
+  ]
+}
+```
+
+***
+
+### `asc pricing price-points view`
+
+View a single app price point.
+
+<ParamField path="--price-point" type="string" required>
+  App price point ID
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc pricing price-points view --price-point "PRICE_POINT_ID"
+```
+
+***
+
+### `asc pricing price-points equalizations`
+
+List equalized price points for a price point.
+
+<ParamField path="--price-point" type="string" required>
+  App price point ID
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc pricing price-points equalizations --price-point "PRICE_POINT_ID"
+```
+
+***
+
+### `asc pricing tiers`
+
+List pricing tiers.
+
+**Examples:**
+
+```bash  theme={null}
+asc pricing tiers --app "123456789" --territory "USA"
+```
+
+***
+
+### `asc pricing schedule view`
+
+View the current app price schedule.
+
+<ParamField path="--app" type="string">
+  App Store Connect app ID (or `ASC_APP_ID` env variable)
+</ParamField>
+
+<ParamField path="--id" type="string">
+  App price schedule ID
+</ParamField>
+
+<Note>
+  Either `--app` or `--id` must be provided, but not both.
+</Note>
+
+**Examples:**
+
+```bash  theme={null}
+asc pricing schedule view --app "123456789"
+asc pricing schedule view --id "SCHEDULE_ID"
+```
+
+**Response:**
+
+```json  theme={null}
+{
+  "data": {
+    "id": "SCHEDULE_ID",
+    "type": "appPriceSchedules",
+    "relationships": {
+      "app": {
+        "data": {
+          "id": "123456789",
+          "type": "apps"
+        }
+      }
+    }
+  }
+}
+```
+
+***
+
+### `asc pricing schedule create`
+
+Create an app price schedule.
+
+<ParamField path="--app" type="string" required>
+  App Store Connect app ID
+</ParamField>
+
+<ParamField path="--price-point" type="string" required>
+  App price point ID
+</ParamField>
+
+<ParamField path="--base-territory" type="string" required>
+  Base territory code (e.g., USA)
+</ParamField>
+
+<ParamField path="--start-date" type="string" required>
+  Start date (YYYY-MM-DD)
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc pricing schedule create --app "123456789" --price-point "PRICE_POINT_ID" --base-territory "USA" --start-date "2024-03-01"
+```
+
+***
+
+### `asc pricing schedule manual-prices`
+
+List manual prices for a schedule.
+
+<ParamField path="--schedule" type="string" required>
+  App price schedule ID
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc pricing schedule manual-prices --schedule "SCHEDULE_ID"
+```
+
+***
+
+### `asc pricing schedule automatic-prices`
+
+List automatic prices for a schedule.
+
+<ParamField path="--schedule" type="string" required>
+  App price schedule ID
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc pricing schedule automatic-prices --schedule "SCHEDULE_ID"
+```
+
+***
+
+### `asc pricing availability view`
+
+View app availability.
+
+<ParamField path="--app" type="string">
+  App Store Connect app ID (or `ASC_APP_ID` env variable)
+</ParamField>
+
+<ParamField path="--id" type="string">
+  App availability ID
+</ParamField>
+
+<Note>
+  Either `--app` or `--id` must be provided, but not both.
+</Note>
+
+**Examples:**
+
+```bash  theme={null}
+asc pricing availability view --app "123456789"
+asc pricing availability view --id "AVAILABILITY_ID"
+```
+
+**Response:**
+
+```json  theme={null}
+{
+  "data": {
+    "id": "AVAILABILITY_ID",
+    "type": "appAvailabilities",
+    "attributes": {
+      "availableInNewTerritories": true
+    }
+  }
+}
+```
+
+***
+
+### `asc pricing availability edit`
+
+Edit app availability for territories.
+
+<ParamField path="--app" type="string" required>
+  App Store Connect app ID
+</ParamField>
+
+<ParamField path="--territory" type="string">
+  Territory codes (comma-separated, e.g., USA,GBR,DEU)
+</ParamField>
+
+<ParamField path="--all-territories" type="boolean" default="false">
+  Apply to all territories instead of `--territory`
+</ParamField>
+
+<ParamField path="--available" type="boolean" required>
+  Set availability (true or false)
+</ParamField>
+
+<ParamField path="--available-in-new-territories" type="boolean">
+  Automatically make available in new territories
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc pricing availability edit --app "123456789" --territory "USA,GBR,DEU" --available true --available-in-new-territories true
+asc pricing availability edit --app "123456789" --all-territories --available true --available-in-new-territories true
+```
+
+***
+
+### `asc pricing availability territory-availabilities`
+
+List territory availabilities for an app availability.
+
+<ParamField path="--availability" type="string" required>
+  App availability ID
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc pricing availability territory-availabilities --availability "AVAILABILITY_ID"
+```
+
+***
+
+## Common Usage Patterns
+
+### List all territories
+
+```bash  theme={null}
+asc pricing territories list --paginate --output table
+```
+
+### Get price points for a specific territory
+
+```bash  theme={null}
+asc pricing price-points --app "123456789" --territory "USA" --output json
+```
+
+### Create a price schedule
+
+```bash  theme={null}
+asc pricing schedule create --app "123456789" --price-point "PRICE_POINT_ID" --base-territory "USA" --start-date "2024-03-01"
+```
+
+### Edit app availability
+
+```bash  theme={null}
+asc pricing availability edit --app "123456789" --territory "USA,GBR,DEU,FRA" --available true --available-in-new-territories true
+```
+
+### Check current pricing schedule
+
+```bash  theme={null}
+asc pricing schedule view --app "123456789" --output json
+```
+
+## Territory Codes
+
+Common territory codes:
+
+* `USA` - United States
+* `GBR` - United Kingdom
+* `DEU` - Germany
+* `FRA` - France
+* `JPN` - Japan
+* `CHN` - China
+* `CAN` - Canada
+* `AUS` - Australia
+
+Use `asc pricing territories list` to see all available territories.
+
+## Pricing Tiers
+
+App Store pricing uses a tier system where each tier corresponds to a price in each territory's currency. When you set a price in your base territory, equivalent prices are automatically set in all other territories.
+
+## Manual vs Automatic Prices
+
+* **Automatic Prices**: Prices are automatically equalized across all territories based on the base territory price
+* **Manual Prices**: You can set specific prices for individual territories that override the automatic equalization

@@ -1,0 +1,377 @@
+# Certificates
+
+> Manage signing certificates
+
+Create, list, and manage code signing certificates for app development and distribution.
+
+## Overview
+
+Certificates are used to sign your apps and establish your identity as a developer. The `certificates` command provides full lifecycle management of signing certificates in App Store Connect.
+
+## List Certificates
+
+List all certificates or filter by type:
+
+```bash  theme={null}
+# List all certificates
+asc certificates list
+
+# Filter by certificate type
+asc certificates list --certificate-type IOS_DISTRIBUTION
+
+# List multiple types
+asc certificates list --certificate-type IOS_DEVELOPMENT,IOS_DISTRIBUTION
+
+# Fetch all pages automatically
+asc certificates list --paginate
+```
+
+### Pagination Options
+
+* `--limit` - Results per page (1-200)
+* `--next` - Fetch next page using a `links.next` URL
+* `--paginate` - Automatically fetch all pages
+
+## Get Certificate Details
+
+Retrieve a specific certificate by ID:
+
+```bash  theme={null}
+asc certificates view --id "CERT_ID"
+
+# Include related resources
+asc certificates view --id "CERT_ID" --include passTypeId
+```
+
+## Certificate Types
+
+### iOS Certificate Types
+
+**Development:**
+
+```bash  theme={null}
+asc certificates list --certificate-type IOS_DEVELOPMENT
+```
+
+* Used for: Running apps on devices during development
+* Profile types: IOS\_APP\_DEVELOPMENT
+* Limit: Multiple per account
+
+**Distribution:**
+
+```bash  theme={null}
+asc certificates list --certificate-type IOS_DISTRIBUTION
+```
+
+* Used for: App Store, Ad Hoc, and Enterprise distribution
+* Profile types: IOS\_APP\_STORE, IOS\_APP\_ADHOC, IOS\_APP\_INHOUSE
+* Limit: 3 active per account
+
+### tvOS Certificate Types
+
+* `TVOS_DEVELOPMENT` - tvOS development
+* `TVOS_DISTRIBUTION` - tvOS distribution
+
+### macOS Certificate Types
+
+**Mac App Development:**
+
+```bash  theme={null}
+asc certificates list --certificate-type MAC_APP_DEVELOPMENT
+```
+
+* Used for: macOS development
+
+**Mac App Distribution:**
+
+```bash  theme={null}
+asc certificates list --certificate-type MAC_APP_DISTRIBUTION
+```
+
+* Used for: Mac App Store distribution
+
+**Developer ID Application:**
+
+```bash  theme={null}
+asc certificates list --certificate-type DEVELOPER_ID_APPLICATION
+```
+
+* Used for: Apps distributed outside the Mac App Store
+* Enables notarization
+
+**Developer ID Installer:**
+
+```bash  theme={null}
+asc certificates list --certificate-type DEVELOPER_ID_INSTALLER
+```
+
+* Used for: Signing installer packages (.pkg) for distribution outside Mac App Store
+
+### Specialized Certificate Types
+
+* `DEVELOPER_ID_KEXT` - Kernel extensions (deprecated on modern macOS)
+* `PASS_TYPE_ID` - Wallet passes and Apple Pay
+* `PASS_TYPE_ID_WITH_NFC` - Wallet passes with NFC
+* `MAC_INSTALLER_DISTRIBUTION` - Mac App Store installer packages
+
+## Create Certificate
+
+Create a new signing certificate:
+
+```bash  theme={null}
+asc certificates create --certificate-type IOS_DISTRIBUTION \
+  --csr ./cert.csr
+```
+
+### Generate CSR (Certificate Signing Request)
+
+Before creating a certificate, generate a CSR:
+
+```bash  theme={null}
+# Using asc CLI
+asc certificates csr generate --key-out ./cert.key --csr-out ./cert.csr
+
+# Or using openssl
+openssl req -new -newkey rsa:2048 -nodes \
+  -keyout private.key \
+  -out cert.csr \
+  -subj "/CN=My Certificate/O=My Organization/C=US"
+```
+
+The CSR contains your public key. Keep the private key secure - you'll need it to sign apps.
+
+### CSR Requirements
+
+* **Key size:** 2048-bit RSA minimum
+* **Format:** PEM-encoded PKCS#10
+* **Common Name:** Any descriptive name
+* The CLI accepts CSR files in PEM format or base64-encoded
+
+## Update Certificate
+
+Enable or disable a certificate:
+
+```bash  theme={null}
+# Enable certificate
+asc certificates update --id "CERT_ID" --activated true
+
+# Disable certificate
+asc certificates update --id "CERT_ID" --activated false
+```
+
+Disabled certificates remain in your account but cannot be used for new profile creation.
+
+## Revoke Certificate
+
+Permanently revoke a certificate:
+
+```bash  theme={null}
+asc certificates revoke --id "CERT_ID" --confirm
+```
+
+**Warning:** This action cannot be undone. Revoking a certificate:
+
+* Invalidates all provisioning profiles using this certificate
+* Cannot be re-enabled
+* Counts against your certificate limit until it expires
+
+**When to revoke:**
+
+* Private key is compromised
+* Certificate is no longer needed
+* Replacing with a new certificate
+
+## Certificate Relationships
+
+View related resources for pass type certificates:
+
+```bash  theme={null}
+asc certificates links pass-type-id --id "CERT_ID"
+```
+
+This shows the pass type ID associated with Wallet pass certificates.
+
+## Complete Example Workflows
+
+### Create iOS Distribution Certificate
+
+```bash  theme={null}
+# 1. Generate CSR and private key
+asc certificates csr generate --key-out ./dist.key --csr-out ./dist.csr
+
+# 2. Create certificate
+asc certificates create --certificate-type IOS_DISTRIBUTION \
+  --csr ./dist.csr
+
+# 3. Download the certificate (from the response)
+# The certificate content is base64-encoded in the API response
+# Save it to a .cer file and import to keychain
+
+# 4. Import to keychain
+security import ~/Downloads/certificate.cer \
+  -k ~/Library/Keychains/login.keychain-db
+```
+
+### Rotate Distribution Certificate
+
+```bash  theme={null}
+# 1. Check current certificates
+asc certificates list --certificate-type IOS_DISTRIBUTION \
+  --output table
+
+# 2. Create new certificate
+asc certificates csr generate --key-out ./new-dist.key --csr-out ./new-dist.csr
+asc certificates create --certificate-type IOS_DISTRIBUTION \
+  --csr ./new-dist.csr
+
+# 3. Update provisioning profiles to use new certificate
+asc profiles list --profile-type IOS_APP_STORE --output json
+# Note the profile IDs that need updating
+
+# 4. Revoke old certificate
+asc certificates revoke --id "OLD_CERT_ID" --confirm
+```
+
+### Development Certificate Setup
+
+```bash  theme={null}
+# 1. Generate CSR
+openssl req -new -newkey rsa:2048 -nodes \
+  -keyout dev-private.key \
+  -out dev.csr \
+  -subj "/CN=iOS Development/O=My Team/C=US"
+
+# 2. Create development certificate
+asc certificates create --certificate-type IOS_DEVELOPMENT \
+  --csr ./dev.csr
+
+# 3. Combine private key with certificate for keychain import
+# Download certificate from response, then:
+security import dev-private.key -k ~/Library/Keychains/login.keychain-db
+security import certificate.cer -k ~/Library/Keychains/login.keychain-db
+```
+
+### Mac Developer ID Certificate
+
+```bash  theme={null}
+# For apps distributed outside Mac App Store
+asc certificates create --certificate-type DEVELOPER_ID_APPLICATION \
+  --csr ./developer-id.csr
+
+# For installer packages
+asc certificates create --certificate-type DEVELOPER_ID_INSTALLER \
+  --csr ./installer.csr
+```
+
+## Certificate Export and Backup
+
+### Export from Keychain
+
+```bash  theme={null}
+# Export certificate and private key as .p12
+security export -k ~/Library/Keychains/login.keychain-db \
+  -t identities \
+  -f pkcs12 \
+  -o certificate.p12 \
+  -P "password"
+```
+
+### Import on Another Machine
+
+```bash  theme={null}
+# Import .p12 bundle
+security import certificate.p12 \
+  -k ~/Library/Keychains/login.keychain-db \
+  -P "password" \
+  -T /usr/bin/codesign
+
+# Allow codesign to use the certificate
+security set-key-partition-list -S apple-tool:,apple: \
+  -s -k "keychain-password" \
+  ~/Library/Keychains/login.keychain-db
+```
+
+## Certificate Limits
+
+Apple imposes limits on active certificates:
+
+| Certificate Type         | Limit         |
+| ------------------------ | ------------- |
+| iOS Development          | Unlimited     |
+| iOS Distribution         | 3 per account |
+| Mac App Development      | Unlimited     |
+| Mac App Distribution     | 3 per account |
+| Developer ID Application | 5 per account |
+| Developer ID Installer   | 5 per account |
+
+Revoked and expired certificates count against limits until they expire (1 year from creation).
+
+## Troubleshooting
+
+### Certificate Limit Reached
+
+```
+Error: You have reached the maximum number of certificates for this type
+```
+
+**Solution:** Revoke unused certificates:
+
+```bash  theme={null}
+# List current certificates
+asc certificates list --certificate-type IOS_DISTRIBUTION --output table
+
+# Revoke old or unused certificates
+asc certificates revoke --id "OLD_CERT_ID" --confirm
+```
+
+### Invalid CSR Format
+
+```
+Error: CSR file is empty or invalid
+```
+
+**Solution:** Ensure CSR is properly formatted:
+
+```bash  theme={null}
+# Verify CSR format
+openssl req -in cert.csr -noout -text
+
+# Regenerate if needed
+asc certificates csr generate --key-out ./cert.key --csr-out ./cert.csr
+```
+
+### Private Key Not Found
+
+```
+Error: The identity cannot be found
+```
+
+This means the certificate was created with a CSR from another machine.
+
+**Solution:**
+
+1. Export the certificate and private key from the original machine as .p12
+2. Import the .p12 on your current machine
+3. Or create a new certificate with a CSR generated on your current machine
+
+### Certificate Shows as Invalid
+
+Check certificate status:
+
+```bash  theme={null}
+asc certificates view --id "CERT_ID" --output json
+```
+
+Look for `certificateType`, `expirationDate`, and related attributes.
+
+**Common issues:**
+
+* Certificate expired (valid for 1 year)
+* Certificate was revoked
+* Private key missing from keychain
+
+## Related Commands
+
+* [Signing](/commands/signing) - High-level signing workflow
+* [Profiles](/commands/profiles) - Provisioning profiles
+* [Devices](/commands/devices) - Register development devices

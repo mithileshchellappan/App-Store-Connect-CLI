@@ -1,0 +1,446 @@
+# App Store Submission
+
+> Submit builds for App Store review and manage the submission lifecycle
+
+Automate the complete App Store submission process, from attaching builds to versions through monitoring review status.
+
+## Overview
+
+The submission workflow handles:
+
+* Creating and managing App Store versions
+* Attaching builds to versions
+* Validating metadata requirements
+* Submitting builds for review
+* Monitoring review status
+* Canceling submissions when needed
+
+## Prerequisites
+
+Before submitting, ensure you have:
+
+1. A processed build uploaded to App Store Connect
+2. App Store version created with required metadata
+3. All localizations configured with required fields
+4. Screenshots uploaded for at least one device type
+5. Privacy information and app review details completed
+
+## Submission Workflow
+
+<Steps>
+  <Step title="Prepare your app version">
+    Create an App Store version if it doesn't exist:
+
+    ```bash  theme={null}
+    asc versions create \
+      --app "YOUR_APP_ID" \
+      --version "1.0.0" \
+      --platform IOS
+    ```
+
+    Or list existing versions:
+
+    ```bash  theme={null}
+    asc versions list --app "YOUR_APP_ID" --platform IOS
+    ```
+  </Step>
+
+  <Step title="Verify localization metadata">
+    The CLI automatically validates that required localization fields are present:
+
+    * Description
+    * Keywords
+    * What's New text
+    * Marketing URL (if applicable)
+
+    Update missing localizations:
+
+    ```bash  theme={null}
+    asc app-setup info set \
+      --app "YOUR_APP_ID" \
+      --locale "en-US" \
+      --name "My App" \
+      --subtitle "Amazing app subtitle" \
+      --privacy-policy-url "https://example.com/privacy"
+    ```
+
+    Update version-specific metadata:
+
+    ```bash  theme={null}
+    asc localizations update \
+      --version "VERSION_ID" \
+      --locale "en-US" \
+      --description "Full app description" \
+      --keywords "productivity,tools,utility" \
+      --whats-new "Bug fixes and improvements"
+    ```
+  </Step>
+
+  <Step title="Find your build ID">
+    List builds for your app version:
+
+    ```bash  theme={null}
+    asc builds list \
+      --app "YOUR_APP_ID" \
+      --version "1.0.0" \
+      --build-number "42" \
+      --output json
+    ```
+
+    Or get the latest build:
+
+    ```bash  theme={null}
+    asc builds list \
+      --app "YOUR_APP_ID" \
+      --sort "-uploadedDate" \
+      --limit 1
+    ```
+  </Step>
+
+  <Step title="Submit for review">
+    Submit the build (with automatic preflight validation):
+
+    ```bash  theme={null}
+    asc submit create \
+      --app "YOUR_APP_ID" \
+      --version "1.0.0" \
+      --build "BUILD_ID" \
+      --confirm
+    ```
+
+    Or submit using version ID:
+
+    ```bash  theme={null}
+    asc submit create \
+      --app "YOUR_APP_ID" \
+      --version-id "VERSION_ID" \
+      --build "BUILD_ID" \
+      --confirm
+    ```
+
+    For macOS, tvOS, or visionOS apps, specify the platform:
+
+    ```bash  theme={null}
+    asc submit create \
+      --app "YOUR_APP_ID" \
+      --version "1.0.0" \
+      --build "BUILD_ID" \
+      --platform MAC_OS \
+      --confirm
+    ```
+  </Step>
+</Steps>
+
+## Monitoring Submission Status
+
+<Steps>
+  <Step title="Check submission status">
+    Using submission ID:
+
+    ```bash  theme={null}
+    asc submit status --id "SUBMISSION_ID"
+    ```
+
+    Using version ID:
+
+    ```bash  theme={null}
+    asc submit status --version-id "VERSION_ID"
+    ```
+  </Step>
+
+  <Step title="Check version state">
+    View detailed version information:
+
+    ```bash  theme={null}
+    asc versions view --version-id "VERSION_ID" --output json
+    ```
+
+    `asc versions view` is the canonical command here. The older deprecated `asc versions get` form remains available as a compatibility alias.
+
+    The version state indicates the current stage:
+
+    * `PREPARE_FOR_SUBMISSION`: Metadata incomplete
+    * `WAITING_FOR_REVIEW`: Submitted, awaiting review
+    * `IN_REVIEW`: Currently being reviewed
+    * `PENDING_DEVELOPER_RELEASE`: Approved, awaiting your release
+    * `READY_FOR_SALE`: Live on the App Store
+    * `REJECTED`: Rejected by review team
+  </Step>
+</Steps>
+
+## Managing Submissions
+
+### Cancel a Submission
+
+If you need to cancel a submission before review:
+
+```bash  theme={null}
+asc submit cancel --id "SUBMISSION_ID" --confirm
+```
+
+Or cancel using version ID:
+
+```bash  theme={null}
+asc submit cancel --version-id "VERSION_ID" --confirm
+```
+
+<Note>
+  You can only cancel submissions that are in `WAITING_FOR_REVIEW` state. Once review begins, you cannot cancel.
+</Note>
+
+### Resubmit After Changes
+
+If you need to make changes after submitting:
+
+<Steps>
+  <Step title="Cancel the current submission">
+    ```bash  theme={null}
+    asc submit cancel --version-id "VERSION_ID" --confirm
+    ```
+  </Step>
+
+  <Step title="Make your changes">
+    Update metadata, upload new screenshots, or attach a different build as needed.
+  </Step>
+
+  <Step title="Resubmit">
+    ```bash  theme={null}
+    asc submit create \
+      --app "YOUR_APP_ID" \
+      --version-id "VERSION_ID" \
+      --build "NEW_BUILD_ID" \
+      --confirm
+    ```
+  </Step>
+</Steps>
+
+## Complete Example: iOS App Submission
+
+Here's a complete workflow for submitting an iOS app:
+
+```bash  theme={null}
+#!/bin/bash
+set -e
+
+# Configuration
+export ASC_APP_ID="YOUR_APP_ID"
+VERSION="1.0.0"
+PLATFORM="IOS"
+
+# 1. Find or create the app version
+echo "Creating version $VERSION..."
+VERSION_RESPONSE=$(asc versions create \
+  --app "$ASC_APP_ID" \
+  --version "$VERSION" \
+  --platform "$PLATFORM" \
+  --output json 2>/dev/null || true)
+
+# Extract version ID (adjust based on actual JSON structure)
+VERSION_ID=$(echo "$VERSION_RESPONSE" | jq -r '.data.id')
+
+if [ -z "$VERSION_ID" ]; then
+  echo "Version already exists, fetching ID..."
+  VERSION_ID=$(asc versions list \
+    --app "$ASC_APP_ID" \
+    --platform "$PLATFORM" \
+    --output json | jq -r '.data[] | select(.attributes.versionString == "'$VERSION'") | .id' | head -1)
+fi
+
+echo "Version ID: $VERSION_ID"
+
+# 2. Get the latest build
+echo "Finding latest build..."
+BUILD_ID=$(asc builds list \
+  --app "$ASC_APP_ID" \
+  --sort "-uploadedDate" \
+  --limit 1 \
+  --output json | jq -r '.data[0].id')
+
+echo "Build ID: $BUILD_ID"
+
+# 3. Update localizations (example for en-US)
+echo "Updating localizations..."
+asc localizations update \
+  --version "$VERSION_ID" \
+  --locale "en-US" \
+  --description "Your app description here" \
+  --keywords "productivity,tools" \
+  --whats-new "Bug fixes and performance improvements"
+
+# 4. Submit for review
+echo "Submitting for review..."
+asc submit create \
+  --app "$ASC_APP_ID" \
+  --version-id "$VERSION_ID" \
+  --build "$BUILD_ID" \
+  --platform "$PLATFORM" \
+  --confirm
+
+echo "Submission complete!"
+
+# 5. Check status
+asc submit status --version-id "$VERSION_ID"
+```
+
+## Preflight Validation
+
+The CLI performs automatic preflight checks before submission:
+
+### Localization Validation
+
+Checks that all required fields are present for each localization:
+
+* Description
+* Keywords
+* What's New text (for updates)
+
+If any fields are missing, the submission will fail with a detailed error:
+
+```
+Submit preflight failed: submission-blocking localization fields are missing:
+  - en-US: description, keywords
+  - es-ES: whats-new
+Fix these with `asc apps info edit` (optionally using `--copy-from-locale`) before retrying `asc submit create`.
+```
+
+### Fixing Validation Errors
+
+Copy complete localization from one locale to another:
+
+```bash  theme={null}
+asc apps info edit \
+  --app "YOUR_APP_ID" \
+  --locale "es-ES" \
+  --copy-from-locale "en-US"
+```
+
+Then update locale-specific fields:
+
+```bash  theme={null}
+asc localizations update \
+  --version "VERSION_ID" \
+  --locale "es-ES" \
+  --description "Descripción de la aplicación" \
+  --keywords "productividad,herramientas"
+```
+
+## Troubleshooting
+
+### "No app store version localizations found"
+
+**Problem**: The version has no localizations configured.
+
+**Solution**: Add at least one localization:
+
+```bash  theme={null}
+asc localizations update \
+  --version "VERSION_ID" \
+  --locale "en-US" \
+  --description "App description" \
+  --keywords "keyword1,keyword2" \
+  --whats-new "What's new in this version"
+```
+
+### "Failed to attach build"
+
+**Problem**: The build may not be compatible with the version or is still processing.
+
+**Solution**: Verify build status:
+
+```bash  theme={null}
+asc builds info --build-id "BUILD_ID"
+```
+
+Ensure the build:
+
+* Has finished processing
+* Matches the app ID
+* Supports the correct platform
+* Has passed automatic checks
+
+### "Stale review submission found"
+
+**Problem**: A previous submission attempt left an orphaned submission.
+
+**Solution**: The CLI automatically cancels stale submissions. If you see this warning, it's informational and the new submission will proceed.
+
+### Submission Rejected
+
+If your submission is rejected:
+
+1. Check rejection details in App Store Connect web interface
+2. Address the issues mentioned in the rejection
+3. Upload a new build if code changes are needed, or just update metadata
+4. Resubmit:
+
+```bash  theme={null}
+asc submit create \
+  --app "YOUR_APP_ID" \
+  --version-id "VERSION_ID" \
+  --build "FIXED_BUILD_ID" \
+  --confirm
+```
+
+## Platform-Specific Considerations
+
+### macOS Apps
+
+For macOS apps, specify the `MAC_OS` platform:
+
+```bash  theme={null}
+asc submit create \
+  --app "YOUR_APP_ID" \
+  --version "1.0.0" \
+  --build "BUILD_ID" \
+  --platform MAC_OS \
+  --confirm
+```
+
+### tvOS Apps
+
+For tvOS apps, use the `TV_OS` platform:
+
+```bash  theme={null}
+asc submit create \
+  --app "YOUR_APP_ID" \
+  --version "1.0.0" \
+  --build "BUILD_ID" \
+  --platform TV_OS \
+  --confirm
+```
+
+### visionOS Apps
+
+For visionOS apps, use the `VISION_OS` platform:
+
+```bash  theme={null}
+asc submit create \
+  --app "YOUR_APP_ID" \
+  --version "1.0.0" \
+  --build "BUILD_ID" \
+  --platform VISION_OS \
+  --confirm
+```
+
+## Best Practices
+
+1. **Always use `--confirm` flag**: Prevents accidental submissions
+
+2. **Test with TestFlight first**: Distribute to internal testers before submitting to the App Store
+
+3. **Validate metadata beforehand**: Use `asc localizations list` to verify all required fields are present
+
+4. **Monitor submission status**: Check status regularly during the review process
+
+5. **Keep builds ready**: Have builds processed and ready before starting the submission workflow
+
+6. **Use version IDs for automation**: Version IDs are more reliable than version strings in scripts
+
+7. **Handle stale submissions**: The CLI automatically cleans up orphaned submissions, but verify in case of errors
+
+## Related Commands
+
+* [TestFlight Distribution](/guides/testflight) - Test builds before App Store submission
+* [Metadata Management](/guides/metadata-management) - Manage app metadata and localizations
+* [Screenshots](/guides/screenshots) - Upload App Store screenshots
+* [Build Management](/commands/builds) - Manage and monitor builds

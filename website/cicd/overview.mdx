@@ -1,0 +1,382 @@
+# CI/CD Integration Overview
+
+> Integrate App Store Connect CLI into your CI/CD pipelines for automated iOS, macOS, tvOS, and visionOS workflows
+
+## Introduction
+
+The App Store Connect CLI (`asc`) is designed for seamless integration into CI/CD pipelines. Whether you're using GitHub Actions, GitLab CI, Bitrise, or CircleCI, `asc` provides:
+
+* **Fast, scriptable automation** for App Store Connect workflows
+* **No interactive prompts** - all operations use explicit flags
+* **TTY-aware output** - automatic JSON output in CI environments
+* **Built-in timeout controls** for reliable pipeline execution
+* **Secure credential management** via environment variables
+
+## Quick Start
+
+All CI platforms follow the same basic pattern:
+
+1. **Install** `asc` using platform-specific actions/components
+2. **Authenticate** using environment variables
+3. **Run** commands with explicit flags
+
+<CodeGroup>
+  ```yaml GitHub Actions theme={null}
+  - uses: rudrankriyam/setup-asc@v1
+    with:
+      version: latest
+
+  - run: asc apps list
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY_B64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
+  ```
+
+  ```yaml GitLab CI theme={null}
+  include:
+    - component: gitlab.com/rudrankriyam/asc-ci-components/run@main
+      inputs:
+        stage: deploy
+        job_prefix: release
+        asc_version: latest
+        command: asc apps list
+  ```
+
+  ```yaml Bitrise theme={null}
+  workflows:
+    primary:
+      steps:
+      - git::https://github.com/rudrankriyam/steps-setup-asc.git@main:
+          inputs:
+          - mode: run
+          - version: latest
+          - command: asc apps list
+  ```
+
+  ```yaml CircleCI theme={null}
+  orbs:
+    asc: rudrankriyam/asc@1.0
+
+  jobs:
+    deploy:
+      steps:
+        - asc/install
+        - run: asc apps list
+  ```
+</CodeGroup>
+
+## Authentication in CI
+
+### Environment Variables
+
+All CI platforms use the same authentication environment variables:
+
+| Variable               | Description                             | Required |
+| ---------------------- | --------------------------------------- | -------- |
+| `ASC_KEY_ID`           | App Store Connect API Key ID            | Yes      |
+| `ASC_ISSUER_ID`        | App Store Connect Issuer ID             | Yes      |
+| `ASC_PRIVATE_KEY_B64`  | Base64-encoded private key (`.p8` file) | Yes\*    |
+| `ASC_PRIVATE_KEY_PATH` | Path to `.p8` file (alternative)        | Yes\*    |
+| `ASC_PRIVATE_KEY`      | Raw private key content (alternative)   | Yes\*    |
+
+\*One of these three private key options is required.
+
+### Generating API Keys
+
+1. Visit [App Store Connect API Keys](https://appstoreconnect.apple.com/access/integrations/api)
+2. Create a new API key with appropriate permissions
+3. Download the `.p8` private key file (only available once!)
+4. Note the Key ID and Issuer ID
+
+### Storing Credentials
+
+<Warning>
+  Never commit API keys or private keys to version control. Always use your CI platform's secret management.
+</Warning>
+
+<Tabs>
+  <Tab title="GitHub Actions">
+    Store credentials in **Settings > Secrets and variables > Actions**:
+
+    * `ASC_KEY_ID`
+    * `ASC_ISSUER_ID`
+    * `ASC_PRIVATE_KEY_B64`
+
+    Base64-encode your private key:
+
+    ```bash  theme={null}
+    base64 -i AuthKey_ABC123.p8 | pbcopy
+    ```
+  </Tab>
+
+  <Tab title="GitLab CI">
+    Store credentials in **Settings > CI/CD > Variables**:
+
+    * `ASC_KEY_ID`
+    * `ASC_ISSUER_ID`
+    * `ASC_PRIVATE_KEY_B64`
+
+    Mark as **Protected** and **Masked** for security.
+  </Tab>
+
+  <Tab title="Bitrise">
+    Store credentials in **Workflow > Secrets**:
+
+    * `ASC_KEY_ID`
+    * `ASC_ISSUER_ID`
+    * `ASC_PRIVATE_KEY_B64`
+
+    Enable "Expose for Pull Requests" only if needed.
+  </Tab>
+
+  <Tab title="CircleCI">
+    Store credentials in **Project Settings > Environment Variables**:
+
+    * `ASC_KEY_ID`
+    * `ASC_ISSUER_ID`
+    * `ASC_PRIVATE_KEY_B64`
+  </Tab>
+</Tabs>
+
+## Optional Environment Variables
+
+Customize `asc` behavior in CI:
+
+| Variable             | Purpose                                     | Default      |
+| -------------------- | ------------------------------------------- | ------------ |
+| `ASC_DEFAULT_OUTPUT` | Output format (`json`, `table`, `markdown`) | `json` in CI |
+| `ASC_TIMEOUT`        | Request timeout (e.g., `90s`, `2m`)         | `60s`        |
+| `ASC_UPLOAD_TIMEOUT` | Upload timeout (e.g., `5m`, `10m`)          | `5m`         |
+| `ASC_DEBUG`          | Enable debug logging (`true`, `api`)        | -            |
+| `ASC_STRICT_AUTH`    | Fail on multiple credential sources         | `false`      |
+| `ASC_APP_ID`         | Default app ID for commands                 | -            |
+
+## Common CI/CD Workflows
+
+### TestFlight Distribution
+
+```bash  theme={null}
+# Upload build to TestFlight
+asc builds upload \
+  --app "123456789" \
+  --ipa "/path/to/MyApp.ipa"
+
+# Add to beta group
+asc builds add-groups \
+  --build-id "BUILD_ID" \
+  --group "External Testers"
+```
+
+### App Store Submission
+
+```bash  theme={null}
+# Validate version
+asc validate \
+  --app "123456789" \
+  --version "1.2.3"
+
+# Submit for review
+asc submit create \
+  --app "123456789" \
+  --version "1.2.3" \
+  --build "BUILD_ID" \
+  --confirm
+```
+
+### Metadata Updates
+
+```bash  theme={null}
+# Update app description
+asc apps info edit \
+  --app "123456789" \
+  --description "New description" \
+  --locale en-US
+
+# Upload screenshots
+asc screenshots upload \
+  --version-localization "VERSION_LOCALIZATION_ID" \
+  --device-type "IPHONE_65" \
+  --path "screenshot.png"
+```
+
+### Crash and Feedback Monitoring
+
+```bash  theme={null}
+# Get latest crashes
+asc testflight crashes list \
+  --app "123456789" \
+  --sort -createdDate \
+  --limit 10 \
+  --output json
+
+# Get feedback
+asc testflight feedback list \
+  --app "123456789" \
+  --paginate
+```
+
+## Exit Codes
+
+`asc` uses standard exit codes for reliable CI integration:
+
+* `0` - Success
+* `1` - Runtime error (API failures, network issues, etc.)
+* `2` - Usage error (invalid flags, missing arguments, etc.)
+
+Example error handling:
+
+```bash  theme={null}
+if ! asc builds upload --app "$APP_ID" --ipa "$IPA_PATH"; then
+  echo "Build upload failed"
+  exit 1
+fi
+```
+
+## Output Formats
+
+### Automatic JSON in CI
+
+When running in non-interactive environments (CI pipelines), `asc` automatically outputs JSON:
+
+```bash  theme={null}
+# Outputs JSON in CI, table in terminal
+asc apps list
+```
+
+### Explicit Output Control
+
+```bash  theme={null}
+# Force JSON output
+asc apps list --output json
+
+# Pretty-printed JSON
+asc apps list --output json --pretty
+
+# Markdown tables
+asc apps list --output markdown
+```
+
+### Parsing JSON Output
+
+```bash  theme={null}
+# Using jq to extract app IDs
+APP_ID=$(asc apps list --output json | jq -r '.[0].id')
+
+# Get build status
+STATUS=$(asc builds list --app "$APP_ID" --output json | jq -r '.[0].processingState')
+```
+
+## Platform-Specific Guides
+
+Detailed integration guides for each platform:
+
+<CardGroup cols={2}>
+  <Card title="GitHub Actions" icon="github" href="/cicd/github-actions">
+    Official action with version caching and matrix builds
+  </Card>
+
+  <Card title="GitLab CI" icon="gitlab" href="/cicd/gitlab-ci">
+    Reusable components for install and run workflows
+  </Card>
+
+  <Card title="Bitrise" icon="bitrise" href="/cicd/bitrise">
+    Step-based integration with environment variable support
+  </Card>
+
+  <Card title="CircleCI" icon="circle" href="/cicd/circleci">
+    Official orb for CircleCI pipelines
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use explicit flags">
+    Always use long-form flags (`--app`, `--version`) instead of short forms for clarity in CI logs:
+
+    ```bash  theme={null}
+    # Good
+    asc builds upload --app "123456789" --ipa "MyApp.ipa"
+
+    # Avoid in CI
+    asc builds upload --app "123456789" --ipa "MyApp.ipa"
+    ```
+  </Accordion>
+
+  <Accordion title="Set timeouts">
+    Configure timeouts for long-running operations:
+
+    ```yaml  theme={null}
+    env:
+      ASC_TIMEOUT: 2m
+      ASC_UPLOAD_TIMEOUT: 10m
+    ```
+  </Accordion>
+
+  <Accordion title="Enable debug logging for troubleshooting">
+    Use `ASC_DEBUG=api` to log HTTP requests/responses:
+
+    ```bash  theme={null}
+    ASC_DEBUG=api asc builds upload --app "$APP_ID" --ipa "$IPA_PATH"
+    ```
+  </Accordion>
+
+  <Accordion title="Handle pagination">
+    Use `--paginate` to fetch all results automatically:
+
+    ```bash  theme={null}
+    asc testflight feedback list --app "123456789" --paginate --output json > feedback.json
+    ```
+  </Accordion>
+
+  <Accordion title="Validate before destructive operations">
+    Use validation commands before submissions:
+
+    ```bash  theme={null}
+    asc validate --app "$APP_ID" --version "$VERSION" || exit 1
+    asc submit create --app "$APP_ID" --version "$VERSION" --build "BUILD_ID" --confirm
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Troubleshooting
+
+### Authentication Failures
+
+```bash  theme={null}
+# Verify credentials are set
+echo "Key ID: ${ASC_KEY_ID:0:8}..."
+echo "Issuer ID: ${ASC_ISSUER_ID:0:8}..."
+echo "Private Key: ${ASC_PRIVATE_KEY_B64:0:20}..."
+
+# Test authentication
+asc apps list --output json
+```
+
+### Timeout Issues
+
+```bash  theme={null}
+# Increase timeouts
+export ASC_TIMEOUT=5m
+export ASC_UPLOAD_TIMEOUT=15m
+```
+
+### Rate Limiting
+
+App Store Connect API has rate limits. Implement retry logic:
+
+```bash  theme={null}
+for i in {1..3}; do
+  asc builds upload --app "$APP_ID" --ipa "$IPA_PATH" && break
+  echo "Retry $i/3..."
+  sleep 10
+done
+```
+
+## Next Steps
+
+* Choose your CI platform and follow the specific guide
+* Review the [Commands Reference](/commands/overview) for available operations
+* Check out [Authentication](/authentication) for detailed credential management
+* Explore [Workflows](/concepts/workflows) for advanced automation patterns

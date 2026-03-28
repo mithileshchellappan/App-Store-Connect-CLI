@@ -1,0 +1,707 @@
+# Subscriptions
+
+> Manage auto-renewable subscription groups and subscriptions in App Store Connect
+
+The `subscriptions` command provides comprehensive management of auto-renewable subscriptions, including groups, pricing, offers, and submission workflows.
+
+## Overview
+
+Auto-renewable subscriptions provide access to content or services on a recurring basis:
+
+* **Subscription Groups** - Collections of subscriptions with different durations and features
+* **Subscriptions** - Individual subscription products (weekly, monthly, yearly, etc.)
+* **Pricing** - Territory-specific pricing with tier and custom price support
+* **Offers** - Introductory offers, promotional offers, and offer codes
+
+## Subscription Groups
+
+Subscription groups contain one or more subscription products that provide access to the same level of service.
+
+### List Groups
+
+List all subscription groups for an app.
+
+```bash  theme={null}
+asc subscriptions groups list --app "APP_ID"
+```
+
+**Optional Flags:**
+
+* `--limit` - Results per page (1-200)
+* `--paginate` - Fetch all pages
+* `--next` - Pagination URL
+
+### Create Group
+
+Create a new subscription group.
+
+```bash  theme={null}
+asc subscriptions groups create \
+  --app "APP_ID" \
+  --reference-name "Premium"
+```
+
+**Required Flags:**
+
+* `--app` - App ID (or `ASC_APP_ID` env)
+* `--reference-name` - Internal reference name
+
+### Get Group Details
+
+```bash  theme={null}
+asc subscriptions groups view --id "GROUP_ID"
+```
+
+### Update Group
+
+```bash  theme={null}
+asc subscriptions groups update \
+  --id "GROUP_ID" \
+  --reference-name "Premium Plus"
+```
+
+### Delete Group
+
+```bash  theme={null}
+asc subscriptions groups delete \
+  --id "GROUP_ID" \
+  --confirm
+```
+
+**Warning:** Cannot delete groups with active subscriptions.
+
+### Group Localizations
+
+Manage group display names for different locales.
+
+```bash  theme={null}
+# Create localization
+asc subscriptions groups localizations create \
+  --group-id "GROUP_ID" \
+  --locale "en-US" \
+  --name "Premium Subscription" \
+  --custom-app-name "Premium App"
+
+# List localizations
+asc subscriptions groups localizations list \
+  --group-id "GROUP_ID"
+
+# Update localization
+asc subscriptions groups localizations update \
+  --id "LOCALIZATION_ID" \
+  --name "Premium Plus Subscription"
+
+# Delete localization
+asc subscriptions groups localizations delete \
+  --id "LOCALIZATION_ID" \
+  --confirm
+```
+
+## Subscriptions
+
+### List Subscriptions
+
+List all subscriptions in a group.
+
+```bash  theme={null}
+asc subscriptions list --group-id "GROUP_ID"
+```
+
+**Optional Flags:**
+
+* `--limit` - Results per page (1-200)
+* `--paginate` - Fetch all pages
+* `--next` - Pagination URL
+
+### Create Subscription
+
+Create a new subscription product.
+
+```bash  theme={null}
+asc subscriptions create \
+  --group-id "GROUP_ID" \
+  --reference-name "Monthly" \
+  --product-id "com.example.sub.monthly" \
+  --subscription-period ONE_MONTH
+```
+
+**Required Flags:**
+
+* `--group` - Subscription group ID
+* `--ref-name` - Reference name
+* `--product-id` - Product ID (must match bundle ID prefix)
+
+**Optional Flags:**
+
+* `--subscription-period` - Duration:
+  * `ONE_WEEK`
+  * `ONE_MONTH`
+  * `TWO_MONTHS`
+  * `THREE_MONTHS`
+  * `SIX_MONTHS`
+  * `ONE_YEAR`
+* `--family-sharable` - Enable Family Sharing (cannot be undone)
+
+**Examples:**
+
+```bash  theme={null}
+# Create monthly subscription
+asc subscriptions create \
+  --group-id "GROUP_ID" \
+  --reference-name "Monthly Premium" \
+  --product-id "com.example.app.monthly"
+
+# Create yearly subscription with Family Sharing
+asc subscriptions create \
+  --group-id "GROUP_ID" \
+  --reference-name "Yearly Premium" \
+  --product-id "com.example.app.yearly" \
+  --subscription-period ONE_YEAR \
+  --family-sharable
+```
+
+### Get Subscription
+
+```bash  theme={null}
+asc subscriptions view --id "SUB_ID"
+```
+
+### Update Subscription
+
+```bash  theme={null}
+asc subscriptions update \
+  --id "SUB_ID" \
+  --reference-name "Monthly Premium Plus"
+```
+
+**Optional Flags:**
+
+* `--ref-name` - New reference name
+* `--subscription-period` - New duration
+* `--family-sharable` - Enable Family Sharing
+
+### Delete Subscription
+
+```bash  theme={null}
+asc subscriptions delete --id "SUB_ID" --confirm
+```
+
+## Pricing
+
+### View Pricing Overview
+
+View pricing for all subscriptions in an app.
+
+```bash  theme={null}
+asc subscriptions pricing summary --app "APP_ID"
+```
+
+**Optional Flags:**
+
+* `--territory` - Filter by territory (e.g., `USA`)
+* `--output` - Output format: `json`, `table`, `markdown`
+
+**Example:**
+
+```bash  theme={null}
+# View pricing as table
+asc subscriptions pricing summary \
+  --app "APP_ID" \
+  --output table
+
+# View USA pricing only
+asc subscriptions pricing summary \
+  --app "APP_ID" \
+  --territory "USA" \
+  --output table
+```
+
+### List Prices
+
+List current prices for a subscription.
+
+```bash  theme={null}
+asc subscriptions pricing prices list --subscription-id "SUB_ID"
+```
+
+**Optional Flags:**
+
+* `--limit` - Results per page (1-200)
+* `--paginate` - Fetch all pages
+
+### Set Price
+
+Add or change pricing for a subscription.
+
+```bash  theme={null}
+asc subscriptions pricing prices set \
+  --subscription-id "SUB_ID" \
+  --price-point "PRICE_POINT_ID"
+```
+
+**Required Flags:**
+
+* `--subscription-id` - Subscription ID
+
+**Price Selection (choose one):**
+
+* `--price-point` - Specific price point ID
+* `--tier` - Pricing tier number (requires `--territory`)
+* `--price` - Customer price (requires `--territory`)
+
+**Optional Flags:**
+
+* `--territory` - Territory ID (e.g., `USA`) - required for `--tier` or `--price`
+* `--start-date` - Price change start date (`YYYY-MM-DD`)
+* `--preserved` - Preserve existing customer pricing
+* `--refresh` - Force refresh of tier cache
+
+**Examples:**
+
+```bash  theme={null}
+# Set price using price point ID
+asc subscriptions pricing prices set \
+  --subscription-id "SUB_ID" \
+  --price-point "abc-123-def"
+
+# Set price using tier
+asc subscriptions pricing prices set \
+  --subscription-id "SUB_ID" \
+  --tier 5 \
+  --territory "USA"
+
+# Set price using exact customer price
+asc subscriptions pricing prices set \
+  --subscription-id "SUB_ID" \
+  --price "4.99" \
+  --territory "USA"
+
+# Schedule future price change
+asc subscriptions pricing prices set \
+  --subscription-id "SUB_ID" \
+  --tier 8 \
+  --territory "USA" \
+  --start-date "2026-06-01" \
+  --preserved
+```
+
+**Initial vs. Change Pricing:**
+
+* **First price**: Uses `PATCH /subscriptions/{id}` with inline price resources
+* **Price changes**: Uses `POST /subscriptionPrices` for existing subscriptions
+
+The CLI automatically detects which method to use.
+
+### Import Prices
+
+Import prices for multiple territories from a CSV file.
+
+```bash  theme={null}
+asc subscriptions pricing prices import \
+  --subscription-id "SUB_ID" \
+  --input "./prices.csv"
+```
+
+**CSV Format:**
+
+```csv  theme={null}
+territory,price
+USA,4.99
+CAN,6.99
+GBR,3.99
+AUS,7.99
+```
+
+**Optional Flags:**
+
+* `--start-date` - Price change start date
+* `--preserved` - Preserve existing customer pricing
+
+### Delete Price
+
+```bash  theme={null}
+asc subscriptions pricing prices delete \
+  --price-id "PRICE_ID" \
+  --confirm
+```
+
+### Price Points
+
+Work with subscription price points and tiers.
+
+```bash  theme={null}
+# List price points for territory
+asc subscriptions pricing price-points list \
+  --subscription-id "SUB_ID"
+
+# Get price point details
+asc subscriptions pricing price-points view \
+  --price-point-id "PRICE_POINT_ID"
+```
+
+## Availability
+
+Control which territories can purchase your subscriptions.
+
+### Get Availability
+
+```bash  theme={null}
+asc subscriptions pricing availability view --availability-id "AVAILABILITY_ID"
+# or
+asc subscriptions pricing availability view --subscription-id "SUB_ID"
+```
+
+### Set Availability
+
+```bash  theme={null}
+asc subscriptions pricing availability edit \
+  --subscription-id "SUB_ID" \
+  --territories "USA,CAN,GBR"
+```
+
+**Optional Flags:**
+
+* `--available-in-new-territories` - Automatically include new App Store territories
+
+### List Available Territories
+
+```bash  theme={null}
+asc subscriptions pricing availability available-territories \
+  --availability-id "AVAILABILITY_ID" \
+  --paginate
+```
+
+## Localizations
+
+Manage subscription display names and descriptions.
+
+```bash  theme={null}
+# Create localization
+asc subscriptions localizations create \
+  --subscription-id "SUB_ID" \
+  --locale "en-US" \
+  --name "Monthly Premium" \
+  --description "Get unlimited access to all premium features"
+
+# List localizations
+asc subscriptions localizations list \
+  --subscription-id "SUB_ID"
+
+# Update localization
+asc subscriptions localizations update \
+  --id "LOCALIZATION_ID" \
+  --name "Monthly Premium Plus"
+
+# Delete localization
+asc subscriptions localizations delete \
+  --id "LOCALIZATION_ID" \
+  --confirm
+```
+
+## Promotional Images
+
+Upload promotional images for subscriptions.
+
+```bash  theme={null}
+# Upload image
+asc subscriptions images create \
+  --subscription-id "SUB_ID" \
+  --file "./promo.png"
+
+# List images
+asc subscriptions images list --subscription-id "SUB_ID"
+
+# Delete image
+asc subscriptions images delete --id "IMAGE_ID" --confirm
+```
+
+**Image Requirements:**
+
+* Format: PNG or JPG
+* Size: 1024 x 1024 pixels
+* Color space: RGB
+* Maximum file size: 4MB
+
+## Introductory Offers
+
+Offer discounted pricing to new subscribers.
+
+```bash  theme={null}
+# Create introductory offer
+asc subscriptions offers introductory create \
+  --subscription-id "SUB_ID" \
+  --offer-duration ONE_MONTH \
+  --offer-mode FREE_TRIAL \
+  --number-of-periods 1
+
+# Update offer
+asc subscriptions offers introductory update \
+  --id "OFFER_ID" \
+  --end-date "2026-02-01"
+
+# Delete offer
+asc subscriptions offers introductory delete \
+  --id "OFFER_ID" \
+  --confirm
+```
+
+**Offer Types:**
+
+* `FREE_TRIAL` - Free access for specified duration
+* `PAY_AS_YOU_GO` - Discounted price per period
+* `PAY_UP_FRONT` - Single upfront payment for multiple periods
+
+## Promotional Offers
+
+Create targeted offers for existing or lapsed subscribers.
+
+```bash  theme={null}
+# Create promotional offer
+asc subscriptions offers promotional create \
+  --subscription-id "SUB_ID" \
+  --name "Win-Back Spring 2024" \
+  --offer-code "SPRING2024"
+
+# List promotional offers
+asc subscriptions offers promotional list \
+  --subscription-id "SUB_ID"
+
+# Delete promotional offer
+asc subscriptions offers promotional delete \
+  --id "OFFER_ID" \
+  --confirm
+```
+
+## Offer Codes
+
+Generate subscription offer codes for marketing campaigns.
+
+```bash  theme={null}
+# Create offer code
+asc subscriptions offers offer-codes create \
+  --subscription-id "SUB_ID" \
+  --name "LAUNCH50" \
+  --offer-eligibility STACK_WITH_INTRO_OFFERS \
+  --customer-eligibilities NEW \
+  --offer-duration ONE_MONTH \
+  --offer-mode FREE_TRIAL \
+  --number-of-periods 1 \
+  --prices "USA:PRICE_POINT_ID"
+
+# List offer codes
+asc subscriptions offers offer-codes list \
+  --subscription-id "SUB_ID"
+```
+
+## App Store Review
+
+Manage review screenshots for subscription approval.
+
+```bash  theme={null}
+# Upload review screenshot
+asc subscriptions review screenshots create \
+  --subscription-id "SUB_ID" \
+  --file "./screenshot.png"
+
+# View App Store review screenshot
+asc subscriptions review app-store-screenshot view \
+  --subscription-id "SUB_ID" \
+```
+
+## Grace Periods
+
+Configure billing grace periods for failed payment recovery.
+
+```bash  theme={null}
+# Set grace period
+asc subscriptions grace-periods update \
+  --id "GRACE_PERIOD_ID" \
+  --duration SIXTEEN_DAYS \
+  --opt-in true \
+  --sandbox-opt-in true
+
+# View grace period settings
+asc subscriptions grace-periods view \
+  --id "GRACE_PERIOD_ID"
+```
+
+## Promoted Subscriptions
+
+Promote subscriptions on your App Store product page.
+
+```bash  theme={null}
+# List promoted subscriptions
+asc subscriptions promoted-purchases list \
+  --app "APP_ID"
+
+# View promoted subscription
+asc subscriptions promoted-purchases view \
+  --promoted-purchase-id "PROMO_ID"
+
+# Create promoted subscription
+asc subscriptions promoted-purchases create \
+  --app "APP_ID" \
+  --product-id "SUB_ID" \
+  --visible-for-all-users true
+
+# Link promoted subscription to the app
+asc subscriptions promoted-purchases link \
+  --app "APP_ID" \
+  --promoted-purchase-id "PROMO_ID"
+```
+
+## Submission
+
+Submit subscription groups or individual subscriptions for review.
+
+```bash  theme={null}
+# Submit subscription group
+asc subscriptions review submit-group \
+  --group-id "GROUP_ID" \
+  --confirm
+
+# Submit individual subscription
+asc subscriptions review submit \
+  --subscription-id "SUB_ID" \
+  --confirm
+```
+
+## Common Workflows
+
+### Create Complete Subscription Tier
+
+```bash  theme={null}
+#!/bin/bash
+# Create a full subscription tier (monthly, yearly)
+
+APP_ID="123456789"
+BUNDLE_ID="com.example.app"
+
+# 1. Create subscription group
+GROUP_RESPONSE=$(asc subscriptions groups create \
+  --app "$APP_ID" \
+  --reference-name "Premium" \
+  --output json)
+
+GROUP_ID=$(echo "$GROUP_RESPONSE" | jq -r '.data.id')
+
+# 2. Create monthly subscription
+MONTHLY_RESPONSE=$(asc subscriptions create \
+  --group-id "$GROUP_ID" \
+  --reference-name "Monthly Premium" \
+  --product-id "${BUNDLE_ID}.monthly" \
+  --subscription-period ONE_MONTH \
+  --output json)
+
+MONTHLY_ID=$(echo "$MONTHLY_RESPONSE" | jq -r '.data.id')
+
+# 3. Create yearly subscription
+YEARLY_RESPONSE=$(asc subscriptions create \
+  --group-id "$GROUP_ID" \
+  --reference-name "Yearly Premium" \
+  --product-id "${BUNDLE_ID}.yearly" \
+  --subscription-period ONE_YEAR \
+  --output json)
+
+YEARLY_ID=$(echo "$YEARLY_RESPONSE" | jq -r '.data.id')
+
+# 4. Set pricing
+asc subscriptions pricing prices set \
+  --subscription-id "$MONTHLY_ID" \
+  --tier 5 \
+  --territory "USA"
+
+asc subscriptions pricing prices set \
+  --subscription-id "$YEARLY_ID" \
+  --tier 40 \
+  --territory "USA"
+
+echo "Created subscription group: $GROUP_ID"
+echo "Monthly subscription: $MONTHLY_ID"
+echo "Yearly subscription: $YEARLY_ID"
+```
+
+### Bulk Price Update
+
+```bash  theme={null}
+#!/bin/bash
+# Update pricing across all subscriptions
+
+GROUP_ID="abc-123-def"
+NEW_TIER=8
+START_DATE="2026-06-01"
+
+# Get all subscriptions in group
+SUBS=$(asc subscriptions list \
+  --group-id "$GROUP_ID" \
+  --paginate \
+  --output json | jq -r '.data[].id')
+
+# Update each subscription
+for SUB_ID in $SUBS; do
+  echo "Updating $SUB_ID"
+  asc subscriptions pricing prices set \
+    --subscription-id "$SUB_ID" \
+    --tier "$NEW_TIER" \
+    --territory "USA" \
+    --start-date "$START_DATE" \
+    --preserved
+done
+```
+
+### Export Subscription Catalog
+
+```bash  theme={null}
+# Export all subscription groups and subscriptions
+asc subscriptions groups list \
+  --app "$APP_ID" \
+  --paginate \
+  --output json \
+  > subscription-groups.json
+
+# Format for review
+jq '[.data[] | {id: .id, name: .attributes.referenceName}]' subscription-groups.json
+```
+
+## Best Practices
+
+### Subscription Structure
+
+* Group subscriptions that provide similar access levels
+* Offer at least two durations (e.g., monthly and yearly)
+* Provide value incentive for longer commitments (e.g., yearly at 20% discount)
+* Limit to 1-2 subscription groups per app
+
+### Pricing Strategy
+
+* Research competitor pricing in key markets
+* Consider regional price adjustments for purchasing power parity
+* Use preserved pricing when raising prices to retain existing subscribers
+* Test introductory offers to improve conversion
+
+### Offer Strategy
+
+* Use free trials to reduce friction for new subscribers
+* Target win-back offers to lapsed subscribers
+* Limit offer code distribution to avoid devaluing your subscription
+* A/B test offer durations and discount levels
+
+### Metadata
+
+* Localize all subscription metadata for supported languages
+* Clearly communicate what subscribers get
+* Use promotional images to showcase value
+* Update screenshots to reflect current features
+
+## Related Commands
+
+* [In-App Purchases](/commands/iap) - One-time and consumable purchases
+* [Apps](/commands/apps) - App metadata and settings
+* [Pricing](/commands/pricing) - Territory pricing and tiers
+
+## API Reference
+
+* [Subscription Groups](https://sosumi.ai/documentation/appstoreconnectapi/subscriptiongroup)
+* [Subscriptions](https://sosumi.ai/documentation/appstoreconnectapi/subscription)
+* [Subscription Prices](https://sosumi.ai/documentation/appstoreconnectapi/subscriptionprice)
+* [Subscription Offers](https://sosumi.ai/documentation/appstoreconnectapi/subscriptionoffer)

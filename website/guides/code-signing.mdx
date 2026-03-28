@@ -1,0 +1,492 @@
+# Code Signing
+
+> Manage signing certificates and provisioning profiles for app distribution
+
+Automate the management of signing certificates and provisioning profiles required for app distribution.
+
+## Overview
+
+Code signing is required for:
+
+* App Store distribution
+* Ad-hoc distribution
+* Development builds
+* Enterprise distribution
+
+The CLI provides a streamlined `signing fetch` command that:
+
+1. Resolves your bundle ID
+2. Finds matching certificates
+3. Locates or creates provisioning profiles
+4. Downloads everything to your local machine
+
+## Quick Start
+
+### Fetch Signing Assets for App Store
+
+For App Store distribution:
+
+```bash  theme={null}
+asc signing fetch \
+  --bundle-id com.example.myapp \
+  --profile-type IOS_APP_STORE \
+  --output ./signing
+```
+
+This will:
+
+* Find your App Store distribution certificates
+* Locate or create an App Store provisioning profile
+* Download certificates as `.cer` files
+* Download the provisioning profile as `.mobileprovision`
+
+### Fetch Signing Assets for Development
+
+For development builds (requires device IDs):
+
+```bash  theme={null}
+asc signing fetch \
+  --bundle-id com.example.myapp \
+  --profile-type IOS_APP_DEVELOPMENT \
+  --device "DEVICE_ID1,DEVICE_ID2" \
+  --output ./signing
+```
+
+## Profile Types
+
+### iOS Profiles
+
+* **IOS\_APP\_STORE**: App Store distribution
+* **IOS\_APP\_DEVELOPMENT**: Development builds
+* **IOS\_APP\_ADHOC**: Ad-hoc distribution
+* **IOS\_APP\_INHOUSE**: Enterprise distribution
+
+### macOS Profiles
+
+* **MAC\_APP\_STORE**: Mac App Store distribution
+* **MAC\_APP\_DEVELOPMENT**: Mac development
+* **MAC\_APP\_DIRECT**: Mac direct distribution
+* **MAC\_CATALYST\_APP\_DEVELOPMENT**: Mac Catalyst development
+* **MAC\_CATALYST\_APP\_STORE**: Mac Catalyst App Store
+
+### tvOS Profiles
+
+* **TVOS\_APP\_STORE**: tvOS App Store
+* **TVOS\_APP\_DEVELOPMENT**: tvOS development
+* **TVOS\_APP\_ADHOC**: tvOS ad-hoc distribution
+* **TVOS\_APP\_INHOUSE**: tvOS enterprise distribution
+
+## Complete Signing Workflow
+
+<Steps>
+  <Step title="Register your bundle ID (if new)">
+    First-time setup for a new app:
+
+    ```bash  theme={null}
+    asc bundle-ids create \
+      --identifier "com.example.myapp" \
+      --name "My App" \
+      --platform IOS
+    ```
+
+    Verify it exists:
+
+    ```bash  theme={null}
+    asc bundle-ids list --paginate
+    ```
+  </Step>
+
+  <Step title="Register development devices (for development profiles)">
+    For development and ad-hoc profiles, register test devices:
+
+    ```bash  theme={null}
+    asc devices register \
+      --name "Jane's iPhone" \
+      --platform IOS \
+      --udid "00008030-XXXXXXXXXXXX"
+    ```
+
+    List all registered devices:
+
+    ```bash  theme={null}
+    asc devices list --platform IOS
+    ```
+  </Step>
+
+  <Step title="Create certificates (if needed)">
+    Generate a Certificate Signing Request (CSR) on your Mac:
+
+    ```bash  theme={null}
+    # Using Keychain Access:
+    # 1. Open Keychain Access
+    # 2. Keychain Access > Certificate Assistant > Request a Certificate from a Certificate Authority
+    # 3. Enter your email and name
+    # 4. Select "Saved to disk"
+    # 5. Save as CertificateSigningRequest.certSigningRequest
+    ```
+
+    Upload the CSR to create a certificate:
+
+    ```bash  theme={null}
+    asc certificates create \
+      --certificate-type IOS_DISTRIBUTION \
+      --csr ./CertificateSigningRequest.certSigningRequest
+    ```
+
+    List existing certificates:
+
+    ```bash  theme={null}
+    asc certificates list --certificate-type IOS_DISTRIBUTION
+    ```
+  </Step>
+
+  <Step title="Fetch signing assets">
+    Download everything at once:
+
+    ```bash  theme={null}
+    asc signing fetch \
+      --bundle-id com.example.myapp \
+      --profile-type IOS_APP_STORE \
+      --output ./signing
+    ```
+
+    The output directory will contain:
+
+    ```
+    signing/
+    ├── My_App_Distribution.mobileprovision
+    └── ABC123DEF456.cer
+    ```
+  </Step>
+
+  <Step title="Install certificates and profiles">
+    Install the certificate (double-click or use CLI):
+
+    ```bash  theme={null}
+    # Import certificate into keychain
+    security import signing/ABC123DEF456.cer -k ~/Library/Keychains/login.keychain-db
+    ```
+
+    Install the provisioning profile:
+
+    ```bash  theme={null}
+    # Copy to Xcode's provisioning profile directory
+    cp signing/*.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+    ```
+
+    Or double-click the `.mobileprovision` file to install via Xcode.
+  </Step>
+</Steps>
+
+## Automatic Profile Creation
+
+If no matching profile exists, use `--create-missing` to automatically create one:
+
+```bash  theme={null}
+asc signing fetch \
+  --bundle-id com.example.myapp \
+  --profile-type IOS_APP_STORE \
+  --create-missing \
+  --output ./signing
+```
+
+For development profiles with specific devices:
+
+```bash  theme={null}
+asc signing fetch \
+  --bundle-id com.example.myapp \
+  --profile-type IOS_APP_DEVELOPMENT \
+  --device "DEVICE_ID1,DEVICE_ID2,DEVICE_ID3" \
+  --create-missing \
+  --output ./signing
+```
+
+## Certificate Management
+
+### List All Certificates
+
+```bash  theme={null}
+asc certificates list
+```
+
+### Filter by Type
+
+```bash  theme={null}
+asc certificates list --certificate-type IOS_DISTRIBUTION
+asc certificates list --certificate-type IOS_DEVELOPMENT
+asc certificates list --certificate-type MAC_APP_DISTRIBUTION
+```
+
+### Check Certificate Expiration
+
+```bash  theme={null}
+asc certificates list --output json | jq '.data[] | {name: .attributes.name, expires: .attributes.expirationDate}'
+```
+
+### Revoke a Certificate
+
+<Warning>
+  Revoking a certificate will invalidate all provisioning profiles that use it. Only revoke certificates that are compromised or no longer needed.
+</Warning>
+
+```bash  theme={null}
+asc certificates revoke --id "CERTIFICATE_ID" --confirm
+```
+
+## Provisioning Profile Management
+
+### List Profiles
+
+```bash  theme={null}
+asc profiles list --profile-type IOS_APP_STORE
+```
+
+### Get Profile Details
+
+```bash  theme={null}
+asc profiles view --id "PROFILE_ID"
+```
+
+### Download a Specific Profile
+
+```bash  theme={null}
+asc profiles download --id "PROFILE_ID" --output ./my-profile.mobileprovision
+```
+
+### Delete a Profile
+
+```bash  theme={null}
+asc profiles delete --id "PROFILE_ID" --confirm
+```
+
+## CI/CD Integration
+
+### GitHub Actions Example
+
+```yaml  theme={null}
+name: Build and Sign
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install asc CLI
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/rudrankriyam/App-Store-Connect-CLI/main/install.sh | bash
+      
+      - name: Configure ASC credentials
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_PRIVATE_KEY }}
+        run: |
+          echo "Credentials configured via environment variables"
+      
+      - name: Fetch signing assets
+        run: |
+          asc signing fetch \
+            --bundle-id com.example.myapp \
+            --profile-type IOS_APP_STORE \
+            --output ./signing
+      
+      - name: Install certificate
+        run: |
+          # Create temporary keychain
+          security create-keychain -p "temp_password" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "temp_password" build.keychain
+          security set-keychain-settings -t 3600 -u build.keychain
+          
+          # Import certificate
+          security import signing/*.cer -k build.keychain -A
+          security set-key-partition-list -S apple-tool:,apple: -s -k "temp_password" build.keychain
+      
+      - name: Install provisioning profile
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp signing/*.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+      
+      - name: Build app
+        run: |
+          xcodebuild archive \
+            -project MyApp.xcodeproj \
+            -scheme MyApp \
+            -archivePath ./build/MyApp.xcarchive
+```
+
+### GitLab CI Example
+
+```yaml  theme={null}
+stages:
+  - sign
+  - build
+
+fetch_signing:
+  stage: sign
+  tags:
+    - macos
+  script:
+    - curl -fsSL https://raw.githubusercontent.com/rudrankriyam/App-Store-Connect-CLI/main/install.sh | bash
+    - |
+      asc signing fetch \
+        --bundle-id com.example.myapp \
+        --profile-type IOS_APP_STORE \
+        --output ./signing
+  artifacts:
+    paths:
+      - signing/
+    expire_in: 1 hour
+
+build_app:
+  stage: build
+  tags:
+    - macos
+  dependencies:
+    - fetch_signing
+  script:
+    - security import signing/*.cer -k ~/Library/Keychains/login.keychain-db
+    - cp signing/*.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+    - xcodebuild archive -project MyApp.xcodeproj -scheme MyApp -archivePath ./build/MyApp.xcarchive
+```
+
+## Advanced Usage
+
+### Filter Certificates by Type
+
+When fetching, you can filter which certificates to download:
+
+```bash  theme={null}
+asc signing fetch \
+  --bundle-id com.example.myapp \
+  --profile-type IOS_APP_STORE \
+  --certificate-type IOS_DISTRIBUTION \
+  --output ./signing
+```
+
+### Fetch for Multiple Bundle IDs
+
+For apps with multiple targets:
+
+```bash  theme={null}
+# Main app
+asc signing fetch --bundle-id com.example.myapp --profile-type IOS_APP_STORE --output ./signing/main
+
+# Today widget extension
+asc signing fetch --bundle-id com.example.myapp.widget --profile-type IOS_APP_STORE --output ./signing/widget
+
+# Watch app
+asc signing fetch --bundle-id com.example.myapp.watchapp --profile-type IOS_APP_STORE --output ./signing/watch
+```
+
+### Verify App Association
+
+Ensure the bundle ID matches your app:
+
+```bash  theme={null}
+asc signing fetch \
+  --app "YOUR_APP_ID" \
+  --bundle-id com.example.myapp \
+  --profile-type IOS_APP_STORE \
+  --output ./signing
+```
+
+The CLI will validate that the bundle ID is associated with the specified app.
+
+## Troubleshooting
+
+### "No certificates found"
+
+**Problem**: No distribution certificates exist for the account.
+
+**Solution**: Create a new certificate:
+
+1. Generate CSR in Keychain Access
+2. Create certificate:
+   ```bash  theme={null}
+   asc certificates create --certificate-type IOS_DISTRIBUTION --csr ./CertificateSigningRequest.certSigningRequest
+   ```
+
+### "Bundle ID not found"
+
+**Problem**: The bundle identifier doesn't exist in App Store Connect.
+
+**Solution**: Register the bundle ID:
+
+```bash  theme={null}
+asc bundle-ids create --identifier com.example.myapp --name "My App" --platform IOS
+```
+
+### "Device IDs required for development profiles"
+
+**Problem**: Development profiles require registered devices.
+
+**Solution**: Register devices and include their IDs:
+
+```bash  theme={null}
+# List device UDIDs
+asc devices list --platform IOS --output json | jq '.data[] | {name: .attributes.name, udid: .attributes.udid}'
+
+# Fetch with device IDs
+asc signing fetch \
+  --bundle-id com.example.myapp \
+  --profile-type IOS_APP_DEVELOPMENT \
+  --device "DEVICE_ID1,DEVICE_ID2"
+```
+
+### "Failed to create profile"
+
+**Problem**: Profile creation failed due to missing prerequisites.
+
+**Solution**: Verify requirements:
+
+* Bundle ID exists
+* Valid certificates exist
+* For development: devices are registered
+* Account has necessary permissions
+
+### Certificate Not Installing
+
+**Problem**: Double-clicking the `.cer` file doesn't import the certificate.
+
+**Solution**: Use the `security` command:
+
+```bash  theme={null}
+security import signing/certificate.cer -k ~/Library/Keychains/login.keychain-db
+```
+
+Verify installation:
+
+```bash  theme={null}
+security find-certificate -c "Apple Distribution" -p ~/Library/Keychains/login.keychain-db
+```
+
+## Best Practices
+
+1. **Automate certificate renewal**: Set up alerts for expiring certificates (they expire after 1 year)
+
+2. **Use different certificates for different environments**: Separate development and distribution certificates
+
+3. **Protect private keys**: Never commit certificates or private keys to version control
+
+4. **Use CI/CD secrets**: Store API keys and certificates as encrypted secrets in your CI/CD platform
+
+5. **Regenerate profiles after certificate renewal**: When you renew certificates, regenerate all associated profiles
+
+6. **Keep device lists updated**: Regularly add new test devices and remove old ones
+
+7. **Use `--create-missing` in CI**: Ensures profiles are created if they don't exist
+
+8. **Clean up old profiles**: Delete unused profiles to avoid confusion
+
+## Related Commands
+
+* [Bundle IDs](/commands/bundle-ids) - Manage bundle identifiers
+* [Certificates](/commands/certificates) - Manage signing certificates
+* [Devices](/commands/devices) - Register test devices
+* [Profiles](/commands/profiles) - Manage provisioning profiles

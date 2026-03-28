@@ -1,0 +1,261 @@
+# Authentication profiles
+
+> Manage multiple API keys with named authentication profiles
+
+Authentication profiles allow you to manage multiple App Store Connect API keys and switch between them easily.
+
+## Overview
+
+Profiles are stored in the configuration file (`~/.asc/config.json` or `.asc/config.json`) and can reference credentials from the keychain or config file.
+
+## Creating profiles
+
+Use the `--name` flag with `asc auth login` to create a named profile:
+
+```bash  theme={null}
+asc auth login \
+  --name "PersonalApp" \
+  --key-id "ABC123" \
+  --issuer-id "DEF456" \
+  --private-key /path/to/AuthKey_ABC123.p8
+```
+
+This stores the credentials in the keychain (or config file as fallback) with the name "PersonalApp".
+
+## Using profiles
+
+Switch between profiles using the `--profile` flag or `ASC_PROFILE` environment variable:
+
+```bash  theme={null}
+# Use a specific profile for one command
+asc --profile PersonalApp apps list
+
+# Set a profile for the current session
+export ASC_PROFILE="PersonalApp"
+asc apps list
+asc builds list --app 123456789
+```
+
+## Switching profiles
+
+Use `asc auth switch` to change the default profile:
+
+```bash  theme={null}
+asc auth switch --name WorkApp
+```
+
+This updates the `default_key_name` field in your config file.
+
+## Listing profiles
+
+View your current authentication status and available profiles:
+
+```bash  theme={null}
+asc auth status
+```
+
+**Example output:**
+
+```
+Authentication: Active
+Profile: PersonalApp (default)
+Key ID: ABC123
+Issuer ID: DEF456
+Source: keychain
+
+Available profiles:
+  - PersonalApp (default)
+  - WorkApp
+  - ClientApp
+```
+
+## Config file structure
+
+Profiles are stored in `~/.asc/config.json`:
+
+```json  theme={null}
+{
+  "default_key_name": "PersonalApp",
+  "keys": [
+    {
+      "name": "PersonalApp",
+      "key_id": "ABC123",
+      "issuer_id": "DEF456",
+      "private_key_path": "/Users/you/.asc/AuthKey_ABC123.p8"
+    },
+    {
+      "name": "WorkApp",
+      "key_id": "XYZ789",
+      "issuer_id": "UVW456",
+      "private_key_path": "/Users/you/.asc/AuthKey_XYZ789.p8"
+    }
+  ]
+}
+```
+
+<Note>
+  Private keys are stored in the keychain when available. The config file only stores references (key ID, issuer ID, and path).
+</Note>
+
+## Local vs global config
+
+The CLI supports both global and local (project-specific) configuration:
+
+* **Global config:** `~/.asc/config.json` (used by default)
+* **Local config:** `.asc/config.json` in your project directory
+
+Local configs take precedence over global configs. This is useful for project-specific API keys:
+
+```bash  theme={null}
+# In your project directory
+mkdir -p .asc
+echo '.asc/' >> .gitignore  # Don't commit credentials
+
+asc auth login \
+  --name "ProjectKey" \
+  --key-id "PROJECT123" \
+  --issuer-id "PROJECT456" \
+  --private-key /path/to/ProjectKey.p8
+```
+
+Now all commands run from this directory will use the project-specific key by default.
+
+## Credential resolution order
+
+When you run a command, credentials are resolved in this order:
+
+1. **`--profile` flag** (highest priority)
+2. **`ASC_PROFILE` environment variable**
+3. **Default profile** from config (`default_key_name`)
+4. **Unnamed credentials** from config or environment variables
+5. **Keychain** (if no profile specified)
+
+<Warning>
+  Use `ASC_STRICT_AUTH=true` to fail when credentials are found in multiple sources. This helps prevent accidental credential mixing.
+</Warning>
+
+## Profile management commands
+
+### Create a new profile
+
+```bash  theme={null}
+asc auth login --name "NewProfile" --key-id KEY --issuer-id ISSUER --private-key /path/to/key.p8
+```
+
+### Switch to a different profile
+
+```bash  theme={null}
+asc auth switch --name ProfileName
+```
+
+### View current profile and status
+
+```bash  theme={null}
+asc auth status
+```
+
+### Remove a profile
+
+```bash  theme={null}
+asc auth logout --name ProfileName
+```
+
+### Remove all profiles
+
+```bash  theme={null}
+asc auth logout --all
+```
+
+## Example workflows
+
+### Multiple client projects
+
+```bash  theme={null}
+# Set up profiles for different clients
+asc auth login --name "ClientA" --key-id KEY_A --issuer-id ISSUER_A --private-key /path/to/a.p8
+asc auth login --name "ClientB" --key-id KEY_B --issuer-id ISSUER_B --private-key /path/to/b.p8
+
+# Use Client A credentials
+asc --profile ClientA apps list
+
+# Switch to Client B
+asc auth switch --name ClientB
+asc apps list  # Uses ClientB by default now
+```
+
+### CI/CD with profile selection
+
+```yaml  theme={null}
+# .github/workflows/release.yml
+env:
+  ASC_PROFILE: Production
+  ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+  ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+  ASC_PRIVATE_KEY_B64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
+  ASC_BYPASS_KEYCHAIN: true
+
+steps:
+  - name: Upload to TestFlight
+    run: asc builds upload --app ${{ secrets.APP_ID }} --ipa MyApp.ipa
+```
+
+### Testing with staging vs production keys
+
+```bash  theme={null}
+# Configure staging and production profiles
+asc auth login --name "staging" --key-id STAGE_KEY --issuer-id STAGE_ISSUER --private-key /path/to/stage.p8
+asc auth login --name "production" --key-id PROD_KEY --issuer-id PROD_ISSUER --private-key /path/to/prod.p8
+
+# Test with staging
+export ASC_PROFILE="staging"
+asc validate --app 123456789 --version 1.0.0
+
+# Release to production
+export ASC_PROFILE="production"
+asc submit create --app 123456789 --version 1.0.0 --build BUILD_ID --confirm
+```
+
+## Troubleshooting
+
+### Profile not found
+
+If you see "profile not found" errors:
+
+1. Check available profiles: `asc auth status`
+2. Verify the profile name matches exactly (case-sensitive)
+3. Ensure the config file exists: `cat ~/.asc/config.json`
+
+### Multiple credential sources
+
+If credentials are found in multiple places:
+
+```bash  theme={null}
+# Enable strict auth to fail loudly
+export ASC_STRICT_AUTH=true
+asc apps list
+
+# Or explicitly use a profile
+asc --profile SpecificProfile apps list
+```
+
+### Keychain access denied
+
+On macOS, if you encounter keychain access errors:
+
+```bash  theme={null}
+# Bypass keychain and use config/env only
+export ASC_BYPASS_KEYCHAIN=true
+asc apps list
+```
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Learn about authentication methods
+  </Card>
+
+  <Card title="Environment variables" icon="code" href="/configuration/environment-variables">
+    Configure with environment variables
+  </Card>
+</CardGroup>

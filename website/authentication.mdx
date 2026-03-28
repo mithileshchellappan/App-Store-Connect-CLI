@@ -1,0 +1,379 @@
+# Authentication
+
+> Set up and manage App Store Connect API credentials for the CLI
+
+The App Store Connect CLI uses **App Store Connect API keys** for authentication. These are JWT-based credentials that provide programmatic access to the App Store Connect API.
+
+## Generate API keys
+
+Before using `asc`, you need to create an API key in App Store Connect:
+
+<Steps>
+  <Step title="Open App Store Connect">
+    Visit [appstoreconnect.apple.com/access/integrations/api](https://appstoreconnect.apple.com/access/integrations/api)
+  </Step>
+
+  <Step title="Create a new API key">
+    * Click the **+** button to create a new key
+    * Assign a name (e.g., "CI/CD Pipeline" or "Local Development")
+    * Select an access level:
+      * **Admin**: Full read/write access (use with caution)
+      * **Developer**: Read/write for apps, builds, TestFlight (recommended)
+      * **App Manager**: Limited to app management tasks
+      * **Customer Support**: Read-only for reviews and feedback
+  </Step>
+
+  <Step title="Download the private key">
+    * Click **Download API Key** to get the `.p8` file
+    * Save it securely - **you can only download it once**
+    * Recommended location: `~/.asc/AuthKey_ABC123.p8`
+  </Step>
+
+  <Step title="Note your credentials">
+    You'll need three values:
+
+    * **Key ID**: 10-character alphanumeric (e.g., `ABC123DEFG`)
+    * **Issuer ID**: UUID format (e.g., `12345678-abcd-1234-abcd-123456789012`)
+    * **Private Key**: The `.p8` file you just downloaded
+  </Step>
+</Steps>
+
+<Warning>
+  The `.p8` private key file can only be downloaded once. If you lose it, you must revoke the key and create a new one.
+</Warning>
+
+## Store credentials
+
+`asc` provides multiple ways to store and manage your API credentials.
+
+### Option 1: System keychain (recommended)
+
+Store credentials securely in your system keychain (macOS Keychain, Windows Credential Manager, or Linux Secret Service):
+
+```bash  theme={null}
+asc auth login \
+  --name "MyApp" \
+  --key-id "ABC123DEFG" \
+  --issuer-id "12345678-abcd-1234-abcd-123456789012" \
+  --private-key ~/.asc/AuthKey_ABC123.p8
+```
+
+<Note>
+  When using keychain storage, the CLI stores the encrypted key material so commands work even if the original `.p8` file is removed.
+</Note>
+
+#### Verify storage
+
+```bash  theme={null}
+asc auth status
+```
+
+Expected output:
+
+```
+Credential storage: System Keychain
+Location: system keychain
+
+Stored credentials:
+Name    Key ID      Default  Stored In
+MyApp   ABC123DEFG  yes      keychain
+```
+
+### Option 2: Config file
+
+Store credentials in a JSON config file with restricted permissions:
+
+```bash  theme={null}
+asc auth login \
+  --bypass-keychain \
+  --name "MyApp" \
+  --key-id "ABC123DEFG" \
+  --issuer-id "12345678-abcd-1234-abcd-123456789012" \
+  --private-key ~/.asc/AuthKey_ABC123.p8
+```
+
+This creates `~/.asc/config.json` with `0600` permissions.
+
+<Warning>
+  Config file storage is less secure than keychain. Use keychain when possible, especially on shared systems.
+</Warning>
+
+#### Local (per-project) config
+
+For project-specific credentials:
+
+```bash  theme={null}
+asc auth login \
+  --bypass-keychain \
+  --local \
+  --name "ProjectKey" \
+  --key-id "XYZ789" \
+  --issuer-id "87654321-dcba-4321-dcba-210987654321" \
+  --private-key ./AuthKey_XYZ789.p8
+```
+
+This creates `./.asc/config.json` in your current directory.
+
+<Note>
+  Add `.asc/config.json` to `.gitignore` to avoid committing secrets.
+</Note>
+
+### Option 3: Environment variables
+
+For CI/CD pipelines or ephemeral environments:
+
+```bash  theme={null}
+export ASC_KEY_ID="ABC123DEFG"
+export ASC_ISSUER_ID="12345678-abcd-1234-abcd-123456789012"
+export ASC_PRIVATE_KEY_PATH="$HOME/.asc/AuthKey_ABC123.p8"
+```
+
+Alternatively, pass the key content directly:
+
+<CodeGroup>
+  ```bash Base64-encoded key theme={null}
+  export ASC_PRIVATE_KEY_B64="LS0tLS1CRUdJTi..."
+  ```
+
+  ```bash Raw PEM content theme={null}
+  export ASC_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----
+  MIGTAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBHk...
+  -----END PRIVATE KEY-----"
+  ```
+</CodeGroup>
+
+<Warning>
+  Never commit private keys to version control. Use secret management tools in CI/CD (GitHub Secrets, GitLab CI Variables, etc.).
+</Warning>
+
+## Manage multiple profiles
+
+Switch between different API keys for multiple apps or teams:
+
+### Add a second profile
+
+```bash  theme={null}
+asc auth login \
+  --name "WorkApp" \
+  --key-id "WORK123" \
+  --issuer-id "00000000-1111-2222-3333-444444444444" \
+  --private-key ~/keys/AuthKey_WORK123.p8
+```
+
+### List all profiles
+
+```bash  theme={null}
+asc auth status
+```
+
+Output:
+
+```
+Stored credentials:
+Name     Key ID      Default  Stored In
+MyApp    ABC123DEFG  yes      keychain
+WorkApp  WORK123     no       keychain
+```
+
+### Switch default profile
+
+```bash  theme={null}
+asc auth switch --name "WorkApp"
+```
+
+### Use a specific profile
+
+Override the default with `--profile`:
+
+```bash  theme={null}
+asc --profile "WorkApp" apps list
+```
+
+## Credential resolution order
+
+`asc` resolves credentials in this order:
+
+1. **Explicit profile flag**: `--profile "ProfileName"`
+2. **Environment variables**: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_PRIVATE_KEY_PATH` (or `ASC_PRIVATE_KEY`, `ASC_PRIVATE_KEY_B64`)
+3. **Default profile**: The profile marked as default in keychain/config
+4. **Single stored credential**: If only one profile exists, use it automatically
+
+<Note>
+  Use `--strict-auth` or `ASC_STRICT_AUTH=true` to fail when credentials are resolved from multiple sources (helps catch mixed-source errors).
+</Note>
+
+## Validate credentials
+
+Test your credentials with a lightweight API request:
+
+```bash  theme={null}
+asc auth login \
+  --network \
+  --name "MyApp" \
+  --key-id "ABC123DEFG" \
+  --issuer-id "12345678-abcd-1234-abcd-123456789012" \
+  --private-key ~/.asc/AuthKey_ABC123.p8
+```
+
+Or validate existing credentials:
+
+```bash  theme={null}
+asc auth status --validate
+```
+
+Output:
+
+```
+Stored credentials:
+Name    Key ID      Default  Stored In  Validation
+MyApp   ABC123DEFG  yes      keychain   works
+```
+
+## Diagnose issues
+
+Run the authentication doctor to check for configuration problems:
+
+```bash  theme={null}
+asc auth doctor
+```
+
+Sample output:
+
+```
+Auth Doctor
+
+Keychain:
+  [OK] System keychain available
+  [OK] Keychain access granted
+
+Stored Credentials:
+  [OK] Found 1 credential(s)
+  [OK] Default credential set: MyApp
+
+Private Keys:
+  [OK] /Users/you/.asc/AuthKey_ABC123.p8 (permissions: 0600)
+
+Environment:
+  [INFO] No environment credentials detected
+
+No issues found.
+```
+
+### Auto-fix issues
+
+```bash  theme={null}
+asc auth doctor --fix --confirm
+```
+
+This can:
+
+* Migrate legacy keychain entries
+* Fix file permissions on `.p8` files
+* Resolve conflicting credential sources
+
+## Remove credentials
+
+### Remove a specific profile
+
+```bash  theme={null}
+asc auth logout --name "WorkApp"
+```
+
+### Remove all credentials
+
+```bash  theme={null}
+asc auth logout --all
+```
+
+This removes credentials from both keychain and config files.
+
+## Security best practices
+
+<AccordionGroup>
+  <Accordion title="Protect private keys">
+    * Store `.p8` files with `0600` permissions: `chmod 600 AuthKey_*.p8`
+    * Never commit keys to version control
+    * Rotate keys periodically (every 6-12 months)
+    * Revoke keys immediately if compromised
+  </Accordion>
+
+  <Accordion title="Use appropriate permissions">
+    * **Developer role**: Sufficient for most automation tasks
+    * **Admin role**: Only for account-wide operations
+    * **App Manager**: For metadata-only workflows
+    * Create separate keys for different environments (dev, staging, production)
+  </Accordion>
+
+  <Accordion title="CI/CD secrets management">
+    * Store keys in secret management systems (GitHub Secrets, GitLab CI Variables, HashiCorp Vault)
+    * Use environment variables, not config files
+    * Prefer `ASC_PRIVATE_KEY_B64` for base64-encoded keys
+    * Never log private key content in CI output
+  </Accordion>
+
+  <Accordion title="Audit and monitoring">
+    * Review API key activity in App Store Connect
+    * Use descriptive key names ("CI Pipeline" not "Key 1")
+    * Revoke unused keys
+    * Enable `--strict-auth` to catch credential conflicts
+  </Accordion>
+</AccordionGroup>
+
+## Environment variables reference
+
+| Variable               | Purpose                       | Example                                |
+| ---------------------- | ----------------------------- | -------------------------------------- |
+| `ASC_KEY_ID`           | API Key ID                    | `ABC123DEFG`                           |
+| `ASC_ISSUER_ID`        | Issuer ID (UUID)              | `12345678-abcd-1234-abcd-123456789012` |
+| `ASC_PRIVATE_KEY_PATH` | Path to `.p8` file            | `/path/to/AuthKey.p8`                  |
+| `ASC_PRIVATE_KEY`      | Raw PEM content               | `-----BEGIN PRIVATE KEY-----\n...`     |
+| `ASC_PRIVATE_KEY_B64`  | Base64-encoded PEM            | `LS0tLS1CRUdJTi...`                    |
+| `ASC_PROFILE`          | Named profile to use          | `MyApp`                                |
+| `ASC_BYPASS_KEYCHAIN`  | Skip keychain, use config/env | `1`, `true`, `yes`, `on`               |
+| `ASC_STRICT_AUTH`      | Fail on mixed sources         | `1`, `true`, `yes`, `on`               |
+
+## Troubleshooting
+
+### Keychain access denied
+
+If you see "keychain access denied" errors:
+
+1. Check macOS keychain settings: **Keychain Access → Preferences → Reset My Default Keychain**
+2. Bypass keychain temporarily:
+   ```bash  theme={null}
+   export ASC_BYPASS_KEYCHAIN=1
+   asc auth login --bypass-keychain --local --name "MyKey" --key-id "ABC123" --issuer-id "12345678-abcd-1234-abcd-123456789012" --private-key "/path/to/AuthKey.p8"
+   ```
+
+### Invalid private key format
+
+Ensure your `.p8` file:
+
+* Starts with `-----BEGIN PRIVATE KEY-----`
+* Is ECDSA format (App Store Connect uses P-256/ES256)
+* Has correct permissions: `chmod 600 AuthKey_*.p8`
+
+### JWT generation failed
+
+Verify all three credentials are correct:
+
+```bash  theme={null}
+asc auth doctor
+```
+
+Common issues:
+
+* Key ID and Issuer ID don't match the `.p8` file
+* Private key file is corrupted or incomplete
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Run your first commands with asc
+  </Card>
+
+  <Card title="CI/CD integration" icon="gear" href="/cicd/overview">
+    Use asc in GitHub Actions, GitLab CI, and more
+  </Card>
+</CardGroup>

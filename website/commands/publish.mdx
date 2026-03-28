@@ -1,0 +1,169 @@
+# publish
+
+> End-to-end publish workflows for TestFlight and App Store
+
+The `publish` command provides high-level workflows for publishing apps to TestFlight or the App Store.
+
+## Usage
+
+```bash  theme={null}
+asc publish <workflow> [flags]
+```
+
+## Workflows
+
+### TestFlight workflow
+
+Upload and distribute to TestFlight:
+
+```bash  theme={null}
+asc publish testflight \
+  --app APP_ID \
+  --ipa /path/to/MyApp.ipa \
+  --group "External Testers"
+```
+
+This workflow:
+
+1. Uploads the build
+2. Waits for processing
+3. Distributes to specified beta groups
+
+### App Store workflow
+
+Submit to App Store:
+
+```bash  theme={null}
+asc publish appstore \
+  --app APP_ID \
+  --version 1.2.0 \
+  --ipa /path/to/MyApp.ipa
+```
+
+This workflow:
+
+1. Uploads the build
+2. Waits for processing
+3. Attaches build to version
+4. Validates version
+5. Submits for review
+
+## TestFlight flags
+
+<ParamField path="--app" type="string" required>
+  App ID for the build
+</ParamField>
+
+<ParamField path="--file" type="string" required>
+  Path to IPA file
+</ParamField>
+
+<ParamField path="--groups" type="string">
+  Comma-separated beta group names or IDs
+
+  Example: `"External Testers,Internal Team"`
+</ParamField>
+
+<ParamField path="--wait" type="boolean">
+  Wait for build processing to complete
+
+  Default: `true`
+</ParamField>
+
+## App Store flags
+
+<ParamField path="--app" type="string" required>
+  App ID for the version
+</ParamField>
+
+<ParamField path="--version" type="string" required>
+  Version string (e.g., `1.2.0`)
+</ParamField>
+
+<ParamField path="--file" type="string" required>
+  Path to IPA file
+</ParamField>
+
+<ParamField path="--submit --confirm" type="boolean">
+  Automatically release after approval
+
+  Default: `false`
+</ParamField>
+
+## Example workflows
+
+### Publish to TestFlight
+
+```bash  theme={null}
+asc publish testflight \
+  --app 123456789 \
+  --ipa build/MyApp.ipa \
+  --group "External Testers,Beta Team"
+```
+
+### Publish to App Store
+
+```bash  theme={null}
+asc publish appstore \
+  --app 123456789 \
+  --version 1.2.0 \
+  --ipa build/MyApp.ipa \
+  --submit --confirm
+```
+
+### CI/CD integration
+
+```yaml  theme={null}
+# GitHub Actions
+- name: Publish to TestFlight
+  run: |
+    asc publish testflight \
+      --app ${{ secrets.APP_ID }} \
+      --ipa MyApp.ipa \
+      --group "External Testers"
+```
+
+## Output
+
+```
+✓ Uploading build...
+✓ Build uploaded successfully
+✓ Waiting for processing...
+✓ Build processed (VALID)
+✓ Distributing to beta groups...
+✓ Build distributed to External Testers
+
+Publish complete!
+Build ID: build-id-here
+```
+
+## Error handling
+
+If any step fails, the workflow stops and reports the error:
+
+```
+✗ Upload failed: Invalid IPA file
+```
+
+You can retry individual steps using the lower-level commands:
+
+```bash  theme={null}
+asc builds upload --app 123456789 --ipa MyApp.ipa
+asc builds add-groups --build-id BUILD_ID --group "External Testers"
+```
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Builds command" icon="box" href="/commands/builds">
+    Manage builds and uploads
+  </Card>
+
+  <Card title="Submit command" icon="paper-plane" href="/commands/submit">
+    Submit for App Store review
+  </Card>
+
+  <Card title="Automation guide" icon="robot" href="/guides/automation">
+    Workflow automation patterns
+  </Card>
+</CardGroup>

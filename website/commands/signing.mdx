@@ -1,0 +1,337 @@
+# Signing
+
+> Manage signing certificates and provisioning profiles
+
+Fetch and manage code signing assets for your applications.
+
+## Overview
+
+The `signing` command provides high-level operations for managing code signing workflows, automatically resolving and downloading the certificates and provisioning profiles needed for app distribution.
+
+## Fetch Signing Files
+
+Fetch certificates and provisioning profiles for an app in a single command:
+
+```bash  theme={null}
+asc signing fetch --bundle-id com.example.app \
+  --profile-type IOS_APP_STORE \
+  --output ./signing
+```
+
+This command:
+
+1. Resolves the bundle ID in App Store Connect
+2. Finds matching certificates for the profile type
+3. Finds or creates a provisioning profile
+4. Downloads certificates (.cer) and profile (.mobileprovision)
+5. Saves files to the output directory
+
+### Required Flags
+
+* `--bundle-id` - Bundle identifier (e.g., com.example.app)
+* `--profile-type` - Type of provisioning profile (see [Profile Types](#profile-types))
+
+### Optional Flags
+
+* `--output` - Output directory (default: `./signing`)
+* `--app` - App Store Connect app ID (validates bundle ID match)
+* `--certificate-type` - Filter specific certificate type (usually auto-inferred)
+* `--device` - Device IDs for development profiles (comma-separated)
+* `--create-missing` - Create a new profile if none exists
+* `--format` - Output format for metadata: json, table, markdown (default: json)
+
+## Profile Types
+
+### iOS Profile Types
+
+**App Store Distribution:**
+
+```bash  theme={null}
+asc signing fetch --bundle-id com.example.app \
+  --profile-type IOS_APP_STORE
+```
+
+* Used for: App Store submission
+* Certificate type: IOS\_DISTRIBUTION
+* Devices: Not required
+
+**Development:**
+
+```bash  theme={null}
+asc signing fetch --bundle-id com.example.app \
+  --profile-type IOS_APP_DEVELOPMENT \
+  --device "DEVICE_ID_1,DEVICE_ID_2"
+```
+
+* Used for: Local development and testing
+* Certificate type: IOS\_DEVELOPMENT
+* Devices: Required (use `asc devices list` to find IDs)
+
+**Ad Hoc:**
+
+```bash  theme={null}
+asc signing fetch --bundle-id com.example.app \
+  --profile-type IOS_APP_ADHOC \
+  --device "DEVICE_ID_1,DEVICE_ID_2"
+```
+
+* Used for: External testing (outside TestFlight)
+* Certificate type: IOS\_DISTRIBUTION
+* Devices: Required
+
+**In-House (Enterprise):**
+
+```bash  theme={null}
+asc signing fetch --bundle-id com.example.app \
+  --profile-type IOS_APP_INHOUSE
+```
+
+* Used for: Enterprise internal distribution
+* Certificate type: IOS\_DISTRIBUTION
+* Devices: Not required
+* Requires: Apple Developer Enterprise Program
+
+### tvOS Profile Types
+
+* `TVOS_APP_STORE` - App Store distribution
+* `TVOS_APP_DEVELOPMENT` - Development
+* `TVOS_APP_ADHOC` - Ad Hoc distribution
+* `TVOS_APP_INHOUSE` - Enterprise distribution
+
+### macOS Profile Types
+
+**App Store:**
+
+```bash  theme={null}
+asc signing fetch --bundle-id com.example.macapp \
+  --profile-type MAC_APP_STORE
+```
+
+* Certificate type: MAC\_APP\_DISTRIBUTION
+
+**Direct Distribution:**
+
+```bash  theme={null}
+asc signing fetch --bundle-id com.example.macapp \
+  --profile-type MAC_APP_DIRECT
+```
+
+* Certificate type: DEVELOPER\_ID\_APPLICATION
+* Used for: Distribution outside Mac App Store
+
+**Development:**
+
+```bash  theme={null}
+asc signing fetch --bundle-id com.example.macapp \
+  --profile-type MAC_APP_DEVELOPMENT
+```
+
+* Certificate type: MAC\_APP\_DEVELOPMENT
+
+**Mac Catalyst:**
+
+* `MAC_CATALYST_APP_STORE` - Mac App Store
+* `MAC_CATALYST_APP_DIRECT` - Direct distribution
+* `MAC_CATALYST_APP_DEVELOPMENT` - Development
+
+## Certificate Type Inference
+
+The CLI automatically infers the correct certificate type from the profile type:
+
+| Profile Type           | Certificate Type           |
+| ---------------------- | -------------------------- |
+| IOS\_APP\_STORE        | IOS\_DISTRIBUTION          |
+| IOS\_APP\_DEVELOPMENT  | IOS\_DEVELOPMENT           |
+| IOS\_APP\_ADHOC        | IOS\_DISTRIBUTION          |
+| IOS\_APP\_INHOUSE      | IOS\_DISTRIBUTION          |
+| TVOS\_APP\_STORE       | TVOS\_DISTRIBUTION         |
+| TVOS\_APP\_DEVELOPMENT | TVOS\_DEVELOPMENT          |
+| MAC\_APP\_STORE        | MAC\_APP\_DISTRIBUTION     |
+| MAC\_APP\_DEVELOPMENT  | MAC\_APP\_DEVELOPMENT      |
+| MAC\_APP\_DIRECT       | DEVELOPER\_ID\_APPLICATION |
+
+Override with `--certificate-type` if needed.
+
+## Create Missing Profiles
+
+Create a new provisioning profile if none exists:
+
+```bash  theme={null}
+asc signing fetch --bundle-id com.example.app \
+  --profile-type IOS_APP_STORE \
+  --create-missing
+```
+
+**For development profiles, devices are required:**
+
+```bash  theme={null}
+asc signing fetch --bundle-id com.example.app \
+  --profile-type IOS_APP_DEVELOPMENT \
+  --device "DEVICE_ID_1,DEVICE_ID_2" \
+  --create-missing
+```
+
+If `--create-missing` is not specified and no matching profile exists, the command will fail with an error suggesting you use this flag.
+
+## Output Files
+
+Files are saved to the output directory with sanitized names:
+
+**Provisioning Profile:**
+
+```
+./signing/IOS_APP_STORE-20250304.mobileprovision
+```
+
+**Certificates:**
+
+```
+./signing/A1B2C3D4E5.cer
+./signing/F6G7H8I9J0.cer
+```
+
+File names are based on profile name/ID and certificate serial numbers.
+
+## Complete Example Workflows
+
+### App Store Submission
+
+```bash  theme={null}
+# 1. Fetch App Store signing files
+asc signing fetch --bundle-id com.example.app \
+  --profile-type IOS_APP_STORE \
+  --output ./signing
+
+# 2. Install certificate in keychain
+security import ./signing/*.cer -k ~/Library/Keychains/login.keychain-db
+
+# 3. Install provisioning profile
+cp ./signing/*.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+
+# 4. Build and sign your app
+xcodebuild -project MyApp.xcodeproj \
+  -scheme MyApp \
+  -configuration Release \
+  -archivePath ./build/MyApp.xcarchive \
+  archive
+```
+
+### Development Setup
+
+```bash  theme={null}
+# 1. List your registered devices
+asc devices list --platform IOS --output table
+
+# 2. Fetch development signing files
+asc signing fetch --bundle-id com.example.app \
+  --profile-type IOS_APP_DEVELOPMENT \
+  --device "DEV_DEVICE_1,DEV_DEVICE_2,DEV_DEVICE_3" \
+  --output ./signing \
+  --create-missing
+
+# 3. Install files
+security import ./signing/*.cer -k ~/Library/Keychains/login.keychain-db
+cp ./signing/*.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/
+```
+
+### CI/CD Integration
+
+```yaml  theme={null}
+# GitHub Actions example
+- name: Fetch signing files
+  run: |
+    asc signing fetch \
+      --bundle-id com.example.app \
+      --profile-type IOS_APP_STORE \
+      --output ./signing
+
+- name: Import certificate
+  run: |
+    security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+    security default-keychain -s build.keychain
+    security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+    security import ./signing/*.cer \
+      -k build.keychain \
+      -P "" \
+      -T /usr/bin/codesign
+    security set-key-partition-list -S apple-tool:,apple: \
+      -s -k "$KEYCHAIN_PASSWORD" build.keychain
+
+- name: Install provisioning profile
+  run: |
+    mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+    cp ./signing/*.mobileprovision \
+      ~/Library/MobileDevice/Provisioning\ Profiles/
+```
+
+## Troubleshooting
+
+### Bundle ID Not Found
+
+```
+Error: bundle ID not found: com.example.app
+```
+
+**Solution:** Create the bundle ID first:
+
+```bash  theme={null}
+asc bundle-ids create --identifier com.example.app \
+  --name "My App" \
+  --platform IOS
+```
+
+### No Certificates Found
+
+```
+Error: no certificates found for type IOS_DISTRIBUTION
+```
+
+**Solution:** Create a certificate:
+
+```bash  theme={null}
+# 1. Generate CSR
+asc certificates csr generate --key-out ./cert.key --csr-out ./cert.csr
+
+# 2. Create certificate
+asc certificates create --certificate-type IOS_DISTRIBUTION \
+  --csr ./cert.csr
+```
+
+### No Active Profile Found
+
+```
+Error: no active profile found for bundle ID; use --create-missing to create one
+```
+
+**Solution:** Add `--create-missing` flag or create profile manually:
+
+```bash  theme={null}
+asc profiles create --name "My App Store Profile" \
+  --profile-type IOS_APP_STORE \
+  --bundle "BUNDLE_ID" \
+  --certificate "CERT_ID"
+```
+
+### Devices Required for Development
+
+```
+Error: --device is required for development profiles
+```
+
+**Solution:** Specify device IDs:
+
+```bash  theme={null}
+# List devices to find IDs
+asc devices list --platform IOS --output table
+
+# Add devices to command
+asc signing fetch --bundle-id com.example.app \
+  --profile-type IOS_APP_DEVELOPMENT \
+  --device "DEVICE_ID_1,DEVICE_ID_2"
+```
+
+## Related Commands
+
+* [Certificates](/commands/certificates) - Manage individual certificates
+* [Profiles](/commands/profiles) - Manage provisioning profiles
+* [Bundle IDs](/commands/bundle-ids) - Manage bundle identifiers

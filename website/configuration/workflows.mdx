@@ -1,0 +1,448 @@
+# Workflow configuration
+
+> Define multi-step automation workflows in .asc/workflow.json
+
+Workflows allow you to define multi-step automation sequences in a `.asc/workflow.json` file. This is useful for complex release processes that involve multiple commands.
+
+## Workflow file structure
+
+Create a `.asc/workflow.json` file in your project root:
+
+```json  theme={null}
+{
+  "env": {
+    "APP_ID": "123456789",
+    "VERSION": "1.2.0"
+  },
+  "before_all": "echo 'Starting workflow'",
+  "after_all": "echo 'Workflow complete'",
+  "error": "echo 'Workflow failed' && exit 1",
+  "workflows": {
+    "testflight": {
+      "description": "Upload build to TestFlight",
+      "steps": [
+        "asc builds upload --app $APP_ID --ipa MyApp.ipa",
+        "asc builds list --app $APP_ID --limit 1",
+        "asc builds info --app $APP_ID --latest --output json"
+      ]
+    },
+    "submit": {
+      "description": "Submit build for App Store review",
+      "steps": [
+        "asc validate --app $APP_ID --version $VERSION",
+        "asc submit create --app $APP_ID --version $VERSION --build $BUILD_ID --confirm"
+      ]
+    }
+  }
+}
+```
+
+## Running workflows
+
+Execute a workflow by name:
+
+```bash  theme={null}
+asc workflow run --file .asc/workflow.json testflight
+```
+
+Or use the short form:
+
+```bash  theme={null}
+asc workflow run testflight
+```
+
+<Note>
+  When `--file` is omitted, the CLI looks for `.asc/workflow.json` in the current directory.
+</Note>
+
+## Workflow schema
+
+### Top-level fields
+
+<ParamField path="env" type="object">
+  Global environment variables available to all workflows
+
+  ```json  theme={null}
+  "env": {
+    "APP_ID": "123456789",
+    "API_KEY": "secret-value"
+  }
+  ```
+</ParamField>
+
+<ParamField path="before_all" type="string">
+  Command to run before any workflow executes
+
+  Useful for validation or setup tasks.
+</ParamField>
+
+<ParamField path="after_all" type="string">
+  Command to run after a workflow completes successfully
+
+  Useful for cleanup or notifications.
+</ParamField>
+
+<ParamField path="error" type="string">
+  Command to run if a workflow fails
+
+  Useful for error notifications or rollback.
+</ParamField>
+
+<ParamField path="workflows" type="object" required>
+  Map of workflow names to workflow definitions
+</ParamField>
+
+### Workflow fields
+
+<ParamField path="description" type="string">
+  Human-readable description of the workflow
+</ParamField>
+
+<ParamField path="private" type="boolean">
+  Hide this workflow from `asc workflow list`
+
+  Default: `false`
+</ParamField>
+
+<ParamField path="env" type="object">
+  Workflow-specific environment variables
+
+  These override global `env` variables.
+</ParamField>
+
+<ParamField path="steps" type="array" required>
+  List of steps to execute (see step format below)
+</ParamField>
+
+### Step formats
+
+Steps can be defined in two formats:
+
+**Short form** (string):
+
+```json  theme={null}
+"steps": [
+  "asc apps list",
+  "asc builds list --app 123456789"
+]
+```
+
+**Long form** (object):
+
+```json  theme={null}
+"steps": [
+  {
+    "name": "Upload build",
+    "run": "asc builds upload --app $APP_ID --ipa MyApp.ipa"
+  },
+  {
+    "name": "Verify upload",
+    "run": "asc builds list --app $APP_ID --limit 1",
+    "if": "$VERIFY == true"
+  },
+  {
+    "name": "Run sub-workflow",
+    "workflow": "notify",
+    "with": {
+      "MESSAGE": "Build uploaded"
+    }
+  }
+]
+```
+
+#### Step fields
+
+<ParamField path="name" type="string">
+  Step name (displayed during execution)
+</ParamField>
+
+<ParamField path="run" type="string">
+  Shell command to execute
+</ParamField>
+
+<ParamField path="workflow" type="string">
+  Name of another workflow to run (sub-workflow)
+
+  Mutually exclusive with `run`.
+</ParamField>
+
+<ParamField path="if" type="string">
+  Condition expression (evaluated as shell command)
+
+  Step runs only if the command exits with code 0.
+</ParamField>
+
+<ParamField path="with" type="object">
+  Environment variables passed to the step
+
+  Only applies to `workflow` steps.
+</ParamField>
+
+## Environment variable precedence
+
+Environment variables are resolved in this order (highest to lowest):
+
+1. **Runtime parameters** (`KEY:VALUE` arguments to `asc workflow run`)
+2. **Step `with` field** (for sub-workflows)
+3. **Workflow `env` field**
+4. **Global `env` field**
+5. **System environment variables**
+
+Example:
+
+```bash  theme={null}
+asc workflow run testflight APP_ID:987654321
+```
+
+This overrides the `APP_ID` defined in the workflow file.
+
+## Conditional steps
+
+Use the `if` field to conditionally execute steps:
+
+```json  theme={null}
+{
+  "steps": [
+    {
+      "name": "Upload build",
+      "run": "asc builds upload --app $APP_ID --ipa MyApp.ipa"
+    },
+    {
+      "name": "Submit for review",
+      "run": "asc submit create --app $APP_ID --version $VERSION --build $BUILD_ID --confirm",
+      "if": "test \"$AUTO_SUBMIT\" = \"true\""
+    }
+  ]
+}
+```
+
+The `if` condition is evaluated as a shell command. The step runs only if the command exits with code 0.
+
+## Sub-workflows
+
+Call other workflows from within a workflow:
+
+```json  theme={null}
+{
+  "workflows": {
+    "notify": {
+      "description": "Send notification",
+      "steps": [
+        "asc notify slack --message \"$MESSAGE\""
+      ]
+    },
+    "release": {
+      "description": "Full release process",
+      "steps": [
+        "asc builds upload --app $APP_ID --ipa MyApp.ipa",
+        {
+          "workflow": "notify",
+          "with": {
+            "MESSAGE": "Build uploaded to TestFlight"
+          }
+        },
+        "asc submit create --app $APP_ID --version $VERSION --build $BUILD_ID --confirm",
+        {
+          "workflow": "notify",
+          "with": {
+            "MESSAGE": "Submitted for App Store review"
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+## Lifecycle hooks
+
+Workflow hooks run at specific points during execution:
+
+* **`before_all`**: Runs before any workflow starts
+* **`after_all`**: Runs after a workflow completes successfully
+* **`error`**: Runs if any step fails
+
+Example with Slack notifications:
+
+```json  theme={null}
+{
+  "before_all": "asc notify slack --message 'Starting release workflow'",
+  "after_all": "asc notify slack --message 'Release complete'",
+  "error": "asc notify slack --message 'Release failed' && exit 1",
+  "workflows": {
+    "release": {
+      "steps": [
+        "asc builds upload --app $APP_ID --ipa MyApp.ipa",
+        "asc submit create --app $APP_ID --version $VERSION --build $BUILD_ID --confirm"
+      ]
+    }
+  }
+}
+```
+
+## Complete example
+
+Here's a comprehensive workflow for a full release process:
+
+```json  theme={null}
+{
+  "env": {
+    "APP_ID": "123456789",
+    "VERSION": "1.2.0",
+    "BUILD_DIR": "build",
+    "SLACK_WEBHOOK": "https://hooks.slack.com/services/..."
+  },
+  "before_all": "echo 'Starting release for v$VERSION'",
+  "after_all": "echo 'Release complete for v$VERSION'",
+  "error": "curl -X POST $SLACK_WEBHOOK -d '{\"text\":\"Release failed for v$VERSION\"}'  && exit 1",
+  "workflows": {
+    "beta": {
+      "description": "Upload build to TestFlight",
+      "steps": [
+        {
+          "name": "Validate build",
+          "run": "test -f $BUILD_DIR/MyApp.ipa"
+        },
+        {
+          "name": "Upload to TestFlight",
+          "run": "asc builds upload --app $APP_ID --ipa $BUILD_DIR/MyApp.ipa"
+        },
+        {
+          "name": "Wait for processing",
+          "run": "sleep 60"
+        },
+        {
+          "name": "Verify build available",
+          "run": "asc builds list --app $APP_ID --limit 1 --output json | jq -e '.data[0]'"
+        },
+        {
+          "name": "Notify team",
+          "workflow": "notify",
+          "with": {
+            "MESSAGE": "New TestFlight build available: v$VERSION"
+          }
+        }
+      ]
+    },
+    "submit": {
+      "description": "Submit to App Store",
+      "steps": [
+        {
+          "name": "Validate version",
+          "run": "asc validate --app $APP_ID --version $VERSION"
+        },
+        {
+          "name": "Submit for review",
+          "run": "asc submit create --app $APP_ID --version $VERSION --build $BUILD_ID --confirm"
+        },
+        {
+          "name": "Notify team",
+          "workflow": "notify",
+          "with": {
+            "MESSAGE": "v$VERSION submitted for App Store review"
+          }
+        }
+      ]
+    },
+    "notify": {
+      "description": "Send Slack notification",
+      "private": true,
+      "steps": [
+        "curl -X POST $SLACK_WEBHOOK -d '{\"text\":\"$MESSAGE\"}'"
+      ]
+    }
+  }
+}
+```
+
+## CI/CD integration
+
+### GitHub Actions
+
+```yaml  theme={null}
+name: Release
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: rudrankriyam/setup-asc@v1
+        with:
+          key-id: ${{ secrets.ASC_KEY_ID }}
+          issuer-id: ${{ secrets.ASC_ISSUER_ID }}
+          private-key: ${{ secrets.ASC_PRIVATE_KEY }}
+      
+      - name: Build app
+        run: xcodebuild -scheme MyApp -archivePath build/MyApp.xcarchive archive
+      
+      - name: Run release workflow
+        run: asc workflow run release VERSION:${{ github.ref_name }}
+```
+
+### GitLab CI
+
+```yaml  theme={null}
+release:
+  stage: deploy
+  script:
+    - asc workflow run release VERSION:$CI_COMMIT_TAG
+  only:
+    - tags
+  variables:
+    ASC_KEY_ID: $ASC_KEY_ID
+    ASC_ISSUER_ID: $ASC_ISSUER_ID
+    ASC_PRIVATE_KEY_B64: $ASC_PRIVATE_KEY_B64
+```
+
+## Security considerations
+
+<Warning>
+  Workflow files execute arbitrary shell commands. Ensure:
+
+  * `.asc/workflow.json` is added to `.gitignore` if it contains secrets
+  * Use environment variables for sensitive values
+  * Review workflow files before execution
+  * Run workflows in trusted environments only
+</Warning>
+
+## Troubleshooting
+
+### Workflow not found
+
+```bash  theme={null}
+asc workflow list  # List all available workflows
+asc workflow run --file .asc/workflow.json testflight  # Specify file explicitly
+```
+
+### Environment variable not expanded
+
+Ensure variables are defined in the workflow file or passed as `KEY:VALUE` arguments:
+
+```bash  theme={null}
+asc workflow run testflight APP_ID:123456789
+```
+
+### Step fails silently
+
+Check exit codes and stderr:
+
+```bash  theme={null}
+asc --debug workflow run testflight
+```
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Workflow command" icon="play" href="/commands/workflow">
+    Workflow command reference
+  </Card>
+
+  <Card title="Automation guide" icon="robot" href="/guides/automation">
+    Workflow automation patterns
+  </Card>
+</CardGroup>

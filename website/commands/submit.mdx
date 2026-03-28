@@ -1,0 +1,157 @@
+# submit
+
+> Submit builds for App Store review
+
+The `submit` command submits an App Store version for review.
+
+## Usage
+
+```bash  theme={null}
+asc submit create [flags]
+```
+
+## Submit a version
+
+Submit a version for App Store review:
+
+```bash  theme={null}
+asc submit create --app APP_ID --version VERSION_STRING --build BUILD_ID --confirm
+asc submit create --app 123456789 --version 1.2.0 --build BUILD_ID --confirm
+```
+
+<Warning>
+  Always run `asc validate` before submitting to catch issues early.
+</Warning>
+
+## Submission process
+
+When you run `asc submit create --app APP_ID --version VERSION_STRING --build BUILD_ID --confirm`, the CLI:
+
+1. Validates the version is ready
+2. Creates an App Store review submission
+3. Adds the version to the submission
+4. Submits for review
+
+## Output
+
+```
+✓ Version 1.2.0 submitted for App Store review
+Submission ID: submission-id-here
+```
+
+## Flags
+
+<ParamField path="--app" type="string" required>
+  App ID to submit
+</ParamField>
+
+<ParamField path="--version" type="string" required>
+  Version string to submit (e.g., `1.2.0`)
+</ParamField>
+
+<ParamField path="--build" type="string" required>
+  Build ID to attach before creating the submission
+</ParamField>
+
+<ParamField path="--confirm" type="boolean" required>
+  Required confirmation flag to actually submit the version
+</ParamField>
+
+<ParamField path="--output" type="string">
+  Output format: `json`, `table`, or `markdown`
+</ParamField>
+
+## Example workflows
+
+### Validate and submit
+
+```bash  theme={null}
+# Validate first
+asc validate --app 123456789 --version 1.2.0
+
+# If validation passes, submit
+if [ $? -eq 0 ]; then
+  asc submit create --app 123456789 --version 1.2.0 --build BUILD_ID --confirm
+fi
+```
+
+### CI/CD submission
+
+```yaml  theme={null}
+# GitHub Actions
+- name: Submit for App Store review
+  run: |
+    asc validate --app ${{ secrets.APP_ID }} --version ${{ github.ref_name }}
+    asc submit create --app ${{ secrets.APP_ID }} --version ${{ github.ref_name }} --build "${{ env.BUILD_ID }}" --confirm
+```
+
+### Check submission status
+
+After submission, check the status:
+
+```bash  theme={null}
+asc status --app 123456789 --output table
+```
+
+## Common errors
+
+### No build attached
+
+```
+Error: Version 1.2.0 has no build attached
+```
+
+**Solution:** Attach a build to the version:
+
+```bash  theme={null}
+asc versions attach-build --version-id "VERSION_ID" --build "BUILD_ID"
+```
+
+### Missing metadata
+
+```
+Error: Missing required metadata for version 1.2.0
+```
+
+**Solution:** Complete all required fields:
+
+```bash  theme={null}
+asc apps info edit --app 123456789 --version 1.2.0 --platform IOS --locale "en-US" \
+  --description "App description" \
+  --keywords "keyword1,keyword2" \
+  --support-url "https://example.com/support" \
+  --whats-new "Bug fixes and improvements"
+```
+
+### Already in review
+
+```
+Error: Version 1.2.0 is already in review
+```
+
+You cannot submit a version that's already in review. Wait for the current review to complete.
+
+## Exit codes
+
+| Code    | Description              |
+| ------- | ------------------------ |
+| `0`     | Submission successful    |
+| `1`     | Submission failed        |
+| `10-59` | HTTP client errors (4xx) |
+| `60-99` | HTTP server errors (5xx) |
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Validate command" icon="check" href="/commands/validate">
+    Validate before submission
+  </Card>
+
+  <Card title="Review command" icon="eye" href="/commands/review">
+    Manage App Store review details
+  </Card>
+
+  <Card title="Submission guide" icon="book-open" href="/guides/app-store-submission">
+    Complete submission guide
+  </Card>
+</CardGroup>

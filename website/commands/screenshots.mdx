@@ -1,0 +1,234 @@
+# Screenshots
+
+> Capture, frame, review, and upload App Store screenshots
+
+Manage the full screenshot workflow from local capture to App Store upload.
+
+## Overview
+
+The `screenshots` command provides both local automation for capturing and framing screenshots, and App Store operations for uploading and managing screenshots in your app listings.
+
+## Local Workflow (Experimental)
+
+The local screenshot automation features are experimental. If you encounter issues, please [file feedback](https://github.com/rudrankriyam/App-Store-Connect-CLI/issues/new/choose).
+
+### Capture Screenshots
+
+Capture screenshots from running simulators or applications:
+
+```bash  theme={null}
+asc screenshots capture --bundle-id "com.example.app" --name home
+```
+
+**Supported Providers:**
+
+* `axe` - Screenshot provider for iOS simulators
+* `macos` - Screenshot provider for macOS applications
+
+**Capture Options:**
+
+* `--bundle-id` - Application bundle identifier
+* `--name` - Screenshot name (without extension)
+* `--output-dir` - Output directory for raw PNG files
+* `--provider` - Capture provider (axe or macos)
+* `--udid` - Simulator UDID or "booted"
+
+### Frame Screenshots
+
+Add device frames and backgrounds to raw screenshots:
+
+```bash  theme={null}
+asc screenshots frame --input ./screenshots/raw/home.png --device iphone-air
+```
+
+**Supported Devices:**
+
+* `iphone-air` - iPhone Air (6.9")
+* `iphone-17-pro` - iPhone 17 Pro (6.7")
+* `iphone-17-pro-max` - iPhone 17 Pro Max (6.9")
+* `iphone-16e` - iPhone 16e (6.1")
+* `iphone-17` - iPhone 17 (6.7")
+* `mac` - macOS desktop
+
+**Framing Options:**
+
+* `--input` - Path to raw screenshot PNG
+* `--device` - Frame device profile
+* `--output` - Output path for framed image
+* `--title` - Overlay title text
+* `--subtitle` - Overlay subtitle text
+* `--title-color` - Title text color (hex format)
+* `--subtitle-color` - Subtitle text color (hex format)
+
+**Requirements:**
+
+* Koubou CLI tool (version 0.14.0 or higher)
+* Install via: `brew install koubou` or download from [releases](https://github.com/rudrankriyam/koubou/releases)
+
+### Review Workflow
+
+Generate, review, and approve framed screenshots:
+
+```bash  theme={null}
+# Generate review HTML
+asc screenshots review-generate --framed-dir ./screenshots/framed
+
+# Open review in browser
+asc screenshots review-open --output-dir ./screenshots/review
+
+# Approve ready screenshots
+asc screenshots review-approve --all-ready --output-dir ./screenshots/review
+```
+
+### Run from Plan
+
+Execute the full capture and framing workflow from a JSON plan:
+
+```bash  theme={null}
+asc screenshots run --plan .asc/screenshots.json
+```
+
+**Plan Format:**
+
+```json  theme={null}
+{
+  "screenshots": [
+    {
+      "name": "home",
+      "bundle_id": "com.example.app",
+      "device": "iphone-air",
+      "title": "Welcome Home",
+      "subtitle": "Your personalized dashboard"
+    }
+  ]
+}
+```
+
+### List Frame Devices
+
+Show all supported frame device profiles:
+
+```bash  theme={null}
+asc screenshots list-frame-devices
+asc screenshots list-frame-devices --output json
+```
+
+## App Store Workflow
+
+### List Screenshots
+
+List all screenshots for a version localization:
+
+```bash  theme={null}
+asc screenshots list --version-localization "LOC_ID"
+```
+
+### Check Screenshot Sizes
+
+Display supported screenshot dimensions and device types:
+
+```bash  theme={null}
+# Show common iOS submission sizes (iPhone 6.5" and iPad Pro 12.9")
+asc screenshots sizes
+
+# Show all supported sizes
+asc screenshots sizes --all
+
+# Filter by specific device type
+asc screenshots sizes --display-type "APP_IPHONE_65"
+```
+
+**Common Display Types:**
+
+* `APP_IPHONE_65` - iPhone 6.5" (required for most iOS submissions)
+* `APP_IPAD_PRO_3GEN_129` - iPad Pro 12.9" (required for iPad submissions)
+* `APP_IPHONE_67` - iPhone 6.7"
+* `APP_IPHONE_61` - iPhone 6.1"
+
+### Upload Screenshots
+
+Upload screenshots to App Store Connect:
+
+```bash  theme={null}
+# Upload single file
+asc screenshots upload --version-localization "LOC_ID" \
+  --path "./screenshot.png" \
+  --device-type "APP_IPHONE_65"
+
+# Upload directory (all PNG files)
+asc screenshots upload --version-localization "LOC_ID" \
+  --path "./screenshots/iphone" \
+  --device-type "APP_IPHONE_65"
+```
+
+**File Requirements:**
+
+* Format: PNG or JPEG
+* Exact dimensions must match the device type specification
+* Use `asc screenshots sizes` to verify required dimensions
+
+**Typical Submission:**
+
+```bash  theme={null}
+# iPhone set (required)
+asc screenshots upload --version-localization "LOC_ID" \
+  --path "./screenshots/iphone" \
+  --device-type "APP_IPHONE_65"
+
+# iPad set (for iPad apps)
+asc screenshots upload --version-localization "LOC_ID" \
+  --path "./screenshots/ipad" \
+  --device-type "APP_IPAD_PRO_3GEN_129"
+```
+
+### Download Screenshots
+
+Download existing screenshots from App Store Connect:
+
+```bash  theme={null}
+asc screenshots download --version-localization "LOC_ID" \
+  --output-dir "./screenshots/downloaded"
+```
+
+### Delete Screenshots
+
+Remove screenshots from a version localization:
+
+```bash  theme={null}
+asc screenshots delete --id "SCREENSHOT_ID" --confirm
+```
+
+## Complete Example Workflow
+
+```bash  theme={null}
+# 1. Capture raw screenshots
+asc screenshots capture --bundle-id "com.example.app" --name home
+asc screenshots capture --bundle-id "com.example.app" --name profile
+asc screenshots capture --bundle-id "com.example.app" --name settings
+
+# 2. Frame screenshots with device bezels and text
+asc screenshots frame --input ./screenshots/raw/home.png \
+  --device iphone-air \
+  --title "Welcome Home" \
+  --subtitle "Your personalized dashboard"
+
+asc screenshots frame --input ./screenshots/raw/profile.png \
+  --device iphone-air \
+  --title "Your Profile" \
+  --subtitle "Manage your account"
+
+# 3. Review framed screenshots
+asc screenshots review-generate --framed-dir ./screenshots/framed
+asc screenshots review-open --output-dir ./screenshots/review
+asc screenshots review-approve --all-ready --output-dir ./screenshots/review
+
+# 4. Upload to App Store Connect
+asc screenshots upload --version-localization "LOC_ID" \
+  --path "./screenshots/framed" \
+  --device-type "APP_IPHONE_65"
+```
+
+## Related Commands
+
+* [Video Previews](/commands/video-previews) - Manage app preview videos
+* [Apps](/commands/apps) - Manage app metadata and versions

@@ -1,0 +1,335 @@
+# Changelog
+
+> Release history and changes for the App Store Connect CLI
+
+## Release Information
+
+The App Store Connect CLI follows semantic versioning. All releases are available on GitHub:
+
+[https://github.com/rudrankriyam/App-Store-Connect-CLI/releases](https://github.com/rudrankriyam/App-Store-Connect-CLI/releases)
+
+## Latest Releases
+
+### v0.36.3
+
+**Highlights**:
+
+* Fixed PKG upload UTI to use `com.apple.pkg`
+* Added subcategory flags to categories set command
+* Enhanced app-info locale validation and metadata copying
+
+**Changes**:
+
+* `fix(builds)`: Use `com.apple.pkg` for PKG upload UTI
+* `feat(categories)`: Add subcategory flags to categories set command
+* `fix(app-info)`: Preserve target fields when copying locale metadata
+* `refactor(app-info)`: Reuse localization attribute builder
+* `refactor(submit)`: Simplify readiness missing-field allocation
+
+### v0.36.2
+
+**Highlights**:
+
+* Improved metadata push workflow with state-aware version resolution
+* Fixed build pagination anomaly detection
+
+**Changes**:
+
+* `refactor(metadata)`: Include state in shared version resolution
+* `fix(builds)`: Detect repeated probe links before early-stop path
+* `fix(builds)`: Use strict uploadedDate for anomaly detection
+
+### v0.36.1
+
+**Highlights**:
+
+* Enhanced build processing reliability
+* Fixed pagination edge cases
+
+**Changes**:
+
+* `fix(builds)`: Error when anomaly scan hits page cap
+* `fix(builds)`: Fail on repeated probe pagination URLs
+* `fix(builds)`: Continue scanning after ordering anomaly detection
+* `fix(builds)`: Propagate context cancellation during probe pages
+
+### v0.36.0
+
+**Highlights**:
+
+* Major build processing improvements
+* Performance optimizations for large build lists
+
+**Changes**:
+
+* `fix(builds)`: Preserve latest response links and sync docs defaults
+* `fix(builds)`: Keep latest result when probe page fetch fails
+* `fix(builds)`: Avoid exhaustive latest-build pagination scans
+* `fix(builds)`: Compare uploadedDate by parsed time across pre-release versions
+
+### v0.35.3
+
+**Highlights**:
+
+* CLI consistency improvements
+* Enhanced app events validation
+
+**Changes**:
+
+* `fix(auth)`: Respect global default output for auth status
+* `refactor(cli)`: Standardize usage errors and pagination loops
+* `fix(app-events)`: Align purchase requirement messaging with supported values
+* `fix(app-events)`: Normalize purchase requirement and guard unsupported values
+
+### v0.35.2
+
+**Highlights**:
+
+* Subscription pricing fixes
+
+**Changes**:
+
+* `fix(subscriptions)`: Honor initial-price attributes and fail on probe errors
+
+## Previous Releases
+
+For a complete release history, see:
+
+* **GitHub Releases**: [https://github.com/rudrankriyam/App-Store-Connect-CLI/releases](https://github.com/rudrankriyam/App-Store-Connect-CLI/releases)
+* **Git Tags**: [https://github.com/rudrankriyam/App-Store-Connect-CLI/tags](https://github.com/rudrankriyam/App-Store-Connect-CLI/tags)
+
+## Viewing Releases
+
+### Via GitHub
+
+View all releases with detailed release notes:
+
+```bash  theme={null}
+open https://github.com/rudrankriyam/App-Store-Connect-CLI/releases
+```
+
+### Via Git
+
+List recent tags:
+
+```bash  theme={null}
+git tag --sort=-v:refname | head -10
+```
+
+View changes between releases:
+
+```bash  theme={null}
+git log v0.36.2..v0.36.3 --oneline
+```
+
+### Via CLI
+
+Check your current version:
+
+```bash  theme={null}
+asc version
+```
+
+## Upgrading
+
+### Homebrew
+
+If installed via Homebrew:
+
+```bash  theme={null}
+brew upgrade asc
+```
+
+### Install Script
+
+If installed via install script, re-run:
+
+```bash  theme={null}
+curl -fsSL https://asccli.sh/install | bash
+```
+
+### From Source
+
+Pull latest changes and rebuild:
+
+```bash  theme={null}
+git pull origin main
+make build
+```
+
+## Versioning Policy
+
+The CLI follows [Semantic Versioning](https://semver.org/):
+
+* **Major version** (x.0.0): Breaking changes, incompatible API updates
+* **Minor version** (0.x.0): New features, backward-compatible additions
+* **Patch version** (0.0.x): Bug fixes, backward-compatible improvements
+
+## Deprecation Policy
+
+When features are deprecated:
+
+1. **Warning added**: Command/flag shows deprecation notice
+2. **Migration path provided**: Documentation updated with alternatives
+3. **Grace period**: Feature remains available for at least one minor version
+4. **Removal**: Deprecated feature removed in next major version
+
+## Breaking Changes
+
+Breaking changes are documented in release notes and migration guides. Check release notes before upgrading major versions.
+
+## Release Channels
+
+### Stable
+
+Recommended for production use. Install via Homebrew or install script.
+
+```bash  theme={null}
+brew install asc
+```
+
+### Main Branch
+
+Latest development version. May include unreleased features and fixes.
+
+```bash  theme={null}
+git clone https://github.com/rudrankriyam/App-Store-Connect-CLI.git
+cd App-Store-Connect-CLI
+make build
+```
+
+**Note**: Main branch is tested but may have unreleased changes. Use stable releases for production.
+
+## Changelog Format
+
+Release notes follow this structure:
+
+```
+## [Version] - YYYY-MM-DD
+
+### Added
+- New features
+
+### Changed
+- Changes to existing functionality
+
+### Deprecated
+- Soon-to-be removed features
+
+### Removed
+- Removed features
+
+### Fixed
+- Bug fixes
+
+### Security
+- Security improvements
+```
+
+## Commit Message Conventions
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/):
+
+* `feat:` - New feature
+* `fix:` - Bug fix
+* `refactor:` - Code refactoring
+* `test:` - Test additions/changes
+* `docs:` - Documentation changes
+* `chore:` - Maintenance tasks
+* `perf:` - Performance improvements
+
+**Example**:
+
+```
+feat(builds): add PKG upload support
+
+fix(auth): respect global default output
+
+refactor(cli): standardize pagination loops
+```
+
+## Notable Changes by Category
+
+### Authentication
+
+* JWT token auto-renewal (all versions)
+* Keychain bypass mode (`ASC_BYPASS_KEYCHAIN`)
+* Strict auth mode for conflict detection (`ASC_STRICT_AUTH`)
+* Base64 key support for CI/CD
+
+### Builds & Uploads
+
+* PKG upload UTI fix (v0.36.3)
+* Build pagination improvements (v0.36.x)
+* Upload timeout configuration
+* Progress tracking for large files
+
+### API Integration
+
+* Automatic retry logic for rate limits
+* Retry-After header support
+* Configurable timeouts and delays
+* Debug mode for HTTP logging (`ASC_DEBUG=api`)
+
+### Output & Formatting
+
+* TTY-aware output defaults
+* JSON, table, and markdown formats
+* Global output preference (`ASC_DEFAULT_OUTPUT`)
+* Pretty-print option for JSON
+
+### Testing & Development
+
+* Keychain bypass for tests
+* Integration test opt-in
+* Pre-commit hooks
+* Command doc generation
+
+## Reporting Issues
+
+Found a bug or regression? Report it:
+
+* **GitHub Issues**: [https://github.com/rudrankriyam/App-Store-Connect-CLI/issues](https://github.com/rudrankriyam/App-Store-Connect-CLI/issues)
+* **Security Issues**: [https://github.com/rudrankriyam/App-Store-Connect-CLI/security/advisories/new](https://github.com/rudrankriyam/App-Store-Connect-CLI/security/advisories/new) (private reporting)
+
+Include:
+
+* CLI version (`asc version`)
+* Platform and architecture
+* Command run (sanitize sensitive data)
+* Expected vs actual behavior
+* Full error output (use `ASC_DEBUG=api` for details)
+
+## Stay Updated
+
+### Watch Releases
+
+Watch the repository for release notifications:
+
+1. Go to [https://github.com/rudrankriyam/App-Store-Connect-CLI](https://github.com/rudrankriyam/App-Store-Connect-CLI)
+2. Click "Watch" → "Custom" → "Releases"
+
+### RSS Feed
+
+Subscribe to releases via RSS:
+
+```
+https://github.com/rudrankriyam/App-Store-Connect-CLI/releases.atom
+```
+
+### Star History
+
+View project growth:
+
+[![Star History Chart](https://api.star-history.com/svg?repos=rudrankriyam/App-Store-Connect-CLI\&type=Date)](https://star-history.com/#rudrankriyam/App-Store-Connect-CLI\&Date)
+
+## Contributing
+
+Contributions are welcome! See the [Contributing Guide](/resources/contributing) for details on:
+
+* Development setup
+* Testing requirements
+* PR guidelines
+* Local validation
+
+All changes are documented in release notes and git history.

@@ -1,0 +1,358 @@
+# Analytics & Reports
+
+> Request and download analytics and sales reports from App Store Connect
+
+The `analytics` command group provides access to App Store analytics data and sales reports. You can request analytics reports, check their status, and download the generated data.
+
+## Overview
+
+Analytics reports provide insights into app performance, user engagement, and sales data. The workflow involves:
+
+1. Creating a report request (one-time or ongoing)
+2. Checking request status and available reports
+3. Downloading report data for analysis
+
+## Sales Reports
+
+Download sales and trends reports directly without creating a request.
+
+### Download Sales Report
+
+```bash  theme={null}
+asc analytics sales \
+  --vendor "12345678" \
+  --type SALES \
+  --subtype SUMMARY \
+  --frequency DAILY \
+  --date "2024-01-20"
+```
+
+**Required Flags:**
+
+* `--vendor` - Vendor number (or `ASC_VENDOR_NUMBER` env)
+* `--type` - Report type: `SALES`, `PRE_ORDER`, `NEWSSTAND`, `SUBSCRIPTION`, `SUBSCRIPTION_EVENT`
+* `--subtype` - Report subtype: `SUMMARY`, `DETAILED`
+* `--frequency` - Frequency: `DAILY`, `WEEKLY`, `MONTHLY`, `YEARLY`
+* `--date` - Report date (format depends on frequency)
+
+**Date Formats:**
+
+* **Daily**: `YYYY-MM-DD`
+* **Weekly**: `YYYY-MM-DD` (Monday start or Sunday end)
+* **Monthly**: `YYYY-MM`
+* **Yearly**: `YYYY`
+
+**Optional Flags:**
+
+* `--version` - Report format version: `1_0` (default), `1_1`, `1_3`
+* `--output` - Custom output path (default: `sales_report_{date}_{type}.tsv.gz`)
+* `--decompress` - Decompress to `.tsv` format
+
+**Examples:**
+
+```bash  theme={null}
+# Daily sales summary
+asc analytics sales \
+  --vendor "12345678" \
+  --type SALES \
+  --subtype SUMMARY \
+  --frequency DAILY \
+  --date "2024-01-20"
+
+# Weekly subscription report with decompression
+asc analytics sales \
+  --vendor "12345678" \
+  --type SUBSCRIPTION \
+  --subtype DETAILED \
+  --frequency WEEKLY \
+  --date "2024-01-15" \
+  --decompress
+
+# Monthly report with custom output path
+asc analytics sales \
+  --vendor "12345678" \
+  --type SALES \
+  --subtype SUMMARY \
+  --frequency MONTHLY \
+  --date "2024-01" \
+  --output "reports/monthly.tsv.gz"
+```
+
+## Analytics Report Requests
+
+### Create Request
+
+Create a new analytics report request to access detailed analytics data.
+
+```bash  theme={null}
+asc analytics request \
+  --app "123456789" \
+  --access-type ONGOING
+```
+
+**Required Flags:**
+
+* `--app` - App ID (or `ASC_APP_ID` env)
+* `--access-type` - `ONGOING` for continuous access or `ONE_TIME_SNAPSHOT` for single request
+
+**Access Types:**
+
+* **ONGOING**: Continuous access to analytics data (recommended)
+* **ONE\_TIME\_SNAPSHOT**: Single-use request for a specific time period
+
+### List Requests
+
+View all analytics report requests for an app.
+
+```bash  theme={null}
+asc analytics requests --app "123456789"
+```
+
+**Optional Flags:**
+
+* `--request-id` - Filter by specific request ID
+* `--state` - Filter by state: `PROCESSING`, `COMPLETED`, `FAILED`
+* `--limit` - Results per page (1-200)
+* `--paginate` - Fetch all pages automatically
+* `--next` - Pagination URL from previous response
+
+**Examples:**
+
+```bash  theme={null}
+# List all requests
+asc analytics requests --app "123456789"
+
+# Filter by completed requests
+asc analytics requests --app "123456789" --state COMPLETED
+
+# Get specific request
+asc analytics requests --request-id "abc-123-def"
+
+# Fetch all pages
+asc analytics requests --app "123456789" --paginate
+```
+
+### View Reports
+
+Retrieve available analytics reports and instances for a request.
+
+`asc analytics get` still works as a deprecated compatibility alias, but `asc analytics view` is the canonical command.
+
+```bash  theme={null}
+asc analytics view --request-id "REQUEST_ID"
+```
+
+**Required Flags:**
+
+* `--request-id` - Analytics report request ID
+
+**Optional Flags:**
+
+* `--instance-id` - Filter by specific report instance
+* `--date` - Filter instances by date (`YYYY-MM-DD`)
+* `--include-segments` - Include download URLs for report segments
+* `--limit` - Results per page (1-200)
+* `--paginate` - Fetch all reports (recommended with `--date`)
+* `--next` - Pagination URL
+
+**Examples:**
+
+```bash  theme={null}
+# Get all reports for a request
+asc analytics view --request-id "REQUEST_ID"
+
+# Get reports with download URLs
+asc analytics view \
+  --request-id "REQUEST_ID" \
+  --include-segments
+
+# Filter by date and paginate
+asc analytics view \
+  --request-id "REQUEST_ID" \
+  --date "2024-01-20" \
+  --paginate
+
+# Get specific instance
+asc analytics view \
+  --request-id "REQUEST_ID" \
+  --instance-id "INSTANCE_ID"
+```
+
+### Download Report Data
+
+Download analytics report data files.
+
+```bash  theme={null}
+asc analytics download \
+  --request-id "REQUEST_ID" \
+  --instance-id "INSTANCE_ID"
+```
+
+**Required Flags:**
+
+* `--request-id` - Analytics report request ID
+* `--instance-id` - Report instance ID
+
+**Optional Flags:**
+
+* `--segment-id` - Specific segment ID (required if multiple segments)
+* `--output` - Custom output path (default: `analytics_report_{requestId}_{instanceId}.csv.gz`)
+* `--decompress` - Decompress to `.csv` format
+
+**Examples:**
+
+```bash  theme={null}
+# Download and decompress report
+asc analytics download \
+  --request-id "REQUEST_ID" \
+  --instance-id "INSTANCE_ID" \
+  --decompress
+
+# Download specific segment
+asc analytics download \
+  --request-id "REQUEST_ID" \
+  --instance-id "INSTANCE_ID" \
+  --segment-id "SEGMENT_ID"
+```
+
+### Delete Request
+
+Delete an analytics report request.
+
+```bash  theme={null}
+asc analytics requests delete \
+  --request-id "REQUEST_ID" \
+  --confirm
+```
+
+**Required Flags:**
+
+* `--request-id` - Request ID to delete
+* `--confirm` - Confirm deletion
+
+## Report Metadata
+
+### List Report Instances
+
+List instances for a specific report.
+
+```bash  theme={null}
+asc analytics reports links --report-id "REPORT_ID"
+```
+
+### View Report Details
+
+Get detailed information about a specific analytics report.
+
+```bash  theme={null}
+asc analytics reports view --report-id "REPORT_ID"
+```
+
+### View Relationships
+
+List instance relationships for a report.
+
+```bash  theme={null}
+asc analytics reports links \
+  --report-id "REPORT_ID" \
+  --paginate
+```
+
+## Report Segments
+
+Large analytics reports are split into segments for download.
+
+### View Segment
+
+```bash  theme={null}
+asc analytics segments view --segment-id "SEGMENT_ID"
+```
+
+Use segment IDs returned by `asc analytics reports links --report-id "REPORT_ID" --paginate`.
+
+## Vendor Number
+
+Sales reports require a vendor number, which identifies your organization in App Store Connect.
+
+**Finding Your Vendor Number:**
+
+1. Sign in to App Store Connect
+2. Go to Payments and Financial Reports
+3. Your vendor number appears in the top right
+
+**Setting via Environment:**
+
+```bash  theme={null}
+export ASC_VENDOR_NUMBER="12345678"
+# or for analytics specifically
+export ASC_ANALYTICS_VENDOR_NUMBER="12345678"
+```
+
+## Report Formats
+
+### Sales Reports (TSV)
+
+Sales reports are tab-separated value files compressed with gzip:
+
+```
+Provider    Provider Country    SKU    Developer    Title    Version    Product Type Identifier    Units    Developer Proceeds    ...
+APPLE       US                  ...    ...
+```
+
+Use `--decompress` to extract the `.tsv` file for analysis.
+
+### Analytics Reports (CSV)
+
+Analytics reports are comma-separated value files:
+
+```
+Date,App Name,App Apple ID,App Version,Device,Source Type,Impressions,Product Page Views,...
+2024-01-20,My App,123456789,1.0,iPhone,App Store Browse,1234,567,...
+```
+
+## Common Workflows
+
+### Weekly Sales Analysis
+
+```bash  theme={null}
+# Download current week sales
+asc analytics sales \
+  --vendor "$ASC_VENDOR_NUMBER" \
+  --type SALES \
+  --subtype SUMMARY \
+  --frequency WEEKLY \
+  --date "$(date -d 'last monday' +%Y-%m-%d)" \
+  --decompress
+```
+
+### Analytics Data Pipeline
+
+```bash  theme={null}
+# 1. Create ongoing request (one time setup)
+asc analytics request \
+  --app "$ASC_APP_ID" \
+  --access-type ONGOING
+
+# 2. Check for new reports
+asc analytics requests \
+  --app "$ASC_APP_ID" \
+  --state COMPLETED
+
+# 3. Download latest data
+asc analytics download \
+  --request-id "REQUEST_ID" \
+  --instance-id "INSTANCE_ID" \
+  --decompress
+```
+
+## Related Commands
+
+* [Finance](/commands/finance) - Download financial reports
+* [Insights](/commands/insights) - Weekly and daily insights from analytics and sales data
+* [Performance](/commands/performance) - Access performance metrics and diagnostics
+
+## API Reference
+
+* [Sales Reports](https://sosumi.ai/documentation/appstoreconnectapi/download_sales_and_trends_reports)
+* [Analytics Report Requests](https://sosumi.ai/documentation/appstoreconnectapi/analyticsreportrequest)
+* [Analytics Reports](https://sosumi.ai/documentation/appstoreconnectapi/analyticsreport)

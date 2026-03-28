@@ -1,0 +1,184 @@
+# Command Reference Overview
+
+> Understanding the asc command-line interface structure and usage patterns
+
+The App Store Connect CLI (`asc`) provides a comprehensive set of commands for automating iOS, macOS, tvOS, and visionOS workflows. This page explains how to discover and use commands effectively.
+
+## Command Discovery
+
+The CLI is self-documenting. Before implementing or testing any command, use `--help` to confirm the exact interface:
+
+```bash  theme={null}
+asc --help                    # List all commands
+asc <command> --help          # Show command details and subcommands
+asc <command> <subcommand> --help  # Show all flags for a specific subcommand
+```
+
+**Do not memorize commands.** Always check `--help` for the current interface.
+
+## Usage Pattern
+
+All commands follow this structure:
+
+```bash  theme={null}
+asc <subcommand> [flags]
+```
+
+Flags can appear before or after subcommands:
+
+```bash  theme={null}
+asc --profile production apps list
+asc --profile production apps list
+```
+
+## Command Families
+
+Commands are organized into logical families based on functionality:
+
+### Getting Started
+
+* `auth` - Manage authentication for the App Store Connect API
+* `doctor` - Diagnose authentication configuration issues
+* `install-skills` - Install the asc skill pack for App Store Connect workflows
+* `init` - Initialize asc helper docs in the current repo
+* `docs` - Access embedded documentation guides and reference helpers
+
+### Analytics and Finance
+
+* `analytics` - Request and download analytics and sales reports
+* `insights` - Generate weekly and daily insights from App Store data sources
+* `finance` - Download payments and financial reports
+* `performance` - Access performance metrics and diagnostic logs
+* `feedback` - List TestFlight feedback from beta testers
+* `crashes` - List and export TestFlight crash reports
+
+### App Management
+
+* `apps` - List and manage apps in App Store Connect
+* `app-setup` - Post-create app setup automation
+* `app-tags` - Manage app tags for App Store visibility
+* `app-info` - Manage App Store version metadata
+* `versions` - Manage App Store versions
+* `localizations` - Manage App Store localization metadata
+* `screenshots` - Capture, frame, review, and upload App Store screenshots
+* `video-previews` - Manage App Store app preview videos
+* `pricing` - Manage app pricing and availability
+* `categories` - Manage App Store categories
+* `age-rating` - Manage App Store age rating declarations
+
+### TestFlight and Builds
+
+* `testflight` - Manage TestFlight resources
+* `builds` - Manage builds in App Store Connect
+* `build-bundles` - Manage build bundles and App Clip data
+* `pre-release-versions` - Manage TestFlight pre-release versions
+* `build-localizations` - Manage build release notes localizations
+* `sandbox` - Manage sandbox testers in App Store Connect
+
+### Review and Release
+
+* `review` - Manage App Store review details, attachments, and submissions
+* `reviews` - List and manage App Store customer reviews
+* `submit` - Submit builds for App Store review
+* `validate` - Validate App Store version readiness before submission
+* `publish` - End-to-end publish workflows for TestFlight and App Store
+
+### Monetization
+
+* `iap` - Manage in-app purchases in App Store Connect
+* `app-events` - Manage App Store in-app events
+* `subscriptions` - Manage subscription groups and subscriptions
+* `offer-codes` - Manage subscription offer codes
+* `win-back-offers` - Manage win-back offers for subscriptions
+
+### Signing
+
+* `signing` - Manage signing certificates and profiles
+* `bundle-ids` - Manage bundle IDs and capabilities
+* `certificates` - Manage signing certificates
+* `profiles` - Manage provisioning profiles
+* `merchant-ids` - Manage merchant IDs and certificates
+* `notarization` - Manage macOS notarization submissions
+
+### Team and Access
+
+* `account` - Inspect account-level health and access signals
+* `users` - Manage users and invitations in App Store Connect
+* `actors` - Lookup actors (users, API keys) by ID
+* `devices` - Manage devices in App Store Connect
+
+### Automation
+
+* `webhooks` - Manage webhooks in App Store Connect
+* `xcode-cloud` - Trigger and monitor Xcode Cloud workflows
+* `notify` - Send notifications to external services
+* `migrate` - Migrate metadata from/to fastlane format
+* `workflow` - Run multi-step automation workflows
+
+### Utility
+
+* `version` - Print version information and exit
+* `completion` - Print shell completion scripts
+* `diff` - Generate deterministic non-mutating diff plans
+* `status` - Show a release pipeline dashboard for an app
+* `metadata` - Manage app metadata with deterministic file workflows
+
+## TTY-Aware Output Defaults
+
+The CLI automatically chooses the best output format based on your environment:
+
+* **Interactive terminal (TTY)**: Defaults to `table` format for human readability
+* **Non-interactive output** (pipes, files, CI): Defaults to minified `json` for machine parsing
+
+This behavior ensures you get readable output in your terminal and parseable output in scripts—without needing to specify `--output` every time.
+
+### Override Defaults
+
+Set a global preference:
+
+```bash  theme={null}
+export ASC_DEFAULT_OUTPUT=markdown
+```
+
+Or use explicit flags (always takes precedence):
+
+```bash  theme={null}
+asc apps list --output json
+asc apps list --output table
+asc apps list --output markdown
+```
+
+## Scripting Tips
+
+* Use `--output json` for explicit machine-readable output in scripts
+* Use `--output table` or `--output markdown` for explicit human-readable output
+* Use `--paginate` on list commands to fetch all pages automatically
+* Use `--limit` and `--next` for manual pagination control
+* Prefer explicit flags and deterministic outputs in CI scripts
+* Use long-form flags (`--app`, `--output`) for clarity in documentation and scripts
+
+## Common Examples
+
+```bash  theme={null}
+# List apps with table output
+asc apps list --output table
+
+# View app details as JSON
+asc apps view --id "123456789" --output json
+
+# Validate and submit an App Store version
+asc validate --app "123456789" --version "1.2.3"
+asc submit create --app "123456789" --version "1.2.3" --build "BUILD_ID" --confirm
+
+# Run a local automation workflow
+asc workflow run --file .asc/workflow.json release
+
+# Fetch all pages of results
+asc builds list --app "123456789" --paginate
+```
+
+## Next Steps
+
+* See [Global Flags](/commands/global-flags) for flags available on all commands
+* Check command-specific pages for detailed usage and examples
+* Use `asc <command> --help` to explore command capabilities

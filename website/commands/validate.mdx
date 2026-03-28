@@ -1,0 +1,118 @@
+# validate
+
+> Validate App Store version readiness before submission
+
+The `validate` command performs preflight validation to check if an App Store version is ready for submission.
+
+## Usage
+
+```bash  theme={null}
+asc validate [flags]
+```
+
+## Validate a version
+
+Check if a version is ready for submission:
+
+```bash  theme={null}
+asc validate --app APP_ID --version VERSION_STRING
+asc validate --app 123456789 --version 1.2.0
+```
+
+## What it checks
+
+The validation process checks:
+
+* Version has a build attached
+* Required metadata is complete (description, keywords, screenshots)
+* Privacy policy URL is set (if required)
+* Age rating is configured
+* App categories are assigned
+* Pricing and availability are configured
+
+## Output
+
+**Success:**
+
+```
+✓ Version 1.2.0 is ready for submission
+```
+
+**Validation errors:**
+
+```
+✗ Version 1.2.0 is not ready for submission:
+  - No build attached to version
+  - Missing screenshots for iPhone 6.5"
+  - Description is empty for en-US
+```
+
+## Flags
+
+<ParamField path="--app" type="string" required>
+  App ID to validate
+</ParamField>
+
+<ParamField path="--version" type="string" required>
+  Version string to validate (e.g., `1.2.0`)
+</ParamField>
+
+<ParamField path="--output" type="string">
+  Output format: `json`, `table`, or `markdown`
+</ParamField>
+
+## Example workflows
+
+### Validate before submission
+
+```bash  theme={null}
+# Validate version
+if asc validate --app 123456789 --version 1.2.0; then
+  echo "Version is ready, submitting..."
+  asc submit create --app 123456789 --version 1.2.0 --build BUILD_ID --confirm
+else
+  echo "Validation failed, fix issues before submitting"
+  exit 1
+fi
+```
+
+### CI/CD validation
+
+```yaml  theme={null}
+# GitHub Actions
+- name: Validate version
+  run: |
+    asc validate --app ${{ secrets.APP_ID }} --version ${{ github.ref_name }}
+    if [ $? -ne 0 ]; then
+      echo "Validation failed"
+      exit 1
+    fi
+
+- name: Submit for review
+  run: asc submit create --app ${{ secrets.APP_ID }} --version ${{ github.ref_name }} --build "${{ env.BUILD_ID }}" --confirm
+```
+
+## Exit codes
+
+| Code    | Description              |
+| ------- | ------------------------ |
+| `0`     | Validation passed        |
+| `1`     | Validation failed        |
+| `10-59` | HTTP client errors (4xx) |
+| `60-99` | HTTP server errors (5xx) |
+
+<Tip>
+  Always run `validate` before `submit` to catch issues early and avoid rejected submissions.
+</Tip>
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Submit command" icon="paper-plane" href="/commands/submit">
+    Submit for App Store review
+  </Card>
+
+  <Card title="Submission guide" icon="book-open" href="/guides/app-store-submission">
+    Complete submission guide
+  </Card>
+</CardGroup>

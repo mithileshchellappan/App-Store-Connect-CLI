@@ -1,0 +1,498 @@
+# Screenshots and Previews
+
+> Manage App Store screenshots and preview videos
+
+Manage your App Store screenshots from capture to upload, including local automation workflows (experimental).
+
+## Overview
+
+The CLI provides two screenshot workflows:
+
+1. **App Store Workflow**: Upload and manage screenshots in App Store Connect
+2. **Local Automation (Experimental)**: Capture, frame, review, and prepare screenshots locally
+
+## App Store Screenshot Management
+
+### Understanding Screenshot Requirements
+
+View required screenshot sizes for App Store submission:
+
+```bash  theme={null}
+asc screenshots sizes
+```
+
+For the full matrix including all device types:
+
+```bash  theme={null}
+asc screenshots sizes --all
+```
+
+<Note>
+  For most iOS submissions, you need:
+
+  * One iPhone set: `IPHONE_65` (6.5" display)
+  * One iPad set: `IPAD_PRO_3GEN_129` (12.9" iPad Pro 3rd gen)
+
+  The App Store will automatically scale these to other sizes.
+</Note>
+
+### Upload Screenshots
+
+<Steps>
+  <Step title="Find your version localization ID">
+    List localizations for your app version:
+
+    ```bash  theme={null}
+    asc localizations list --version "VERSION_ID" --output json
+    ```
+
+    Extract the localization ID for your target locale (e.g., `en-US`).
+  </Step>
+
+  <Step title="Prepare screenshot files">
+    Organize screenshots by device type:
+
+    ```
+    screenshots/
+    ├── iphone/
+    │   ├── 01-home.png
+    │   ├── 02-features.png
+    │   └── 03-settings.png
+    └── ipad/
+        ├── 01-home.png
+        ├── 02-features.png
+        └── 03-settings.png
+    ```
+  </Step>
+
+  <Step title="Upload iPhone screenshots">
+    ```bash  theme={null}
+    asc screenshots upload \
+      --version-localization "LOCALIZATION_ID" \
+      --path "./screenshots/iphone" \
+      --device-type "IPHONE_65"
+    ```
+  </Step>
+
+  <Step title="Upload iPad screenshots">
+    ```bash  theme={null}
+    asc screenshots upload \
+      --version-localization "LOCALIZATION_ID" \
+      --path "./screenshots/ipad" \
+      --device-type "IPAD_PRO_3GEN_129"
+    ```
+  </Step>
+</Steps>
+
+### Device Types
+
+Common device types for screenshots:
+
+**iPhone:**
+
+* `IPHONE_65` - 6.5" display (iPhone 14 Plus, etc.)
+* `IPHONE_55` - 5.5" display (iPhone 8 Plus)
+* `IPHONE_40` - 4" display (iPhone SE 1st gen)
+
+**iPad:**
+
+* `IPAD_PRO_3GEN_129` - 12.9" iPad Pro (3rd gen)
+* `IPAD_PRO_129` - 12.9" iPad Pro (1st/2nd gen)
+* `IPAD_105` - 10.5" iPad Pro
+* `IPAD_97` - 9.7" iPad
+
+**Apple Watch:**
+
+* `APPLE_WATCH_SERIES_7` - 45mm Series 7
+* `APPLE_WATCH_SERIES_4` - 44mm Series 4
+* `APPLE_WATCH_SERIES_3` - 42mm Series 3
+
+**Mac:**
+
+* `DESKTOP`
+
+**Apple TV:**
+
+* `APPLE_TV`
+
+### List Existing Screenshots
+
+```bash  theme={null}
+asc screenshots list --version-localization "LOCALIZATION_ID"
+```
+
+Filter client-side by device type:
+
+```bash  theme={null}
+asc screenshots list \
+  --version-localization "LOCALIZATION_ID" \
+  --output json | jq '.data[] | select(.attributes.displayType == "IPHONE_65")'
+```
+
+### Download Screenshots
+
+Download all screenshots for a localization:
+
+```bash  theme={null}
+asc screenshots download \
+  --version-localization "LOCALIZATION_ID" \
+  --output-dir "./downloaded-screenshots"
+```
+
+### Delete Screenshots
+
+Delete a specific screenshot:
+
+```bash  theme={null}
+asc screenshots delete --id "SCREENSHOT_ID" --confirm
+```
+
+<Warning>
+  Deleting screenshots is permanent. Download backups before deleting.
+</Warning>
+
+## Local Screenshot Automation (Experimental)
+
+<Note>
+  Local screenshot commands are experimental. Please report issues at:
+  [https://github.com/rudrankriyam/App-Store-Connect-CLI/issues/new/choose](https://github.com/rudrankriyam/App-Store-Connect-CLI/issues/new/choose)
+</Note>
+
+### Complete Local Workflow
+
+<Steps>
+  <Step title="Capture screenshots from simulator">
+    Launch your app in iOS Simulator, then capture screenshots:
+
+    ```bash  theme={null}
+    asc screenshots capture \
+      --bundle-id "com.example.myapp" \
+      --name "home-screen" \
+      --output "./screenshots/raw"
+    ```
+
+    This captures from the currently running simulator.
+  </Step>
+
+  <Step title="Frame screenshots with device bezel">
+    Add device frame around raw screenshots:
+
+    ```bash  theme={null}
+    asc screenshots frame \
+      --input "./screenshots/raw/home-screen.png" \
+      --device "iphone-air" \
+      --output "./screenshots/framed"
+    ```
+
+    See available device frames:
+
+    ```bash  theme={null}
+    asc screenshots list-frame-devices
+    ```
+  </Step>
+
+  <Step title="Generate HTML review gallery">
+    Create an HTML page to review all screenshots:
+
+    ```bash  theme={null}
+    asc screenshots review-generate \
+      --framed-dir "./screenshots/framed" \
+      --output-dir "./screenshots/review"
+    ```
+  </Step>
+
+  <Step title="Open review in browser">
+    ```bash  theme={null}
+    asc screenshots review-open --output-dir "./screenshots/review"
+    ```
+
+    This opens a browser with an interactive gallery for review.
+  </Step>
+
+  <Step title="Approve screenshots">
+    Mark screenshots as ready for upload:
+
+    ```bash  theme={null}
+    asc screenshots review-approve \
+      --all-ready \
+      --output-dir "./screenshots/review"
+    ```
+
+    Or approve selectively in the browser UI.
+  </Step>
+
+  <Step title="Upload approved screenshots">
+    Upload the approved screenshots to App Store Connect:
+
+    ```bash  theme={null}
+    asc screenshots upload \
+      --version-localization "LOCALIZATION_ID" \
+      --path "./screenshots/review/approved" \
+      --device-type "IPHONE_65"
+    ```
+  </Step>
+</Steps>
+
+### Screenshot Plan Automation
+
+Define a complete screenshot plan in `.asc/screenshots.json`:
+
+```json  theme={null}
+{
+  "bundle_id": "com.example.myapp",
+  "device_types": ["iphone-air", "ipad-pro-129"],
+  "locales": ["en-US", "es-ES", "ja"],
+  "screenshots": [
+    {
+      "name": "home",
+      "description": "Home screen showing main features",
+      "device_type": "iphone-air"
+    },
+    {
+      "name": "feature-detail",
+      "description": "Detailed feature view",
+      "device_type": "iphone-air"
+    },
+    {
+      "name": "settings",
+      "description": "Settings and customization",
+      "device_type": "iphone-air"
+    }
+  ],
+  "output_dirs": {
+    "raw": "./screenshots/raw",
+    "framed": "./screenshots/framed",
+    "review": "./screenshots/review"
+  }
+}
+```
+
+Run the entire workflow:
+
+```bash  theme={null}
+asc screenshots run --plan .asc/screenshots.json
+```
+
+### Available Frame Devices
+
+List supported devices for framing:
+
+```bash  theme={null}
+asc screenshots list-frame-devices --output json
+```
+
+Common devices:
+
+* `iphone-air` - iPhone with edge-to-edge display
+* `iphone-14-pro` - iPhone 14 Pro
+* `iphone-se` - iPhone SE
+* `ipad-pro-129` - 12.9" iPad Pro
+* `ipad-air` - iPad Air
+* `apple-watch-series-7` - Apple Watch Series 7
+
+## Complete Screenshot Workflow Example
+
+Here's a complete workflow for managing screenshots:
+
+```bash  theme={null}
+#!/bin/bash
+set -e
+
+# Configuration
+export ASC_APP_ID="YOUR_APP_ID"
+VERSION_ID="YOUR_VERSION_ID"
+BUNDLE_ID="com.example.myapp"
+
+# 1. Get localization IDs
+echo "Getting localization IDs..."
+EN_US_LOC_ID=$(asc localizations list --version "$VERSION_ID" --output json | \
+  jq -r '.data[] | select(.attributes.locale == "en-US") | .id')
+
+echo "en-US Localization ID: $EN_US_LOC_ID"
+
+# 2. Create directories
+mkdir -p screenshots/{raw,framed,iphone,ipad}
+
+# 3. Capture screenshots (requires simulator running)
+echo "Launch your app in iOS Simulator and press enter..."
+read
+
+for screen in home features settings details; do
+  echo "Navigate to $screen screen and press enter..."
+  read
+  asc screenshots capture \
+    --bundle-id "$BUNDLE_ID" \
+    --name "$screen" \
+    --output "./screenshots/raw"
+done
+
+# 4. Frame screenshots
+echo "Framing screenshots..."
+for raw_file in screenshots/raw/*.png; do
+  filename=$(basename "$raw_file")
+  asc screenshots frame \
+    --input "$raw_file" \
+    --device "iphone-air" \
+    --output "./screenshots/framed/$filename"
+done
+
+# 5. Copy to upload directories
+cp screenshots/framed/*.png screenshots/iphone/
+
+# 6. Upload to App Store Connect
+echo "Uploading iPhone screenshots..."
+asc screenshots upload \
+  --version-localization "$EN_US_LOC_ID" \
+  --path "./screenshots/iphone" \
+  --device-type "IPHONE_65"
+
+echo "Screenshots uploaded successfully!"
+
+# 7. Verify upload
+asc screenshots list --version-localization "$EN_US_LOC_ID"
+```
+
+## Preview Videos
+
+Upload app preview videos:
+
+### Upload Preview Video
+
+```bash  theme={null}
+asc video-previews upload \
+  --version-localization "LOCALIZATION_ID" \
+  --path "./previews/app-preview.mp4" \
+  --device-type "IPHONE_65"
+```
+
+### Preview Video Requirements
+
+* **Format**: H.264 or HEVC codec, .mov or .mp4
+* **Duration**: 15-30 seconds
+* **Resolution**: Matches device screenshot size
+* **File size**: Up to 500 MB
+* **Aspect ratio**: Matches device (typically 16:9 or device aspect)
+
+## Multi-Locale Screenshot Workflow
+
+For apps with multiple localizations:
+
+```bash  theme={null}
+#!/bin/bash
+set -e
+
+VERSION_ID="YOUR_VERSION_ID"
+LOCALES=("en-US" "es-ES" "fr-FR" "ja" "zh-Hans")
+
+for locale in "${LOCALES[@]}"; do
+  echo "Processing $locale..."
+  
+  # Get localization ID
+  LOC_ID=$(asc localizations list --version "$VERSION_ID" --output json | \
+    jq -r '.data[] | select(.attributes.locale == "'$locale'") | .id')
+  
+  if [ -z "$LOC_ID" ]; then
+    echo "Localization $locale not found, skipping"
+    continue
+  fi
+  
+  # Upload screenshots for this locale
+  if [ -d "screenshots/$locale/iphone" ]; then
+    echo "Uploading iPhone screenshots for $locale..."
+    asc screenshots upload \
+      --version-localization "$LOC_ID" \
+      --path "screenshots/$locale/iphone" \
+      --device-type "IPHONE_65"
+  fi
+  
+  if [ -d "screenshots/$locale/ipad" ]; then
+    echo "Uploading iPad screenshots for $locale..."
+    asc screenshots upload \
+      --version-localization "$LOC_ID" \
+      --path "screenshots/$locale/ipad" \
+      --device-type "IPAD_PRO_3GEN_129"
+  fi
+done
+
+echo "All locales processed!"
+```
+
+## Troubleshooting
+
+### "Invalid image dimensions"
+
+**Problem**: Screenshot dimensions don't match the device type.
+
+**Solution**: Verify required dimensions:
+
+```bash  theme={null}
+asc screenshots sizes
+```
+
+Ensure your images match exactly:
+
+* iPhone 6.5": 1242 x 2688 pixels
+* iPad Pro 12.9": 2048 x 2732 pixels
+
+### "Capture failed - no simulator running"
+
+**Problem**: `asc screenshots capture` requires a running simulator.
+
+**Solution**:
+
+1. Launch iOS Simulator
+2. Open your app in the simulator
+3. Run the capture command
+
+### "Frame device not found"
+
+**Problem**: Invalid device name for framing.
+
+**Solution**: List available devices:
+
+```bash  theme={null}
+asc screenshots list-frame-devices
+```
+
+Use exact device names from the output.
+
+### "Upload failed - file too large"
+
+**Problem**: Image file size exceeds limits.
+
+**Solution**: Optimize images:
+
+```bash  theme={null}
+# Using ImageMagick
+mogrify -quality 85 -resize '1242x2688>' screenshots/*.png
+
+# Using pngquant for compression
+pngquant --quality=80-95 screenshots/*.png
+```
+
+## Best Practices
+
+1. **Use consistent naming**: Name screenshots clearly (`01-home.png`, `02-features.png`)
+
+2. **Optimize file sizes**: Compress screenshots to reduce upload time while maintaining quality
+
+3. **Follow Apple guidelines**:
+   * No UI chrome (status bars are optional)
+   * Show actual app content
+   * Use device-appropriate assets
+
+4. **Localize screenshots**: Create locale-specific screenshots showing localized UI
+
+5. **Test on real devices**: Capture from actual devices when possible for best quality
+
+6. **Version control**: Keep screenshot sources in git for easy updates
+
+7. **Automate where possible**: Use the local workflow tools to streamline repetitive tasks
+
+8. **Review before upload**: Always review screenshots in context before uploading to App Store Connect
+
+## Related Commands
+
+* [Metadata Management](/guides/metadata-management) - Manage app descriptions and metadata
+* [App Store Submission](/guides/app-store-submission) - Submit with screenshots
+* [Localizations API](/commands/localizations) - Manage version localizations

@@ -1,0 +1,207 @@
+# Review Commands
+
+> Manage App Store review details, attachments, submissions, and history
+
+The `review` command uses hyphenated leaf subcommands for App Store review
+details, attachments, submissions, and submission items.
+
+For simple submission status checks by submission ID or version ID, use
+`asc submit status`.
+
+## Overview
+
+Common review commands:
+
+```bash  theme={null}
+asc review details-get --id "DETAIL_ID"
+asc review details-for-version --version-id "VERSION_ID"
+asc review details-create --version-id "VERSION_ID" --contact-email "dev@example.com"
+asc review details-update --id "DETAIL_ID" --notes "Updated review notes"
+asc review attachments-list --review-detail "DETAIL_ID"
+asc review attachments-upload --review-detail "DETAIL_ID" --file ./review-doc.pdf
+asc review submissions-list --app "123456789"
+asc review submissions-get --id "SUBMISSION_ID"
+asc review submissions-create --app "123456789" --platform IOS
+asc review submissions-submit --id "SUBMISSION_ID" --confirm
+asc review submissions-cancel --id "SUBMISSION_ID" --confirm
+asc review items-get --id "ITEM_ID"
+asc review items-add --submission "SUBMISSION_ID" --item-type appStoreVersions --item-id "VERSION_ID"
+asc review history --app "123456789"
+```
+
+## Commands
+
+### `asc review submissions-list`
+
+List review submissions for an app or globally.
+
+<ParamField path="--app" type="string">
+  App Store Connect app ID (or `ASC_APP_ID`)
+</ParamField>
+
+<ParamField path="--platform" type="string">
+  Filter by platform: `IOS`, `MAC_OS`, `TV_OS`, `VISION_OS` (comma-separated)
+</ParamField>
+
+<ParamField path="--state" type="string">
+  Filter by submission state (comma-separated)
+</ParamField>
+
+<ParamField path="--paginate" type="boolean" default="false">
+  Automatically fetch all pages
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc review submissions-list --app "123456789"
+asc review submissions-list --app "123456789" --platform IOS --state READY_FOR_REVIEW
+asc review submissions-list --app "123456789" --paginate
+```
+
+***
+
+### `asc review submissions-get`
+
+Get a review submission by ID.
+
+<ParamField path="--id" type="string" required>
+  Review submission ID
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc review submissions-get --id "SUBMISSION_ID"
+```
+
+***
+
+### `asc review submissions-cancel`
+
+Cancel a review submission.
+
+<ParamField path="--id" type="string" required>
+  Review submission ID
+</ParamField>
+
+<ParamField path="--confirm" type="boolean" required>
+  Confirm cancellation
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc review submissions-cancel --id "SUBMISSION_ID" --confirm
+```
+
+***
+
+### `asc review details-update`
+
+Update App Store review details.
+
+<ParamField path="--id" type="string" required>
+  App Store review detail ID
+</ParamField>
+
+<ParamField path="--contact-email" type="string">
+  Contact email
+</ParamField>
+
+<ParamField path="--contact-phone" type="string">
+  Contact phone
+</ParamField>
+
+<ParamField path="--notes" type="string">
+  Reviewer instructions or context
+</ParamField>
+
+<ParamField path="--demo-account-required" type="boolean">
+  Set `true` only when App Review needs demo credentials
+</ParamField>
+
+<ParamField path="--demo-account-name" type="string">
+  Demo account name when demo credentials are required
+</ParamField>
+
+<ParamField path="--demo-account-password" type="string">
+  Demo account password when demo credentials are required
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc review details-update --id "DETAIL_ID" --notes "Reviewer can use the guest flow from the welcome screen."
+asc review details-update --id "DETAIL_ID" --demo-account-required=true --demo-account-name "reviewer@example.com" --demo-account-password "rotated-password" --notes "This account has full reviewer access."
+```
+
+***
+
+### `asc review attachments-upload`
+
+Upload a review attachment.
+
+<ParamField path="--review-detail" type="string" required>
+  App Store review detail ID
+</ParamField>
+
+<ParamField path="--file" type="string" required>
+  Path to the attachment file
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc review attachments-upload --review-detail "REVIEW_DETAIL_ID" --file ./review-doc.pdf
+```
+
+***
+
+### `asc review history`
+
+Show enriched review submission history for an app.
+
+<ParamField path="--app" type="string">
+  App Store Connect app ID (or `ASC_APP_ID`)
+</ParamField>
+
+<ParamField path="--platform" type="string">
+  Filter by platform: `IOS`, `MAC_OS`, `TV_OS`, `VISION_OS`
+</ParamField>
+
+<ParamField path="--state" type="string">
+  Filter by submission state
+</ParamField>
+
+<ParamField path="--version" type="string">
+  Filter by version string (for example `1.2.0`)
+</ParamField>
+
+<ParamField path="--paginate" type="boolean" default="false">
+  Automatically fetch all pages
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc review history --app "123456789"
+asc review history --app "123456789" --platform IOS --state COMPLETE
+asc review history --app "123456789" --version "1.2.0"
+```
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Submit command" icon="paper-plane" href="/commands/submit">
+    Check submission status or submit builds for App Store review
+  </Card>
+
+  <Card title="Reviews command" icon="star" href="/commands/reviews">
+    Manage customer reviews
+  </Card>
+
+  <Card title="Submission guide" icon="book-open" href="/guides/app-store-submission">
+    Complete submission guide
+  </Card>
+</CardGroup>

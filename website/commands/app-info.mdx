@@ -1,0 +1,267 @@
+# App Info Commands
+
+> Manage App Store version metadata
+
+## Overview
+
+App Info commands manage version-specific metadata like descriptions, keywords, What's New text, and other localization data.
+
+`asc app-info ...` still works as a deprecated compatibility alias, but the canonical commands live under `asc apps info ...`.
+
+## Commands
+
+### `asc apps info view`
+
+View app store version localization metadata.
+
+<ParamField path="--app" type="string">
+  App Store Connect app ID (or `ASC_APP_ID` env variable)
+</ParamField>
+
+<ParamField path="--info-id" type="string">
+  App Info ID (optional override; legacy `--app-info` also works)
+</ParamField>
+
+<ParamField path="--version-id" type="string">
+  App Store version ID (optional override)
+</ParamField>
+
+<ParamField path="--version" type="string">
+  App Store version string (optional)
+</ParamField>
+
+<ParamField path="--platform" type="string">
+  Platform: `IOS`, `MAC_OS`, `TV_OS`, `VISION_OS` (required with `--version`)
+</ParamField>
+
+<ParamField path="--state" type="string">
+  Filter by app store state(s), comma-separated
+</ParamField>
+
+<ParamField path="--locale" type="string">
+  Filter by locale(s), comma-separated
+</ParamField>
+
+<ParamField path="--limit" type="integer">
+  Maximum results per page (1-200)
+</ParamField>
+
+<ParamField path="--next" type="string">
+  Fetch next page using a links.next URL
+</ParamField>
+
+<ParamField path="--paginate" type="boolean" default="false">
+  Automatically fetch all pages
+</ParamField>
+
+<ParamField path="--include" type="string">
+  Include related resources (comma-separated): `ageRatingDeclaration`, `territoryAgeRatings`, `primaryCategory`, `primarySubcategoryOne`, `primarySubcategoryTwo`, `secondaryCategory`, `secondarySubcategoryOne`, `secondarySubcategoryTwo`
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc apps info view --app "APP_ID"
+asc apps info view --app "APP_ID" --version "1.2.3" --platform IOS
+asc apps info view --version-id "VERSION_ID"
+asc apps info view --info-id "APP_INFO_ID" --include "ageRatingDeclaration"
+asc apps info view --app "APP_ID" --include "ageRatingDeclaration,territoryAgeRatings"
+asc apps info view --app "APP_ID" --locale "en-US" --output table
+```
+
+**Response:**
+
+```json  theme={null}
+{
+  "data": [
+    {
+      "id": "LOCALIZATION_ID",
+      "type": "appStoreVersionLocalizations",
+      "attributes": {
+        "locale": "en-US",
+        "description": "My app description",
+        "keywords": "productivity, tools",
+        "supportUrl": "https://example.com/support",
+        "marketingUrl": "https://example.com",
+        "promotionalText": "Try our new features!",
+        "whatsNew": "Bug fixes and improvements"
+      }
+    }
+  ]
+}
+```
+
+***
+
+### `asc apps info edit`
+
+Create or update App Store version metadata.
+
+<ParamField path="--app" type="string">
+  App Store Connect app ID (or `ASC_APP_ID` env variable)
+</ParamField>
+
+<ParamField path="--version-id" type="string">
+  App Store version ID (optional override)
+</ParamField>
+
+<ParamField path="--version" type="string">
+  App Store version string (optional)
+</ParamField>
+
+<ParamField path="--platform" type="string">
+  Platform: `IOS`, `MAC_OS`, `TV_OS`, `VISION_OS` (required with `--version`)
+</ParamField>
+
+<ParamField path="--state" type="string">
+  Filter by app store state(s), comma-separated
+</ParamField>
+
+<ParamField path="--locale" type="string" required>
+  Locale (e.g., en-US)
+</ParamField>
+
+<ParamField path="--copy-from-locale" type="string">
+  Copy submit-required fields (description, keywords, support-url) from this locale when missing
+</ParamField>
+
+<ParamField path="--description" type="string">
+  App description
+</ParamField>
+
+<ParamField path="--keywords" type="string">
+  Keywords (comma-separated)
+</ParamField>
+
+<ParamField path="--support-url" type="string">
+  Support URL
+</ParamField>
+
+<ParamField path="--marketing-url" type="string">
+  Marketing URL
+</ParamField>
+
+<ParamField path="--promotional-text" type="string">
+  Promotional text
+</ParamField>
+
+<ParamField path="--whats-new" type="string">
+  What's New text
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc apps info edit --app "APP_ID" --locale "en-US" --whats-new "Bug fixes"
+asc apps info edit --app "APP_ID" --locale "fr-FR" --copy-from-locale "en-US" --whats-new "Corrections"
+asc apps info edit --app "APP_ID" --version "1.2.3" --platform IOS --locale "en-US" --description "New release"
+```
+
+**Response:**
+
+```json  theme={null}
+{
+  "data": {
+    "id": "LOCALIZATION_ID",
+    "type": "appStoreVersionLocalizations",
+    "attributes": {
+      "locale": "en-US",
+      "description": "My app description",
+      "keywords": "productivity, tools",
+      "supportUrl": "https://example.com/support",
+      "whatsNew": "Bug fixes"
+    }
+  }
+}
+```
+
+***
+
+## Common Usage Patterns
+
+### Get metadata for the latest version
+
+```bash  theme={null}
+asc apps info view --app "123456789" --output table
+```
+
+### Update What's New text
+
+```bash  theme={null}
+asc apps info edit --app "123456789" --locale "en-US" --whats-new "New features and improvements"
+```
+
+### Create a new locale by copying from existing
+
+```bash  theme={null}
+asc apps info edit --app "123456789" --locale "fr-FR" --copy-from-locale "en-US" --whats-new "Nouvelles fonctionnalités"
+```
+
+### Get metadata with related resources
+
+```bash  theme={null}
+asc apps info view --app "123456789" --include "ageRatingDeclaration,territoryAgeRatings" --output json
+```
+
+## Submit-Required Fields
+
+The following fields are required for submission:
+
+* `description` - App description
+* `keywords` - Search keywords
+* `supportUrl` - Support URL
+
+<Warning>
+  When creating a new locale, all submit-required fields must be provided. Use `--copy-from-locale` to automatically copy these fields from an existing locale.
+</Warning>
+
+## Metadata Fields
+
+### Description
+
+A description of your app, detailing features and functionality.
+
+* Maximum length: 4000 characters
+* Required for submission
+
+### Keywords
+
+One or more keywords that describe your app. Keywords make App Store search results more accurate.
+
+* Separate keywords with English commas, Chinese commas, or a mix of both
+* Maximum 100 characters
+* Required for submission
+
+### Support URL
+
+A URL with support information for your app.
+
+* Must be a valid URL
+* Required for submission
+
+### Marketing URL
+
+A URL with marketing information about your app.
+
+* Must be a valid URL
+* Optional
+
+### Promotional Text
+
+Promotional text lets you inform your App Store visitors of any current app features without requiring an updated submission.
+
+* Maximum 170 characters
+* Can be updated at any time
+* Optional
+
+### What's New
+
+Describe what's new in this version of your app, such as new features, improvements, and bug fixes.
+
+* Maximum 4000 characters
+* Version-specific
+* Optional (but recommended)
+
+## Version Resolution
+
+If multiple versions exist and no `--version-id` or `--version` is provided, the most recently created version is used.

@@ -1,0 +1,340 @@
+# Version Management Commands
+
+> Manage App Store versions, builds, and releases
+
+## Overview
+
+Version management commands allow you to create, update, delete, and manage App Store versions.
+
+## Commands
+
+### `asc versions list`
+
+List app store versions for an app.
+
+<ParamField path="--app" type="string" required>
+  App Store Connect app ID (or `ASC_APP_ID` env variable)
+</ParamField>
+
+<ParamField path="--version" type="string">
+  Filter by version string (comma-separated)
+</ParamField>
+
+<ParamField path="--platform" type="string">
+  Filter by platform: `IOS`, `MAC_OS`, `TV_OS`, `VISION_OS` (comma-separated)
+</ParamField>
+
+<ParamField path="--state" type="string">
+  Filter by state: `PREPARE_FOR_SUBMISSION`, `WAITING_FOR_REVIEW`, `IN_REVIEW`, `PENDING_DEVELOPER_RELEASE`, `READY_FOR_SALE` (comma-separated)
+</ParamField>
+
+<ParamField path="--limit" type="integer">
+  Maximum results per page (1-200)
+</ParamField>
+
+<ParamField path="--next" type="string">
+  Next page URL from a previous response
+</ParamField>
+
+<ParamField path="--paginate" type="boolean" default="false">
+  Automatically fetch all pages (aggregate results)
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc versions list --app "123456789"
+asc versions list --app "123456789" --version "1.0.0"
+asc versions list --app "123456789" --platform IOS --state READY_FOR_REVIEW
+asc versions list --app "123456789" --paginate
+```
+
+**Response:**
+
+```json  theme={null}
+{
+  "data": [
+    {
+      "id": "VERSION_ID",
+      "type": "appStoreVersions",
+      "attributes": {
+        "versionString": "1.0.0",
+        "platform": "IOS",
+        "appStoreState": "READY_FOR_SALE",
+        "createdDate": "2024-01-15T10:30:00.000+0000"
+      }
+    }
+  ]
+}
+```
+
+***
+
+### `asc versions view`
+
+View details for an app store version.
+
+`asc versions get` still works as a deprecated compatibility alias, but `asc versions view` is the canonical command.
+
+<ParamField path="--version-id" type="string" required>
+  App Store version ID
+</ParamField>
+
+<ParamField path="--include-build" type="boolean" default="false">
+  Include attached build information
+</ParamField>
+
+<ParamField path="--include-submission" type="boolean" default="false">
+  Include submission information
+</ParamField>
+
+<ParamField path="--include" type="string">
+  Include related resources (comma-separated): `ageRatingDeclaration`, `appStoreReviewDetail`, `appClipDefaultExperience`, `appStoreVersionExperiments`, `appStoreVersionExperimentsV2`, `appStoreVersionSubmission`, `customerReviews`, `routingAppCoverage`, `alternativeDistributionPackage`, `gameCenterAppVersion`
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc versions view --version-id "VERSION_ID"
+asc versions view --version-id "VERSION_ID" --include-build --include-submission
+asc versions view --version-id "VERSION_ID" --include "ageRatingDeclaration,appStoreReviewDetail"
+```
+
+**Response:**
+
+```json  theme={null}
+{
+  "id": "VERSION_ID",
+  "versionString": "1.0.0",
+  "platform": "IOS",
+  "state": "READY_FOR_SALE",
+  "buildId": "BUILD_ID",
+  "buildVersion": "100",
+  "submissionId": "SUBMISSION_ID"
+}
+```
+
+***
+
+### `asc versions create`
+
+Create a new app store version.
+
+<ParamField path="--app" type="string" required>
+  App Store Connect app ID (or `ASC_APP_ID` env variable)
+</ParamField>
+
+<ParamField path="--version" type="string" required>
+  Version string (e.g., 1.0.0)
+</ParamField>
+
+<ParamField path="--platform" type="string" default="IOS">
+  Platform: `IOS`, `MAC_OS`, `TV_OS`, `VISION_OS`
+</ParamField>
+
+<ParamField path="--copyright" type="string">
+  Copyright text (e.g., '2026 My Company')
+</ParamField>
+
+<ParamField path="--release-type" type="string">
+  Release type: `MANUAL`, `AFTER_APPROVAL`, `SCHEDULED`
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc versions create --app "123456789" --version "2.0.0"
+asc versions create --app "123456789" --version "2.0.0" --platform IOS
+asc versions create --app "123456789" --version "2.0.0" --copyright "2026 My Company" --release-type MANUAL
+```
+
+**Response:**
+
+```json  theme={null}
+{
+  "id": "NEW_VERSION_ID",
+  "versionString": "2.0.0",
+  "platform": "IOS",
+  "state": "PREPARE_FOR_SUBMISSION"
+}
+```
+
+***
+
+### `asc versions update`
+
+Update an app store version.
+
+<ParamField path="--version-id" type="string" required>
+  App Store version ID
+</ParamField>
+
+<ParamField path="--copyright" type="string">
+  Copyright text (e.g., '2026 My Company')
+</ParamField>
+
+<ParamField path="--release-type" type="string">
+  Release type: `MANUAL`, `AFTER_APPROVAL`, `SCHEDULED`
+</ParamField>
+
+<ParamField path="--earliest-release-date" type="string">
+  Earliest release date (ISO 8601, e.g., 2026-02-01T08:00:00+00:00)
+</ParamField>
+
+<ParamField path="--version" type="string">
+  Version string (e.g., 1.0.1)
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc versions update --version-id "VERSION_ID" --copyright "2026 My Company"
+asc versions update --version-id "VERSION_ID" --release-type MANUAL
+asc versions update --version-id "VERSION_ID" --release-type SCHEDULED --earliest-release-date "2026-02-01T08:00:00+00:00"
+asc versions update --version-id "VERSION_ID" --version "1.0.1"
+```
+
+**Response:**
+
+```json  theme={null}
+{
+  "id": "VERSION_ID",
+  "versionString": "1.0.1",
+  "platform": "IOS",
+  "state": "PREPARE_FOR_SUBMISSION"
+}
+```
+
+***
+
+### `asc versions delete`
+
+Delete an app store version (only versions in PREPARE\_FOR\_SUBMISSION state).
+
+<ParamField path="--version-id" type="string" required>
+  App Store version ID
+</ParamField>
+
+<ParamField path="--confirm" type="boolean" required>
+  Confirm deletion (required)
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc versions delete --version-id "VERSION_ID" --confirm
+```
+
+**Response:**
+
+```json  theme={null}
+{
+  "versionId": "VERSION_ID",
+  "deleted": true
+}
+```
+
+***
+
+### `asc versions attach-build`
+
+Attach a build to an app store version.
+
+<ParamField path="--version-id" type="string" required>
+  App Store version ID
+</ParamField>
+
+<ParamField path="--build" type="string" required>
+  Build ID to attach
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc versions attach-build --version-id "VERSION_ID" --build "BUILD_ID"
+```
+
+**Response:**
+
+```json  theme={null}
+{
+  "versionId": "VERSION_ID",
+  "buildId": "BUILD_ID",
+  "attached": true
+}
+```
+
+***
+
+### `asc versions release`
+
+Release an approved version in the Pending Developer Release state.
+
+<ParamField path="--version-id" type="string" required>
+  App Store version ID
+</ParamField>
+
+<ParamField path="--confirm" type="boolean" required>
+  Confirm release request (required)
+</ParamField>
+
+**Examples:**
+
+```bash  theme={null}
+asc versions release --version-id "VERSION_ID" --confirm
+```
+
+**Response:**
+
+```json  theme={null}
+{
+  "releaseRequestId": "RELEASE_REQUEST_ID",
+  "versionId": "VERSION_ID"
+}
+```
+
+***
+
+## Common Usage Patterns
+
+### Create a new version and attach a build
+
+```bash  theme={null}
+asc versions create --app "123456789" --version "2.0.0" --platform IOS
+asc versions attach-build --version-id "VERSION_ID" --build "BUILD_ID"
+```
+
+### List versions in a specific state
+
+```bash  theme={null}
+asc versions list --app "123456789" --state WAITING_FOR_REVIEW,IN_REVIEW
+```
+
+### Update version release type
+
+```bash  theme={null}
+asc versions update --version-id "VERSION_ID" --release-type SCHEDULED --earliest-release-date "2026-03-01T08:00:00+00:00"
+```
+
+### Release a pending version
+
+```bash  theme={null}
+asc versions release --version-id "VERSION_ID" --confirm
+```
+
+## Version States
+
+* `PREPARE_FOR_SUBMISSION` - Version is being prepared
+* `WAITING_FOR_REVIEW` - Version is waiting for Apple review
+* `IN_REVIEW` - Version is currently under review
+* `PENDING_CONTRACT` - Pending contract approval
+* `WAITING_FOR_EXPORT_COMPLIANCE` - Waiting for export compliance
+* `PENDING_DEVELOPER_RELEASE` - Approved and waiting for developer to release
+* `PROCESSING_FOR_APP_STORE` - Processing for release
+* `PENDING_APPLE_RELEASE` - Pending Apple release
+* `READY_FOR_SALE` - Live on the App Store
+* `REMOVED_FROM_SALE` - Removed from sale
+* `DEVELOPER_REJECTED` - Rejected by developer
+* `REJECTED` - Rejected by Apple
+* `METADATA_REJECTED` - Metadata rejected
+* `INVALID_BINARY` - Binary is invalid

@@ -1,0 +1,298 @@
+# Installation
+
+> Install the App Store Connect CLI on macOS, Linux, or from source
+
+The App Store Connect CLI (`asc`) is distributed as a single binary with no runtime dependencies. Choose the installation method that works best for your environment.
+
+## Requirements
+
+* **Operating System**: macOS or Linux
+* **Architecture**: x86\_64 (amd64) or ARM64 (arm64/aarch64)
+* **Go**: 1.26+ (only required for source builds)
+
+## Homebrew (recommended)
+
+The easiest way to install `asc` on macOS or Linux:
+
+```bash  theme={null}
+brew install asc
+```
+
+<Note>
+  Homebrew automatically manages updates. Run `brew upgrade asc` to get the latest version.
+</Note>
+
+### Verify installation
+
+```bash  theme={null}
+asc --version
+```
+
+Expected output:
+
+```
+v1.2.3 (commit: abc1234, date: 2026-03-04)
+```
+
+## Install script
+
+For automated setups or environments without Homebrew:
+
+<CodeGroup>
+  ```bash macOS/Linux theme={null}
+  curl -fsSL https://asccli.sh/install | bash
+  ```
+
+  ```bash Custom install directory theme={null}
+  INSTALL_DIR="$HOME/bin" curl -fsSL https://asccli.sh/install | bash
+  ```
+</CodeGroup>
+
+### What the script does
+
+<Steps>
+  <Step title="Detect your platform">
+    Automatically identifies your OS (macOS/Linux) and architecture (amd64/arm64)
+  </Step>
+
+  <Step title="Download the latest release">
+    Fetches the appropriate binary from [GitHub Releases](https://github.com/rudrankriyam/App-Store-Connect-CLI/releases/latest)
+  </Step>
+
+  <Step title="Verify checksums">
+    Validates the downloaded binary using SHA-256 checksums (if `shasum` or `sha256sum` is available)
+  </Step>
+
+  <Step title="Install to bin directory">
+    Installs to `~/.local/bin` by default (or `/usr/local/bin` if `$HOME` is not set)
+  </Step>
+</Steps>
+
+<Warning>
+  The install script may prompt for `sudo` if the target directory requires elevated permissions.
+</Warning>
+
+### Add to PATH
+
+If `~/.local/bin` is not in your `PATH`, add it to your shell profile:
+
+<CodeGroup>
+  ```bash bash (~/.bashrc or ~/.bash_profile) theme={null}
+  export PATH="$HOME/.local/bin:$PATH"
+  ```
+
+  ```bash zsh (~/.zshrc) theme={null}
+  export PATH="$HOME/.local/bin:$PATH"
+  ```
+
+  ```bash fish (~/.config/fish/config.fish) theme={null}
+  set -gx PATH $HOME/.local/bin $PATH
+  ```
+</CodeGroup>
+
+Reload your shell:
+
+```bash  theme={null}
+source ~/.bashrc  # or ~/.zshrc, etc.
+```
+
+## Manual download
+
+For maximum control, download binaries directly from GitHub:
+
+<Steps>
+  <Step title="Visit releases page">
+    Go to [github.com/rudrankriyam/App-Store-Connect-CLI/releases/latest](https://github.com/rudrankriyam/App-Store-Connect-CLI/releases/latest)
+  </Step>
+
+  <Step title="Download your platform binary">
+    Choose the appropriate file:
+
+    * `asc_v{version}_macOS_amd64` (Intel Mac)
+    * `asc_v{version}_macOS_arm64` (Apple Silicon)
+    * `asc_v{version}_linux_amd64` (Linux x86\_64)
+    * `asc_v{version}_linux_arm64` (Linux ARM64)
+  </Step>
+
+  <Step title="Make it executable">
+    ```bash  theme={null}
+    chmod +x asc_v*
+    ```
+  </Step>
+
+  <Step title="Move to PATH">
+    ```bash  theme={null}
+    mv asc_v* /usr/local/bin/asc
+    ```
+  </Step>
+</Steps>
+
+## Build from source
+
+For contributors or custom builds:
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash  theme={null}
+    git clone https://github.com/rudrankriyam/App-Store-Connect-CLI.git
+    cd App-Store-Connect-CLI
+    ```
+  </Step>
+
+  <Step title="Build the binary">
+    ```bash  theme={null}
+    make build
+    ```
+
+    This creates `./asc` in the project root.
+  </Step>
+
+  <Step title="Install locally (optional)">
+    ```bash  theme={null}
+    make install
+    ```
+
+    This installs to `$GOPATH/bin` (typically `~/go/bin`).
+  </Step>
+</Steps>
+
+<Note>
+  See [CONTRIBUTING.md](https://github.com/rudrankriyam/App-Store-Connect-CLI/blob/main/CONTRIBUTING.md) for development setup, testing, and PR guidelines.
+</Note>
+
+### Development tools
+
+Install optional tooling for linting and formatting:
+
+```bash  theme={null}
+make tools   # installs gofumpt + golangci-lint
+make lint    # run linter
+make format  # format code
+```
+
+### Run tests
+
+```bash  theme={null}
+ASC_BYPASS_KEYCHAIN=1 make test
+```
+
+<Warning>
+  Always use `ASC_BYPASS_KEYCHAIN=1` when running tests to avoid macOS keychain prompts and environment bleed-through.
+</Warning>
+
+## Shell completion
+
+`asc` supports shell completion for bash, zsh, and fish.
+
+<CodeGroup>
+  ```bash bash theme={null}
+  asc completion --shell bash > /usr/local/etc/bash_completion.d/asc
+  ```
+
+  ```bash zsh theme={null}
+  asc completion --shell zsh > "${fpath[1]}/_asc"
+  ```
+
+  ```bash fish theme={null}
+  asc completion --shell fish > ~/.config/fish/completions/asc.fish
+  ```
+</CodeGroup>
+
+Reload your shell to activate completions.
+
+## Upgrading
+
+<Tabs>
+  <Tab title="Homebrew">
+    ```bash  theme={null}
+    brew upgrade asc
+    ```
+  </Tab>
+
+  <Tab title="Install script">
+    Re-run the install script to get the latest version:
+
+    ```bash  theme={null}
+    curl -fsSL https://asccli.sh/install | bash
+    ```
+  </Tab>
+
+  <Tab title="Manual">
+    Download the latest binary from [releases](https://github.com/rudrankriyam/App-Store-Connect-CLI/releases/latest) and replace your existing binary.
+  </Tab>
+
+  <Tab title="Source">
+    ```bash  theme={null}
+    git pull
+    make build
+    make install
+    ```
+  </Tab>
+</Tabs>
+
+## Uninstalling
+
+<Tabs>
+  <Tab title="Homebrew">
+    ```bash  theme={null}
+    brew uninstall asc
+    ```
+  </Tab>
+
+  <Tab title="Manual">
+    Remove the binary and config:
+
+    ```bash  theme={null}
+    rm /usr/local/bin/asc        # or ~/.local/bin/asc
+    rm -rf ~/.asc                # config and credentials
+    ```
+
+    Optionally remove keychain entries:
+
+    ```bash  theme={null}
+    asc auth logout --all        # before removing binary
+    ```
+  </Tab>
+</Tabs>
+
+## Troubleshooting
+
+### Binary not found
+
+If `asc` is not in your `PATH`:
+
+```bash  theme={null}
+which asc
+```
+
+If this returns nothing, check your installation directory and add it to `PATH`.
+
+### Permission denied
+
+If you get a "permission denied" error:
+
+```bash  theme={null}
+chmod +x /path/to/asc
+```
+
+### macOS Gatekeeper warning
+
+On macOS, you may see a security warning on first run. Allow the binary:
+
+```bash  theme={null}
+xattr -d com.apple.quarantine /usr/local/bin/asc
+```
+
+Or go to **System Preferences → Security & Privacy → General** and click "Allow Anyway".
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Configure your App Store Connect API credentials
+  </Card>
+
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Run your first commands and explore workflows
+  </Card>
+</CardGroup>
