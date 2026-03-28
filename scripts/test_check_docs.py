@@ -330,6 +330,34 @@ class WebsiteCommandChecksTest(unittest.TestCase):
             errors = check_website_commands.collect_errors(website, index)
             self.assertEqual(errors, [])
 
+    def test_website_command_checks_consume_global_flag_value_before_subcommand_match(self) -> None:
+        index = {
+            (): check_website_commands.CommandSpec(
+                path=(),
+                usage="asc <subcommand> [flags]",
+                flags={"--profile": False},
+                subcommands={"apps"},
+            ),
+            ("apps",): check_website_commands.CommandSpec(
+                path=("apps",),
+                usage="asc apps list [flags]",
+                flags={},
+                subcommands={"list"},
+            ),
+            ("apps", "list"): check_website_commands.CommandSpec(
+                path=("apps", "list"),
+                usage="asc apps list [flags]",
+                flags={},
+                subcommands=set(),
+            ),
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            website = Path(tmpdir)
+            (website / "index.mdx").write_text("```bash\nasc --profile apps list\n```\n")
+            errors = check_website_commands.collect_errors(website, index)
+            self.assertEqual(len(errors), 1)
+            self.assertIn("could not resolve top-level command", errors[0])
+
     def test_website_command_checks_reject_flags_after_positionals(self) -> None:
         index = {
             (): check_website_commands.CommandSpec(
@@ -351,6 +379,34 @@ class WebsiteCommandChecksTest(unittest.TestCase):
             errors = check_website_commands.collect_errors(website, index)
             self.assertEqual(len(errors), 1)
             self.assertIn("appears after positional", errors[0])
+
+    def test_website_command_checks_reject_missing_flag_value_before_next_flag(self) -> None:
+        index = {
+            (): check_website_commands.CommandSpec(
+                path=(),
+                usage="asc <subcommand> [flags]",
+                flags={},
+                subcommands={"apps"},
+            ),
+            ("apps",): check_website_commands.CommandSpec(
+                path=("apps",),
+                usage="asc apps list [flags]",
+                flags={},
+                subcommands={"list"},
+            ),
+            ("apps", "list"): check_website_commands.CommandSpec(
+                path=("apps", "list"),
+                usage="asc apps list [flags]",
+                flags={"--output": False, "--paginate": True},
+                subcommands=set(),
+            ),
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            website = Path(tmpdir)
+            (website / "index.mdx").write_text("```bash\nasc apps list --output --paginate\n```\n")
+            errors = check_website_commands.collect_errors(website, index)
+            self.assertEqual(len(errors), 1)
+            self.assertIn("missing value for flag '--output'", errors[0])
 
     def test_website_command_checks_parse_deprecated_replacement(self) -> None:
         help_text = """
@@ -375,6 +431,13 @@ USAGE
                 examples[0].tokens,
                 ("asc", "app-events", "get", "--event-id", "EVENT_ID"),
             )
+
+    def test_website_command_checks_ignore_usage_placeholder_after_flag(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            website = Path(tmpdir)
+            (website / "index.mdx").write_text("```bash\nasc completion --shell <bash|zsh|fish>\n```\n")
+            examples = check_website_commands.extract_examples(website)
+            self.assertEqual(examples, [])
 
     def test_website_command_checks_parse_indented_fenced_blocks(self) -> None:
         index = {

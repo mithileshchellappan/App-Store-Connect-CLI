@@ -27,6 +27,7 @@ SHELL_OPERATORS = {"|", ";", ">", "<"}
 REQUIRED_FLAGS_BY_COMMAND: dict[tuple[str, ...], set[str]] = {
     ("submit", "create"): {"--build", "--confirm"},
 }
+BOOLEAN_FLAG_OVERRIDES = {"--api-debug", "--debug", "--retry-log"}
 
 
 @dataclass(frozen=True)
@@ -80,7 +81,11 @@ def parse_help_text(help_text: str, *, is_root: bool) -> CommandSpec:
             match = FLAG_RE.match(line)
             if match:
                 flag, description = match.group(1), match.group(2)
-                flags[flag] = description.rstrip().endswith("(default: false)") or description.rstrip().endswith("(default: true)")
+                flags[flag] = (
+                    flag in BOOLEAN_FLAG_OVERRIDES
+                    or description.rstrip().endswith("(default: false)")
+                    or description.rstrip().endswith("(default: true)")
+                )
             continue
 
         if is_root:
@@ -206,16 +211,19 @@ def truncate_shell_expression(text: str) -> str:
     quote: str | None = None
     escaped = False
     result: list[str] = []
-
-    for i, ch in enumerate(text):
+    i = 0
+    while i < len(text):
+        ch = text[i]
         if escaped:
             result.append(ch)
             escaped = False
+            i += 1
             continue
 
         if ch == "\\" and quote != "'":
             result.append(ch)
             escaped = True
+            i += 1
             continue
 
         if ch in {"'", '"'}:
@@ -224,9 +232,16 @@ def truncate_shell_expression(text: str) -> str:
             elif quote is None:
                 quote = ch
             result.append(ch)
+            i += 1
             continue
 
         if quote is None:
+            if ch == "<":
+                placeholder = re.match(r"<[^>]+>", text[i:])
+                if placeholder:
+                    result.append(placeholder.group(0))
+                    i += len(placeholder.group(0))
+                    continue
             if ch == "#" and (i == 0 or text[i - 1].isspace()):
                 break
             if ch in SHELL_OPERATORS:
@@ -237,6 +252,7 @@ def truncate_shell_expression(text: str) -> str:
                 break
 
         result.append(ch)
+        i += 1
 
     return "".join(result).strip()
 
@@ -338,8 +354,17 @@ def validate_example(example: Example, index: dict[tuple[str, ...], CommandSpec]
     tokens = example.tokens
 
     top_level_index: int | None = None
-    pending_root_value = False
+    pending_root_flag: str | None = None
     for i, token in enumerate(tokens[1:], start=1):
+        if pending_root_flag is not None:
+            if token.startswith("--"):
+                errors.append(
+                    f"{example.path.relative_to(example.path.parents[1])}:{example.line_number}: "
+                    f"missing value for global flag {pending_root_flag!r} in {example.raw!r}"
+                )
+                return errors
+            pending_root_flag = None
+            continue
         if token == "--help":
             if i == len(tokens) - 1:
                 return errors
@@ -355,14 +380,18 @@ def validate_example(example: Example, index: dict[tuple[str, ...], CommandSpec]
                     f"unknown global flag {flag!r} in {example.raw!r}"
                 )
                 return errors
-            pending_root_value = "=" not in token and not root.flags[flag]
-            continue
-        if pending_root_value:
-            pending_root_value = False
+            pending_root_flag = flag if "=" not in token and not root.flags[flag] else None
             continue
         errors.append(
             f"{example.path.relative_to(example.path.parents[1])}:{example.line_number}: "
             f"could not resolve top-level command in {example.raw!r}"
+        )
+        return errors
+
+    if pending_root_flag is not None:
+        errors.append(
+            f"{example.path.relative_to(example.path.parents[1])}:{example.line_number}: "
+            f"missing value for global flag {pending_root_flag!r} in {example.raw!r}"
         )
         return errors
 
@@ -395,12 +424,22 @@ def validate_example(example: Example, index: dict[tuple[str, ...], CommandSpec]
     style = usage_position_style(current)
     if current.path == ("workflow", "run"):
         style = "positionals_and_flags"
-    pending_value = False
+    pending_flag: str | None = None
     saw_positional = False
     seen_flags: set[str] = set()
 
     while i < len(tokens):
         token = tokens[i]
+        if pending_flag is not None:
+            if token.startswith("--"):
+                errors.append(
+                    f"{example.path.relative_to(example.path.parents[1])}:{example.line_number}: "
+                    f"missing value for flag {pending_flag!r} in {example.raw!r}"
+                )
+                return errors
+            pending_flag = None
+            i += 1
+            continue
         if token == "--help":
             i += 1
             continue
@@ -413,7 +452,7 @@ def validate_example(example: Example, index: dict[tuple[str, ...], CommandSpec]
                         f"flag {flag!r} appears after positional arguments in {example.raw!r}"
                     )
                 seen_flags.add(flag)
-                pending_value = "=" not in token and not current.flags.get(flag, False)
+                pending_flag = flag if "=" not in token and not current.flags.get(flag, False) else None
                 i += 1
                 continue
             if flag in root.flags:
@@ -421,18 +460,13 @@ def validate_example(example: Example, index: dict[tuple[str, ...], CommandSpec]
                     f"{example.path.relative_to(example.path.parents[1])}:{example.line_number}: "
                     f"global flag {flag!r} must appear before the top-level command in {example.raw!r}"
                 )
-                pending_value = "=" not in token and not root.flags.get(flag, False)
+                pending_flag = flag if "=" not in token and not root.flags.get(flag, False) else None
             else:
                 errors.append(
                     f"{example.path.relative_to(example.path.parents[1])}:{example.line_number}: "
                     f"unknown flag {flag!r} for {' '.join(current.path)!r} in {example.raw!r}"
                 )
-                pending_value = "=" not in token and not current.flags.get(flag, False)
-            i += 1
-            continue
-
-        if pending_value:
-            pending_value = False
+                pending_flag = flag if "=" not in token and not current.flags.get(flag, False) else None
             i += 1
             continue
 
@@ -444,6 +478,13 @@ def validate_example(example: Example, index: dict[tuple[str, ...], CommandSpec]
             )
             return errors
         i += 1
+
+    if pending_flag is not None:
+        errors.append(
+            f"{example.path.relative_to(example.path.parents[1])}:{example.line_number}: "
+            f"missing value for flag {pending_flag!r} in {example.raw!r}"
+        )
+        return errors
 
     missing_flags = sorted(REQUIRED_FLAGS_BY_COMMAND.get(current.path, set()) - seen_flags)
     if missing_flags:
