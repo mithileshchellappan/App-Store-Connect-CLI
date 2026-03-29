@@ -63,15 +63,15 @@ Validation failed for version 1.2.0:
 
 ## Example workflows
 
-### Validate before submission
+### Validate before the release pipeline
 
 ```bash  theme={null}
 # Validate version
 if asc validate --app 123456789 --version 1.2.0; then
-  echo "Version is ready, submitting..."
-  asc submit create --app 123456789 --version 1.2.0 --build BUILD_ID --confirm
+  echo "Version is ready, running the release pipeline..."
+  asc release run --app 123456789 --version 1.2.0 --build BUILD_ID --metadata-dir ./metadata/version/1.2.0 --confirm
 else
-  echo "Validation failed, fix issues before submitting"
+  echo "Validation failed, fix issues before publishing"
   exit 1
 fi
 ```
@@ -88,8 +88,8 @@ fi
       exit 1
     fi
 
-- name: Submit for review
-  run: asc submit create --app ${{ secrets.APP_ID }} --version ${{ github.ref_name }} --build "${{ env.BUILD_ID }}" --confirm
+- name: Publish to App Store
+  run: asc release run --app ${{ secrets.APP_ID }} --version ${{ github.ref_name }} --build "${{ env.BUILD_ID }}" --metadata-dir ./metadata/version/${{ github.ref_name }} --confirm
 ```
 
 ## Exit codes
@@ -102,7 +102,7 @@ fi
 | `60-99` | HTTP server errors (5xx) |
 
 <Tip>
-  Always run `validate` before `submit` to catch issues early and avoid rejected submissions.
+  Always run `validate` before `release run` to catch issues early and avoid rejected submissions.
 </Tip>
 
 ## Related

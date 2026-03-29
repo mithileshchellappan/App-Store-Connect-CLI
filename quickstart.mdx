@@ -199,14 +199,14 @@ Before submitting for review:
 asc validate --app "123456789" --version "1.2.3"
 ```
 
-### Submit for App Store review
+### Publish to the App Store
 
 ```bash  theme={null}
-asc submit create --app "123456789" --version "1.2.3" --build "BUILD_ID" --confirm
+asc release run --app "123456789" --version "1.2.3" --build "BUILD_ID" --metadata-dir "./metadata/version/1.2.3" --confirm
 ```
 
 <Note>
-  Submissions require both a build ID and `--confirm`: `asc submit create --app "123456789" --version "1.2.3" --build "BUILD_ID" --confirm`
+  The canonical App Store publish path is `asc release run ... --confirm`. Use `asc submit preflight`, `asc submit status`, or `asc submit cancel` for lower-level submission lifecycle work.
 </Note>
 
 ## Explore commands

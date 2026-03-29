@@ -79,9 +79,9 @@ Commands are organized into logical families based on functionality:
 
 * `review` - Manage App Store review details, attachments, and submissions
 * `reviews` - List and manage App Store customer reviews
-* `submit` - Submit builds for App Store review
+* `submit` - Submission lifecycle tools for App Store review state
 * `validate` - Validate App Store version readiness before submission
-* `publish` - End-to-end publish workflows for TestFlight and App Store
+* `publish` - High-level publish workflows for TestFlight; use `release run` for App Store shipping
 
 ### Monetization
 
@@ -166,9 +166,8 @@ asc apps list --output table
 # View app details as JSON
 asc apps view --id "123456789" --output json
 
-# Validate and submit an App Store version
-asc validate --app "123456789" --version "1.2.3"
-asc submit create --app "123456789" --version "1.2.3" --build "BUILD_ID" --confirm
+# Publish an App Store version
+asc release run --app "123456789" --version "1.2.3" --build "BUILD_ID" --metadata-dir "./metadata/version/1.2.3" --confirm
 
 # Run a local automation workflow
 asc workflow run --file .asc/workflow.json release

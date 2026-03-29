@@ -578,8 +578,9 @@ func buildSuggestedCommands(signals migrationSignals, resolver MigrationSuggesti
 		add(fmt.Sprintf(`asc publish testflight --app %q --ipa app.ipa --group "GROUP_ID"`, values.appID))
 	}
 	if hasAppStoreSignal {
-		add(fmt.Sprintf(`asc publish appstore --app %q --ipa app.ipa --version %q --submit --confirm`, values.appID, values.versionString))
-		add(fmt.Sprintf(`asc submit create --app %q --version %q --build %q --confirm`, values.appID, values.versionString, values.buildID))
+		add(fmt.Sprintf(`asc release run --app %q --version %q --build %q --metadata-dir "./metadata/version/%s" --confirm`, values.appID, values.versionString, values.buildID, values.versionString))
+		add(fmt.Sprintf(`asc validate --app %q --version %q`, values.appID, values.versionString))
+		add(fmt.Sprintf(`asc submit preflight --app %q --version %q`, values.appID, values.versionString))
 	}
 
 	return commands

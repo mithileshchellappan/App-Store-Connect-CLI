@@ -1,14 +1,26 @@
 # publish
 
-> End-to-end publish workflows for TestFlight and App Store
+> High-level publish workflows; prefer `publish testflight` for TestFlight
 
-The `publish` command provides high-level workflows for publishing apps to TestFlight or the App Store.
+The `publish` command is the high-level publishing surface for TestFlight.
+For App Store shipping, use `asc release run`.
 
 ## Usage
 
 ```bash  theme={null}
 asc publish <workflow> [flags]
 ```
+
+## Canonical paths
+
+Use these top-level workflows deliberately:
+
+* `asc publish testflight` - canonical high-level TestFlight publish path
+* `asc release run` - canonical App Store publish path
+* `asc release stage` - prepare an App Store version without submitting it
+
+`asc publish appstore` remains available only as a deprecated compatibility path
+for older IPA-first automation.
 
 ## Workflows
 
@@ -31,21 +43,23 @@ This workflow:
 
 ### App Store workflow
 
-Submit to App Store:
+Ship to the App Store with the canonical release pipeline:
 
 ```bash  theme={null}
-asc publish appstore \
+asc release run \
   --app APP_ID \
   --version 1.2.0 \
-  --ipa /path/to/MyApp.ipa
+  --build BUILD_ID \
+  --metadata-dir ./metadata/version/1.2.0 \
+  --confirm
 ```
 
 This workflow:
 
-1. Uploads the build
-2. Waits for processing
-3. Attaches build to version
-4. Validates version
+1. Ensures the App Store version exists
+2. Applies metadata and localizations
+3. Attaches the selected build
+4. Runs readiness validation
 5. Submits for review
 
 ## TestFlight flags
@@ -70,25 +84,20 @@ This workflow:
   Default: `true`
 </ParamField>
 
-## App Store flags
+## Deprecated App Store compatibility path
 
-<ParamField path="--app" type="string" required>
-  App ID for the version
-</ParamField>
+If you still maintain an older IPA-first script, the deprecated compatibility
+path is:
 
-<ParamField path="--version" type="string" required>
-  Version string (e.g., `1.2.0`)
-</ParamField>
+```bash  theme={null}
+asc publish appstore \
+  --app APP_ID \
+  --ipa /path/to/MyApp.ipa \
+  --version 1.2.0 \
+  --submit --confirm
+```
 
-<ParamField path="--file" type="string" required>
-  Path to IPA file
-</ParamField>
-
-<ParamField path="--submit --confirm" type="boolean">
-  Automatically release after approval
-
-  Default: `false`
-</ParamField>
+Prefer migrating that workflow to `asc release run`.
 
 ## Example workflows
 
@@ -104,11 +113,12 @@ asc publish testflight \
 ### Publish to App Store
 
 ```bash  theme={null}
-asc publish appstore \
+asc release run \
   --app 123456789 \
   --version 1.2.0 \
-  --ipa build/MyApp.ipa \
-  --submit --confirm
+  --build BUILD_ID \
+  --metadata-dir ./metadata/version/1.2.0 \
+  --confirm
 ```
 
 ### CI/CD integration
@@ -159,8 +169,8 @@ asc builds add-groups --build-id BUILD_ID --group "External Testers"
     Manage builds and uploads
   </Card>
 
-  <Card title="Submit command" icon="paper-plane" href="/commands/submit">
-    Submit for App Store review
+  <Card title="Release command" icon="rocket" href="/commands/overview">
+    Canonical App Store publish workflow
   </Card>
 
   <Card title="Automation guide" icon="robot" href="/guides/automation">

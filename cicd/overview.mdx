@@ -176,11 +176,12 @@ asc validate \
   --app "123456789" \
   --version "1.2.3"
 
-# Submit for review
-asc submit create \
+# Run the canonical App Store release pipeline
+asc release run \
   --app "123456789" \
   --version "1.2.3" \
   --build "BUILD_ID" \
+  --metadata-dir "./metadata/version/1.2.3" \
   --confirm
 ```
 
@@ -335,7 +336,7 @@ Detailed integration guides for each platform:
 
     ```bash  theme={null}
     asc validate --app "$APP_ID" --version "$VERSION" || exit 1
-    asc submit create --app "$APP_ID" --version "$VERSION" --build "BUILD_ID" --confirm
+    asc release run --app "$APP_ID" --version "$VERSION" --build "BUILD_ID" --metadata-dir "./metadata/version/$VERSION" --confirm
     ```
   </Accordion>
 </AccordionGroup>

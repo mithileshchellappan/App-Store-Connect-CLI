@@ -251,8 +251,8 @@ asc workflow run beta
   "after_all": "echo Submission complete!",
   "error": "echo Submission failed - check logs",
   "workflows": {
-    "submit": {
-      "description": "Submit latest build for App Store review",
+    "release": {
+      "description": "Publish latest build to the App Store",
       "steps": [
         {
           "name": "validate_metadata",
@@ -267,9 +267,9 @@ asc workflow run beta
           "run": "BUILD_ID=$(jq -r '.data[0].id' /tmp/build.json) && echo BUILD_ID=$BUILD_ID >> $GITHUB_ENV"
         },
         {
-          "name": "submit_for_review",
+          "name": "publish_release",
           "if": "BUILD_ID",
-          "run": "asc submit create --app $APP_ID --version $VERSION --build $BUILD_ID --platform $PLATFORM --confirm"
+          "run": "asc release run --app $APP_ID --version $VERSION --build $BUILD_ID --metadata-dir ./metadata/version/$VERSION --confirm"
         },
         {
           "name": "check_status",
@@ -284,7 +284,7 @@ asc workflow run beta
 Run with:
 
 ```bash  theme={null}
-asc workflow run submit VERSION:1.0.0 VERSION_ID:abc123
+asc workflow run release VERSION:1.0.0 VERSION_ID:abc123
 ```
 
 ### Complete Release Workflow
@@ -364,15 +364,15 @@ asc workflow run submit VERSION:1.0.0 VERSION_ID:abc123
     },
     "submit_for_review": {
       "private": true,
-      "description": "Submit for App Store review",
+      "description": "Run the App Store release pipeline",
       "steps": [
         {
           "name": "get_build",
           "run": "BUILD_ID=$(asc builds list --app $APP_ID --sort -uploadedDate --limit 1 --output json | jq -r '.data[0].id') && echo BUILD_ID=$BUILD_ID"
         },
         {
-          "name": "submit",
-          "run": "asc submit create --app $APP_ID --version-id $VERSION_ID --build $BUILD_ID --platform $PLATFORM --confirm"
+          "name": "release_run",
+          "run": "asc release run --app $APP_ID --version $VERSION --build $BUILD_ID --metadata-dir ./metadata/version/$VERSION --confirm"
         }
       ]
     }

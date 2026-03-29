@@ -421,11 +421,15 @@ func TestRootCommand_UsageGroupsSubcommands(t *testing.T) {
 	releaseIdx := strings.Index(usage, "  release:")
 	reviewIdx := strings.Index(usage, "  review:")
 	submitIdx := strings.Index(usage, "  submit:")
-	if releaseIdx == -1 || reviewIdx == -1 || submitIdx == -1 {
-		t.Fatalf("expected release, review, and submit commands in root usage, got %q", usage)
+	publishIdx := strings.Index(usage, "  publish:")
+	if releaseIdx == -1 || reviewIdx == -1 || submitIdx == -1 || publishIdx == -1 {
+		t.Fatalf("expected release, review, submit, and publish commands in root usage, got %q", usage)
 	}
 	if releaseIdx > reviewIdx || releaseIdx > submitIdx {
 		t.Fatalf("expected release to lead the review and release group, got %q", usage)
+	}
+	if strings.Contains(usage, "End-to-end publish workflows for TestFlight and App Store.") {
+		t.Fatalf("expected publish root help to stop advertising App Store publishing, got %q", usage)
 	}
 }
 

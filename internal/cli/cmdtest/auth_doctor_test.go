@@ -219,11 +219,8 @@ func TestAuthDoctorJSONPrefillsVersionFromXcodeProject(t *testing.T) {
 		if err := json.Unmarshal([]byte(stdout), &report); err != nil {
 			t.Fatalf("unmarshal error: %v", err)
 		}
-		if !sliceContains(report.Migration.SuggestedCommands, `asc publish appstore --app "123456789" --ipa app.ipa --version "3.2.1" --submit --confirm`) {
-			t.Fatalf("expected publish command with prefilled app/version, got %#v", report.Migration.SuggestedCommands)
-		}
-		if !sliceContains(report.Migration.SuggestedCommands, `asc submit create --app "123456789" --version "3.2.1" --build "BUILD_ID" --confirm`) {
-			t.Fatalf("expected submit command with prefilled app/version, got %#v", report.Migration.SuggestedCommands)
+		if !sliceContains(report.Migration.SuggestedCommands, `asc release run --app "123456789" --version "3.2.1" --build "BUILD_ID" --metadata-dir "./metadata/version/3.2.1" --confirm`) {
+			t.Fatalf("expected canonical App Store release command with prefilled app/version, got %#v", report.Migration.SuggestedCommands)
 		}
 	})
 }

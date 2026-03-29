@@ -26,11 +26,10 @@ Create a `.asc/workflow.json` file in your project root:
         "asc builds info --app $APP_ID --latest --output json"
       ]
     },
-    "submit": {
-      "description": "Submit build for App Store review",
+    "release": {
+      "description": "Publish build to the App Store",
       "steps": [
-        "asc validate --app $APP_ID --version $VERSION",
-        "asc submit create --app $APP_ID --version $VERSION --build $BUILD_ID --confirm"
+        "asc release run --app $APP_ID --version $VERSION --build $BUILD_ID --metadata-dir ./metadata/version/$VERSION --confirm"
       ]
     }
   }
@@ -208,8 +207,8 @@ Use the `if` field to conditionally execute steps:
       "run": "asc builds upload --app $APP_ID --ipa MyApp.ipa"
     },
     {
-      "name": "Submit for review",
-      "run": "asc submit create --app $APP_ID --version $VERSION --build $BUILD_ID --confirm",
+      "name": "Publish to the App Store",
+      "run": "asc release run --app $APP_ID --version $VERSION --build $BUILD_ID --metadata-dir ./metadata/version/$VERSION --confirm",
       "if": "test \"$AUTO_SUBMIT\" = \"true\""
     }
   ]
@@ -241,11 +240,11 @@ Call other workflows from within a workflow:
             "MESSAGE": "Build uploaded to TestFlight"
           }
         },
-        "asc submit create --app $APP_ID --version $VERSION --build $BUILD_ID --confirm",
+        "asc release run --app $APP_ID --version $VERSION --build $BUILD_ID --metadata-dir ./metadata/version/$VERSION --confirm",
         {
           "workflow": "notify",
           "with": {
-            "MESSAGE": "Submitted for App Store review"
+            "MESSAGE": "Published App Store release pipeline started"
           }
         }
       ]
@@ -273,7 +272,7 @@ Example with Slack notifications:
     "release": {
       "steps": [
         "asc builds upload --app $APP_ID --ipa MyApp.ipa",
-        "asc submit create --app $APP_ID --version $VERSION --build $BUILD_ID --confirm"
+        "asc release run --app $APP_ID --version $VERSION --build $BUILD_ID --metadata-dir ./metadata/version/$VERSION --confirm"
       ]
     }
   }
@@ -324,22 +323,22 @@ Here's a comprehensive workflow for a full release process:
         }
       ]
     },
-    "submit": {
-      "description": "Submit to App Store",
+    "release": {
+      "description": "Publish to the App Store",
       "steps": [
         {
           "name": "Validate version",
           "run": "asc validate --app $APP_ID --version $VERSION"
         },
         {
-          "name": "Submit for review",
-          "run": "asc submit create --app $APP_ID --version $VERSION --build $BUILD_ID --confirm"
+          "name": "Run App Store release pipeline",
+          "run": "asc release run --app $APP_ID --version $VERSION --build $BUILD_ID --metadata-dir ./metadata/version/$VERSION --confirm"
         },
         {
           "name": "Notify team",
           "workflow": "notify",
           "with": {
-            "MESSAGE": "v$VERSION submitted for App Store review"
+            "MESSAGE": "v$VERSION release pipeline submitted to App Store review"
           }
         }
       ]

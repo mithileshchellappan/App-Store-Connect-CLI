@@ -260,11 +260,12 @@ set -e
 VERSION="1.2.3"
 BUILD_ID="12345"
 
-# Submit for review
-asc submit create \
+# Publish to the App Store
+asc release run \
   --app "$APP_ID" \
   --version "$VERSION" \
   --build "$BUILD_ID" \
+  --metadata-dir "./metadata/version/$VERSION" \
   --confirm
 
 # Notify Slack with success

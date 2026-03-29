@@ -178,9 +178,9 @@ Use the `if` field to skip steps when a variable is unset or empty:
       "run": "asc builds upload --path app.ipa"
     },
     {
-      "name": "submit_build",
+      "name": "publish_app_store_release",
       "if": "SUBMIT_FOR_REVIEW",
-      "run": "asc submit create --app $APP_ID --version $VERSION --build $BUILD_ID --confirm"
+      "run": "asc release run --app $APP_ID --version $VERSION --build $BUILD_ID --metadata-dir ./metadata/version/$VERSION --confirm"
     }
   ]
 }
@@ -375,7 +375,7 @@ Output:
   },
   {
     "name": "release",
-    "description": "Submit a version for App Store review",
+    "description": "Publish a version to the App Store",
     "private": false,
     "step_count": 3
   }
@@ -507,8 +507,8 @@ asc workflow run beta BUILD_ID:abc123 GROUP_ID:xyz789
           "with": {"NOTE": "running preflight checks"}
         },
         {
-          "name": "submit",
-          "run": "asc submit create --app $APP_ID --version $VERSION --build $BUILD_ID --confirm"
+          "name": "publish",
+          "run": "asc release run --app $APP_ID --version $VERSION --build $BUILD_ID --metadata-dir ./metadata/version/$VERSION --confirm"
         }
       ]
     },

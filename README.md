@@ -214,11 +214,13 @@ asc release run --app "123456789" --version "1.2.3" --build "BUILD_ID" --metadat
 asc status --app "123456789" --watch
 ```
 
-Lower-level alternatives (for scripting or partial workflows):
+Lower-level submission lifecycle commands (for debugging or partial workflows):
 
 ```bash
 asc validate --app "123456789" --version "1.2.3"
-asc submit create --app "123456789" --version "1.2.3" --build "BUILD_ID" --confirm
+asc submit preflight --app "123456789" --version "1.2.3"
+asc submit status --version-id "VERSION_ID"
+asc submit cancel --version-id "VERSION_ID" --confirm
 ```
 
 ### Review status and blockers

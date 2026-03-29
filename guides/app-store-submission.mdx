@@ -1,19 +1,24 @@
 # App Store Submission
 
-> Submit builds for App Store review and manage the submission lifecycle
+> Publish with `release run`, then use `submit` for lifecycle checks
 
-Automate the complete App Store submission process, from attaching builds to versions through monitoring review status.
+Automate the complete App Store submission process with the canonical release
+pipeline, then use the lower-level submission lifecycle commands to inspect or
+cancel review state when needed.
 
 ## Overview
 
-The submission workflow handles:
+Use these surfaces deliberately:
 
-* Creating and managing App Store versions
-* Attaching builds to versions
-* Validating metadata requirements
-* Submitting builds for review
-* Monitoring review status
-* Canceling submissions when needed
+* `asc release run` - canonical App Store publish path
+* `asc release stage` - prepare a version without submitting it
+* `asc submit preflight` - inspect submission readiness without mutating anything
+* `asc submit status` - inspect submission or version review state
+* `asc submit cancel` - cancel an active submission
+
+`asc submit create` remains available only as a deprecated compatibility path
+for older automation that already prepared the version and only needs the final
+review-submission step.
 
 ## Prerequisites
 
@@ -25,7 +30,7 @@ Before submitting, ensure you have:
 4. Screenshots uploaded for at least one device type
 5. Privacy information and app review details completed
 
-## Submission Workflow
+## Canonical Publish Workflow
 
 <Steps>
   <Step title="Prepare your app version">
@@ -97,39 +102,42 @@ Before submitting, ensure you have:
     ```
   </Step>
 
-  <Step title="Submit for review">
-    Submit the build (with automatic preflight validation):
+  <Step title="Run the release pipeline">
+    Publish with the canonical App Store flow:
 
     ```bash  theme={null}
-    asc submit create \
+    asc release run \
       --app "YOUR_APP_ID" \
       --version "1.0.0" \
       --build "BUILD_ID" \
+      --metadata-dir "./metadata/version/1.0.0" \
       --confirm
     ```
 
-    Or submit using version ID:
+    Use `asc release stage` instead when you want the same preparation flow
+    without creating the review submission yet:
 
     ```bash  theme={null}
-    asc submit create \
-      --app "YOUR_APP_ID" \
-      --version-id "VERSION_ID" \
-      --build "BUILD_ID" \
-      --confirm
-    ```
-
-    For macOS, tvOS, or visionOS apps, specify the platform:
-
-    ```bash  theme={null}
-    asc submit create \
+    asc release stage \
       --app "YOUR_APP_ID" \
       --version "1.0.0" \
       --build "BUILD_ID" \
-      --platform MAC_OS \
+      --copy-metadata-from "0.9.0" \
       --confirm
     ```
   </Step>
 </Steps>
+
+## Lower-level submission lifecycle
+
+Use the `submit` command family when you need to inspect or manage the review
+submission itself instead of running the full publish pipeline.
+
+### Preflight
+
+```bash  theme={null}
+asc submit preflight --app "YOUR_APP_ID" --version "1.0.0"
+```
 
 ## Monitoring Submission Status
 
@@ -205,10 +213,11 @@ If you need to make changes after submitting:
 
   <Step title="Resubmit">
     ```bash  theme={null}
-    asc submit create \
+    asc release run \
       --app "YOUR_APP_ID" \
-      --version-id "VERSION_ID" \
+      --version "1.0.0" \
       --build "NEW_BUILD_ID" \
+      --metadata-dir "./metadata/version/1.0.0" \
       --confirm
     ```
   </Step>
@@ -216,7 +225,7 @@ If you need to make changes after submitting:
 
 ## Complete Example: iOS App Submission
 
-Here's a complete workflow for submitting an iOS app:
+Here's a complete workflow for publishing an iOS app:
 
 ```bash  theme={null}
 #!/bin/bash
@@ -267,13 +276,13 @@ asc localizations update \
   --keywords "productivity,tools" \
   --whats-new "Bug fixes and performance improvements"
 
-# 4. Submit for review
+# 4. Run the canonical release pipeline
 echo "Submitting for review..."
-asc submit create \
+asc release run \
   --app "$ASC_APP_ID" \
-  --version-id "$VERSION_ID" \
+  --version "$VERSION" \
   --build "$BUILD_ID" \
-  --platform "$PLATFORM" \
+  --metadata-dir "./metadata/version/$VERSION" \
   --confirm
 
 echo "Submission complete!"
@@ -371,13 +380,14 @@ If your submission is rejected:
 1. Check rejection details in App Store Connect web interface
 2. Address the issues mentioned in the rejection
 3. Upload a new build if code changes are needed, or just update metadata
-4. Resubmit:
+4. Resubmit with the canonical release pipeline:
 
 ```bash  theme={null}
-asc submit create \
+asc release run \
   --app "YOUR_APP_ID" \
-  --version-id "VERSION_ID" \
+  --version "1.0.0" \
   --build "FIXED_BUILD_ID" \
+  --metadata-dir "./metadata/version/1.0.0" \
   --confirm
 ```
 
@@ -388,10 +398,11 @@ asc submit create \
 For macOS apps, specify the `MAC_OS` platform:
 
 ```bash  theme={null}
-asc submit create \
+asc release run \
   --app "YOUR_APP_ID" \
   --version "1.0.0" \
   --build "BUILD_ID" \
+  --metadata-dir "./metadata/version/1.0.0" \
   --platform MAC_OS \
   --confirm
 ```
@@ -401,10 +412,11 @@ asc submit create \
 For tvOS apps, use the `TV_OS` platform:
 
 ```bash  theme={null}
-asc submit create \
+asc release run \
   --app "YOUR_APP_ID" \
   --version "1.0.0" \
   --build "BUILD_ID" \
+  --metadata-dir "./metadata/version/1.0.0" \
   --platform TV_OS \
   --confirm
 ```
@@ -414,10 +426,11 @@ asc submit create \
 For visionOS apps, use the `VISION_OS` platform:
 
 ```bash  theme={null}
-asc submit create \
+asc release run \
   --app "YOUR_APP_ID" \
   --version "1.0.0" \
   --build "BUILD_ID" \
+  --metadata-dir "./metadata/version/1.0.0" \
   --platform VISION_OS \
   --confirm
 ```
@@ -434,7 +447,7 @@ asc submit create \
 
 5. **Keep builds ready**: Have builds processed and ready before starting the submission workflow
 
-6. **Use version IDs for automation**: Version IDs are more reliable than version strings in scripts
+6. **Use version IDs for lifecycle automation**: Version IDs are reliable for `submit status` and `submit cancel`
 
 7. **Handle stale submissions**: The CLI automatically cleans up orphaned submissions, but verify in case of errors
 

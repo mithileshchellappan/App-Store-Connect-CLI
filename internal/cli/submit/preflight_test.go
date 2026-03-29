@@ -612,7 +612,7 @@ func TestPreflightTextOutput(t *testing.T) {
 		Platform: "IOS",
 		Checks: []checkResult{
 			{Name: "Version exists", Passed: true, Message: "Version 1.0 found"},
-			{Name: "Build attached", Passed: false, Message: "No build", Hint: "asc submit create ..."},
+			{Name: "Build attached", Passed: false, Message: "No build", Hint: "Attach a build with `asc release stage ...`, or use the deprecated direct path `asc submit create ...`"},
 			{Name: "App Privacy", Advisory: true, Message: "App Privacy publish state is not verifiable via the public App Store Connect API and may still block submission", Hint: "Confirm App Privacy is published in App Store Connect before submitting: https://appstoreconnect.apple.com/apps/123/appPrivacy"},
 		},
 		PassCount: 1,

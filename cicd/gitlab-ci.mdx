@@ -148,17 +148,18 @@ check:run:
   only:
     - tags
 
-# Submit for review
+# Publish to the App Store
   - component: gitlab.com/rudrankriyam/asc-ci-components/run@main
     inputs:
       stage: submit
       job_prefix: release
       asc_version: latest
       command: |
-        asc submit create \
+        asc release run \
           --app "$APP_ID" \
           --version "$CI_COMMIT_TAG" \
           --build "BUILD_ID" \
+          --metadata-dir "./metadata/version/$CI_COMMIT_TAG" \
           --confirm
 
 release:run:
@@ -401,8 +402,8 @@ include:
       job_prefix: release
       asc_version: latest
       command: |
-        echo "Submitting version $VERSION"
-        asc submit create --app "$APP_ID" --version "$VERSION" --build "BUILD_ID" --confirm
+        echo "Publishing version $VERSION"
+        asc release run --app "$APP_ID" --version "$VERSION" --build "BUILD_ID" --metadata-dir "./metadata/version/$VERSION" --confirm
 
 release:run:
   needs:
@@ -469,10 +470,11 @@ staging:run:
       job_prefix: production
       asc_version: latest
       command: |
-        asc submit create \
+        asc release run \
           --app "$PRODUCTION_APP_ID" \
           --version "$CI_COMMIT_TAG" \
           --build "BUILD_ID" \
+          --metadata-dir "./metadata/version/$CI_COMMIT_TAG" \
           --confirm
 
 production:run:

@@ -143,10 +143,10 @@ func TestDocsShowPrintsReferenceGuide(t *testing.T) {
 	if !strings.Contains(stdout, "# asc cli reference") {
 		t.Fatalf("expected reference guide heading, got %q", stdout)
 	}
-	if !strings.Contains(stdout, "Release (full pipeline)") {
+	if !strings.Contains(stdout, "Publish to App Store (canonical)") {
 		t.Fatalf("expected reference guide to lead with release pipeline guidance, got %q", stdout)
 	}
-	if !strings.Contains(stdout, "Submit for review (low-level)") {
+	if !strings.Contains(stdout, "Submission lifecycle (preflight)") {
 		t.Fatalf("expected reference guide to keep low-level submit guidance discoverable, got %q", stdout)
 	}
 	if !strings.Contains(stdout, `asc status --app "APP_ID"`) {

@@ -3837,6 +3837,13 @@ func TestPublishRejectsSymlinkIPAPath(t *testing.T) {
 			if stdout != "" {
 				t.Fatalf("expected empty stdout, got %q", stdout)
 			}
+			if test.name == "publish appstore rejects symlink" {
+				requireStderrContainsWarning(t, stderr, publishAppStoreDeprecationWarning)
+				if stripDeprecatedCommandWarnings(stderr) != "" {
+					t.Fatalf("expected only deprecation warning on stderr, got %q", stderr)
+				}
+				return
+			}
 			if stderr != "" {
 				t.Fatalf("expected empty stderr, got %q", stderr)
 			}

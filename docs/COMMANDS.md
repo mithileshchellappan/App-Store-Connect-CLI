@@ -97,9 +97,9 @@ asc <subcommand> [flags]
 - `release-notes` - Generate and manage App Store release notes.
 - `review` - Manage App Store review details, attachments, and submissions.
 - `reviews` - List and manage App Store customer reviews.
-- `submit` - Submit builds for App Store review.
+- `submit` - Submission lifecycle tools; use `release run` to ship.
 - `validate` - Validate App Store version readiness before submission.
-- `publish` - End-to-end publish workflows for TestFlight and App Store.
+- `publish` - High-level publish workflows; use `publish testflight` for TestFlight.
 
 ### Monetization
 

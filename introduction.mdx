@@ -81,8 +81,8 @@ Here are some everyday tasks you can automate with `asc`:
 
   <Accordion title="Submit for App Store review">
     ```bash  theme={null}
-    asc validate --app "123456789" --version "1.2.3"
-    asc submit create --app "123456789" --version "1.2.3" --build "BUILD_ID" --confirm
+    asc release run --app "123456789" --version "1.2.3" --build "BUILD_ID" --metadata-dir "./metadata/version/1.2.3" --dry-run
+    asc release run --app "123456789" --version "1.2.3" --build "BUILD_ID" --metadata-dir "./metadata/version/1.2.3" --confirm
     ```
   </Accordion>
 

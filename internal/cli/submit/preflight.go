@@ -236,7 +236,7 @@ func checkBuildAttachedWithAttrs(ctx context.Context, client *asc.Client, versio
 				Name:    "Build attached",
 				Passed:  false,
 				Message: "No build attached to this version",
-				Hint:    fmt.Sprintf("asc submit create --version-id %s --build BUILD_ID --confirm", versionID),
+				Hint:    fmt.Sprintf("Attach a build with `asc release stage --app APP_ID --version VERSION --build BUILD_ID --metadata-dir ./metadata/version/VERSION --confirm`, or use the deprecated direct path `asc submit create --version-id %s --build BUILD_ID --confirm` if the version is already fully prepared.", versionID),
 			}
 		}
 		return "", nil, checkResult{
@@ -252,7 +252,7 @@ func checkBuildAttachedWithAttrs(ctx context.Context, client *asc.Client, versio
 			Name:    "Build attached",
 			Passed:  false,
 			Message: "No build attached to this version",
-			Hint:    fmt.Sprintf("asc submit create --version-id %s --build BUILD_ID --confirm", versionID),
+			Hint:    fmt.Sprintf("Attach a build with `asc release stage --app APP_ID --version VERSION --build BUILD_ID --metadata-dir ./metadata/version/VERSION --confirm`, or use the deprecated direct path `asc submit create --version-id %s --build BUILD_ID --confirm` if the version is already fully prepared.", versionID),
 		}
 	}
 
