@@ -1,0 +1,178 @@
+package subscriptions
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/asc"
+	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/shared"
+)
+
+type resolvedSubscriptionPriceCandidate struct {
+	row       shared.ResolvedPriceRow
+	startAt   time.Time
+	preserved bool
+}
+
+func fetchResolvedSubscriptionPrices(
+	ctx context.Context,
+	client *asc.Client,
+	subscriptionID string,
+	limit int,
+	nextURL string,
+	now time.Time,
+) (*shared.ResolvedPricesResult, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+
+	opts := []asc.SubscriptionPricesOption{
+		asc.WithSubscriptionPricesLimit(limit),
+		asc.WithSubscriptionPricesNextURL(nextURL),
+		asc.WithSubscriptionPricesInclude([]string{"subscriptionPricePoint", "territory"}),
+		asc.WithSubscriptionPricesPricePointFields([]string{"customerPrice", "proceeds", "proceedsYear2"}),
+		asc.WithSubscriptionPricesTerritoryFields([]string{"currency"}),
+	}
+
+	firstPage, err := client.GetSubscriptionPrices(ctx, subscriptionID, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	candidates := make(map[string]resolvedSubscriptionPriceCandidate)
+	if err := asc.PaginateEach(ctx, firstPage, func(ctx context.Context, next string) (asc.PaginatedResponse, error) {
+		return client.GetSubscriptionPrices(
+			ctx,
+			subscriptionID,
+			asc.WithSubscriptionPricesNextURL(next),
+			asc.WithSubscriptionPricesInclude([]string{"subscriptionPricePoint", "territory"}),
+			asc.WithSubscriptionPricesPricePointFields([]string{"customerPrice", "proceeds", "proceedsYear2"}),
+			asc.WithSubscriptionPricesTerritoryFields([]string{"currency"}),
+		)
+	}, func(page asc.PaginatedResponse) error {
+		resp, ok := page.(*asc.SubscriptionPricesResponse)
+		if !ok {
+			return fmt.Errorf("unexpected subscription prices response type %T", page)
+		}
+		return consumeResolvedSubscriptionPricePage(candidates, resp, now)
+	}); err != nil {
+		return nil, err
+	}
+
+	rows := make([]shared.ResolvedPriceRow, 0, len(candidates))
+	for _, candidate := range candidates {
+		rows = append(rows, candidate.row)
+	}
+	shared.SortResolvedPrices(rows)
+	return &shared.ResolvedPricesResult{Prices: rows}, nil
+}
+
+func consumeResolvedSubscriptionPricePage(
+	candidates map[string]resolvedSubscriptionPriceCandidate,
+	page *asc.SubscriptionPricesResponse,
+	now time.Time,
+) error {
+	if page == nil {
+		return nil
+	}
+
+	values, currencies := parseSubscriptionPricesIncluded(page.Included)
+	asOf := dateOnlyUTC(now)
+
+	for _, price := range page.Data {
+		territoryID := extractSubscriptionPriceRelationshipID(price, "territory")
+		if territoryID == "" {
+			continue
+		}
+
+		pricePointID := extractSubscriptionPriceRelationshipID(price, "subscriptionPricePoint")
+		if pricePointID == "" {
+			continue
+		}
+
+		value, ok := values[pricePointID]
+		if !ok {
+			continue
+		}
+
+		startAt := parseSubscriptionPricingDate(price.Attributes.StartDate)
+		if startAt == nil || startAt.After(asOf) {
+			continue
+		}
+
+		territoryID = strings.ToUpper(strings.TrimSpace(territoryID))
+		currency := currencies[territoryID]
+		if currency == "" {
+			currency = territoryToCurrency(territoryID)
+		}
+
+		candidate := resolvedSubscriptionPriceCandidate{
+			row: shared.ResolvedPriceRow{
+				Territory:     territoryID,
+				PriceID:       strings.TrimSpace(price.ID),
+				PricePointID:  strings.TrimSpace(pricePointID),
+				CustomerPrice: value.CustomerPrice,
+				Currency:      currency,
+				Proceeds:      value.Proceeds,
+				ProceedsYear2: value.ProceedsYear2,
+				StartDate:     strings.TrimSpace(price.Attributes.StartDate),
+				Preserved:     boolPtr(price.Attributes.Preserved),
+			},
+			startAt:   *startAt,
+			preserved: price.Attributes.Preserved,
+		}
+
+		existing, ok := candidates[territoryID]
+		if !ok || subscriptionResolvedCandidateIsNewer(candidate, existing) {
+			candidates[territoryID] = candidate
+		}
+	}
+
+	return nil
+}
+
+func subscriptionResolvedCandidateIsNewer(candidate, existing resolvedSubscriptionPriceCandidate) bool {
+	if candidate.startAt.After(existing.startAt) {
+		return true
+	}
+	if candidate.startAt.Before(existing.startAt) {
+		return false
+	}
+	if candidate.preserved != existing.preserved {
+		return !candidate.preserved && existing.preserved
+	}
+	return candidate.row.PriceID < existing.row.PriceID
+}
+
+func extractSubscriptionPriceRelationshipID(price asc.Resource[asc.SubscriptionPriceAttributes], key string) string {
+	if len(price.Relationships) == 0 {
+		return ""
+	}
+
+	var rels map[string]json.RawMessage
+	if err := json.Unmarshal(price.Relationships, &rels); err != nil {
+		return ""
+	}
+
+	rawRelationship, ok := rels[key]
+	if !ok {
+		return ""
+	}
+
+	var relationship struct {
+		Data asc.ResourceData `json:"data"`
+	}
+	if err := json.Unmarshal(rawRelationship, &relationship); err != nil {
+		return ""
+	}
+
+	return strings.TrimSpace(relationship.Data.ID)
+}
+
+func boolPtr(value bool) *bool {
+	v := value
+	return &v
+}
