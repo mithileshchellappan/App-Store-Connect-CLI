@@ -1009,18 +1009,42 @@ export default function App() {
                       {s.summary?.nextAction && <p style={{ margin: "8px 0 0", fontSize: 13, color: "var(--text-secondary)" }}>{s.summary.nextAction}</p>}
                     </div>
 
+                    {/* Blockers */}
+                    {s.summary?.blockers?.length > 0 && (
+                      <div className="status-blockers" style={{ marginBottom: 16 }}>
+                        {s.summary.blockers.map((b: string, i: number) => (
+                          <div key={i} className="blocker-row">
+                            <span className="blocker-icon">!</span>
+                            <span>{b}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     <table className="data-table" style={{ marginBottom: 20 }}>
                       <tbody>
-                        <tr><td className="vcard-label">App Store Version</td><td>{s.appstore?.version} — {fmt(s.appstore?.state ?? "")}</td></tr>
+                        <tr><td className="vcard-label">App Store Version</td><td>{s.appstore?.version} — <span className={`status-pill status-${(s.appstore?.state ?? "").toLowerCase().replace(/_/g, "-")}`}>{fmt(s.appstore?.state ?? "")}</span></td></tr>
                         <tr><td className="vcard-label">Platform</td><td>{fmt(s.appstore?.platform ?? "")}</td></tr>
-                        <tr><td className="vcard-label">Latest Build</td><td>{s.builds?.latest?.version} (#{s.builds?.latest?.buildNumber}) — {fmt(s.builds?.latest?.processingState ?? "")}</td></tr>
-                        <tr><td className="vcard-label">Uploaded</td><td>{s.builds?.latest?.uploadedDate}</td></tr>
-                        <tr><td className="vcard-label">Review</td><td>{fmt(s.review?.state ?? "")} {s.review?.submittedDate ? `(submitted ${s.review.submittedDate.split("T")[0]})` : ""}</td></tr>
-                        <tr><td className="vcard-label">TestFlight</td><td>{fmt(s.testflight?.betaReviewState ?? "")}</td></tr>
+                        <tr><td className="vcard-label">Latest Build</td><td>{s.builds?.latest?.version} (#{s.builds?.latest?.buildNumber}) — <span className={`status-pill status-${(s.builds?.latest?.processingState ?? "").toLowerCase()}`}>{fmt(s.builds?.latest?.processingState ?? "")}</span></td></tr>
+                        <tr><td className="vcard-label">Uploaded</td><td>{fmt(s.builds?.latest?.uploadedDate ?? "")}</td></tr>
+                        <tr><td className="vcard-label">Review</td><td><span className={`status-pill status-${(s.review?.state ?? "").toLowerCase()}`}>{fmt(s.review?.state ?? "")}</span> {s.review?.submittedDate ? `(submitted ${s.review.submittedDate.split("T")[0]})` : ""}</td></tr>
+                        <tr><td className="vcard-label">TestFlight</td><td><span className={`status-pill status-${(s.testflight?.betaReviewState ?? "").toLowerCase()}`}>{fmt(s.testflight?.betaReviewState ?? "")}</span></td></tr>
                         <tr><td className="vcard-label">Phased Release</td><td>{s.phasedRelease?.configured ? "Configured" : "Not configured"}</td></tr>
                         <tr><td className="vcard-label">Submission</td><td>{s.submission?.inFlight ? "In flight" : "None"}{s.submission?.blockingIssues?.length ? ` — ${s.submission.blockingIssues.length} blocking` : ""}</td></tr>
                       </tbody>
                     </table>
+
+                    {/* Links */}
+                    {s.links && (
+                      <div style={{ marginTop: 8 }}>
+                        <p className="metadata-label">Links</p>
+                        <div style={{ display: "flex", gap: 12 }}>
+                          {s.links.appStoreConnect && <a href={s.links.appStoreConnect} target="_blank" rel="noopener" style={{ color: "var(--accent)", fontSize: 12 }}>App Store Connect</a>}
+                          {s.links.testFlight && <a href={s.links.testFlight} target="_blank" rel="noopener" style={{ color: "var(--accent)", fontSize: 12 }}>TestFlight</a>}
+                          {s.links.review && <a href={s.links.review} target="_blank" rel="noopener" style={{ color: "var(--accent)", fontSize: 12 }}>Review</a>}
+                        </div>
+                      </div>
+                    )}
                   </>
                 );
               })() : null}

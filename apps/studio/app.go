@@ -1365,6 +1365,14 @@ func (a *App) ListThreads() ([]StudioThread, error) {
 }
 
 func (a *App) CreateThread(title string) (StudioThread, error) {
+	thread, err := a.createThreadRecord(title)
+	if err != nil {
+		return StudioThread{}, err
+	}
+	return toStudioThread(thread), nil
+}
+
+func (a *App) createThreadRecord(title string) (threads.Thread, error) {
 	if strings.TrimSpace(title) == "" {
 		title = "New Studio Thread"
 	}
@@ -1377,9 +1385,9 @@ func (a *App) CreateThread(title string) (StudioThread, error) {
 		UpdatedAt: now,
 	}
 	if err := a.threads.SaveThread(thread); err != nil {
-		return StudioThread{}, err
+		return threads.Thread{}, err
 	}
-	return toStudioThread(thread), nil
+	return thread, nil
 }
 
 func (a *App) ResolveASC() (ResolutionResponse, error) {
@@ -1510,7 +1518,7 @@ func (a *App) SendPrompt(req PromptRequest) (PromptResponse, error) {
 
 func (a *App) ensureThread(id string) (threads.Thread, error) {
 	if strings.TrimSpace(id) == "" {
-		return a.CreateThread("New Studio Thread")
+		return a.createThreadRecord("New Studio Thread")
 	}
 	return a.threads.Get(id)
 }

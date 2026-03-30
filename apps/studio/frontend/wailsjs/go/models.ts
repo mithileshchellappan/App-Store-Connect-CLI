@@ -1,56 +1,3 @@
-export namespace approvals {
-	
-	export class Action {
-	    id: string;
-	    threadId: string;
-	    title: string;
-	    summary: string;
-	    commandPreview: string[];
-	    mutationSurface: string;
-	    status: string;
-	    // Go type: time
-	    createdAt: any;
-	    // Go type: time
-	    resolvedAt?: any;
-	
-	    static createFrom(source: any = {}) {
-	        return new Action(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.threadId = source["threadId"];
-	        this.title = source["title"];
-	        this.summary = source["summary"];
-	        this.commandPreview = source["commandPreview"];
-	        this.mutationSurface = source["mutationSurface"];
-	        this.status = source["status"];
-	        this.createdAt = this.convertValues(source["createdAt"], null);
-	        this.resolvedAt = this.convertValues(source["resolvedAt"], null);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-
-}
-
 export namespace environment {
 	
 	export class Snapshot {
@@ -303,6 +250,94 @@ export namespace main {
 	        this.state = source["state"];
 	    }
 	}
+	export class StudioApproval {
+	    id: string;
+	    threadId: string;
+	    title: string;
+	    summary: string;
+	    commandPreview: string[];
+	    mutationSurface: string;
+	    status: string;
+	    createdAt: string;
+	    resolvedAt?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new StudioApproval(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.threadId = source["threadId"];
+	        this.title = source["title"];
+	        this.summary = source["summary"];
+	        this.commandPreview = source["commandPreview"];
+	        this.mutationSurface = source["mutationSurface"];
+	        this.status = source["status"];
+	        this.createdAt = source["createdAt"];
+	        this.resolvedAt = source["resolvedAt"];
+	    }
+	}
+	export class StudioMessage {
+	    id: string;
+	    role: string;
+	    kind: string;
+	    content: string;
+	    createdAt: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new StudioMessage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.role = source["role"];
+	        this.kind = source["kind"];
+	        this.content = source["content"];
+	        this.createdAt = source["createdAt"];
+	    }
+	}
+	export class StudioThread {
+	    id: string;
+	    title: string;
+	    sessionId?: string;
+	    createdAt: string;
+	    updatedAt: string;
+	    messages: StudioMessage[];
+	
+	    static createFrom(source: any = {}) {
+	        return new StudioThread(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.title = source["title"];
+	        this.sessionId = source["sessionId"];
+	        this.createdAt = source["createdAt"];
+	        this.updatedAt = source["updatedAt"];
+	        this.messages = this.convertValues(source["messages"], StudioMessage);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class WorkspaceSection {
 	    id: string;
 	    label: string;
@@ -322,14 +357,13 @@ export namespace main {
 	export class BootstrapData {
 	    appName: string;
 	    tagline: string;
-	    // Go type: time
-	    generatedAt: any;
+	    generatedAt: string;
 	    sections: WorkspaceSection[];
 	    settings: settings.StudioSettings;
 	    presets: settings.ProviderPreset[];
 	    environment: environment.Snapshot;
-	    threads: threads.Thread[];
-	    approvals: approvals.Action[];
+	    threads: StudioThread[];
+	    approvals: StudioApproval[];
 	    windowFlavor: string;
 	
 	    static createFrom(source: any = {}) {
@@ -340,13 +374,13 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.appName = source["appName"];
 	        this.tagline = source["tagline"];
-	        this.generatedAt = this.convertValues(source["generatedAt"], null);
+	        this.generatedAt = source["generatedAt"];
 	        this.sections = this.convertValues(source["sections"], WorkspaceSection);
 	        this.settings = this.convertValues(source["settings"], settings.StudioSettings);
 	        this.presets = this.convertValues(source["presets"], settings.ProviderPreset);
 	        this.environment = this.convertValues(source["environment"], environment.Snapshot);
-	        this.threads = this.convertValues(source["threads"], threads.Thread);
-	        this.approvals = this.convertValues(source["approvals"], approvals.Action);
+	        this.threads = this.convertValues(source["threads"], StudioThread);
+	        this.approvals = this.convertValues(source["approvals"], StudioApproval);
 	        this.windowFlavor = source["windowFlavor"];
 	    }
 	
@@ -499,7 +533,7 @@ export namespace main {
 	    }
 	}
 	export class PromptResponse {
-	    thread: threads.Thread;
+	    thread: StudioThread;
 	
 	    static createFrom(source: any = {}) {
 	        return new PromptResponse(source);
@@ -507,7 +541,7 @@ export namespace main {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.thread = this.convertValues(source["thread"], threads.Thread);
+	        this.thread = this.convertValues(source["thread"], StudioThread);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -630,6 +664,9 @@ export namespace main {
 		    return a;
 		}
 	}
+	
+	
+	
 	
 	export class SubscriptionItem {
 	    id: string;
@@ -810,92 +847,6 @@ export namespace settings {
 	        this.windowMaterial = source["windowMaterial"];
 	        this.showCommandPreviews = source["showCommandPreviews"];
 	    }
-	}
-
-}
-
-export namespace threads {
-	
-	export class Message {
-	    id: string;
-	    role: string;
-	    kind: string;
-	    content: string;
-	    // Go type: time
-	    createdAt: any;
-	
-	    static createFrom(source: any = {}) {
-	        return new Message(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.role = source["role"];
-	        this.kind = source["kind"];
-	        this.content = source["content"];
-	        this.createdAt = this.convertValues(source["createdAt"], null);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class Thread {
-	    id: string;
-	    title: string;
-	    sessionId?: string;
-	    // Go type: time
-	    createdAt: any;
-	    // Go type: time
-	    updatedAt: any;
-	    messages: Message[];
-	
-	    static createFrom(source: any = {}) {
-	        return new Thread(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.title = source["title"];
-	        this.sessionId = source["sessionId"];
-	        this.createdAt = this.convertValues(source["createdAt"], null);
-	        this.updatedAt = this.convertValues(source["updatedAt"], null);
-	        this.messages = this.convertValues(source["messages"], Message);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
 	}
 
 }

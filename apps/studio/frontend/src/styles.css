@@ -1610,3 +1610,41 @@ textarea {
   color: var(--text-secondary);
   line-height: 1.5;
 }
+
+/* ── Status blockers ─────────────────────────────── */
+
+.blocker-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  border-radius: var(--radius-sm);
+  background: rgba(255, 59, 48, 0.08);
+  font-size: 12px;
+  color: var(--red);
+}
+
+.blocker-icon {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--red);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.status-pill.status-installed {
+  background: rgba(52, 199, 89, 0.12);
+  color: #1a9a3a;
+}
+
+.status-pill.status-invited {
+  background: rgba(0, 122, 255, 0.1);
+  color: var(--accent);
+}
