@@ -83,7 +83,7 @@ func TestSubmitCreateHelpShowsDeprecatedCompatibilityGuidance(t *testing.T) {
 }
 
 func TestDeprecatedPublishAppStoreInvocationWarns(t *testing.T) {
-	stdout, stderr, runErr := runRootCommand(t, []string{"publish", "appstore", "--version", "1.0.0"})
+	stdout, stderr, runErr := runRootCommand(t, []string{"publish", "appstore", "--app", "app-1", "--version", "1.0.0"})
 
 	if !errors.Is(runErr, flag.ErrHelp) {
 		t.Fatalf("expected ErrHelp, got %v", runErr)
