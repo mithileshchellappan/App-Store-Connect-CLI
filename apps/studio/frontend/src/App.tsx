@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 
 import "./styles.css";
 import { ChatMessage, NavSection } from "./types";
-import { Bootstrap, CheckAuthStatus, GetAppDetail, GetSettings, ListApps, SaveSettings } from "../wailsjs/go/main/App";
+import { Bootstrap, CheckAuthStatus, GetAppDetail, GetSettings, GetVersionMetadata, ListApps, SaveSettings } from "../wailsjs/go/main/App";
 import { environment, settings as settingsNS } from "../wailsjs/go/models";
 
 const sections: NavSection[] = [
@@ -81,6 +81,12 @@ export default function App() {
     error?: string;
   } | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [allLocalizations, setAllLocalizations] = useState<{
+    locale: string; description: string; keywords: string; whatsNew: string;
+    promotionalText: string; supportUrl: string; marketingUrl: string;
+  }[]>([]);
+  const [selectedLocale, setSelectedLocale] = useState<string>("");
+  const [metadataLoading, setMetadataLoading] = useState(false);
   const [appsLoading, setAppsLoading] = useState(false);
 
   useEffect(() => {
@@ -160,12 +166,36 @@ export default function App() {
   function handleSelectApp(id: string) {
     setSelectedAppId(id);
     setAppDetail(null);
+    setAllLocalizations([]);
+    setSelectedLocale("");
     setDetailLoading(true);
     GetAppDetail(id)
-      .then((d) => setAppDetail({
-        id: d.id, name: d.name, subtitle: d.subtitle, bundleId: d.bundleId,
-        sku: d.sku, primaryLocale: d.primaryLocale, versions: d.versions ?? [], error: d.error,
-      }))
+      .then((d) => {
+        const detail = {
+          id: d.id, name: d.name, subtitle: d.subtitle, bundleId: d.bundleId,
+          sku: d.sku, primaryLocale: d.primaryLocale, versions: d.versions ?? [], error: d.error,
+        };
+        setAppDetail(detail);
+        // Fetch metadata for the primary iOS version (fallback to first version)
+        const primaryVersion = (d.versions ?? []).find((v: { platform: string }) => v.platform === "IOS")
+          ?? (d.versions ?? [])[0];
+        if (primaryVersion?.id) {
+          setMetadataLoading(true);
+          GetVersionMetadata(primaryVersion.id)
+            .then((meta) => {
+              if (meta.localizations?.length) {
+                setAllLocalizations(meta.localizations);
+                // Default to primaryLocale, fall back to first available
+                const defaultLocale = meta.localizations.find(
+                  (l: { locale: string }) => l.locale === d.primaryLocale
+                )?.locale ?? meta.localizations[0].locale;
+                setSelectedLocale(defaultLocale);
+              }
+            })
+            .catch(() => {})
+            .finally(() => setMetadataLoading(false));
+        }
+      })
       .catch((e) => setAppDetail({ id, name: "", subtitle: "", bundleId: "", sku: "", primaryLocale: "", versions: [], error: String(e) }))
       .finally(() => setDetailLoading(false));
   }
@@ -496,6 +526,63 @@ export default function App() {
                       </div>
                     </div>
                   </div>
+
+                  {/* App Store metadata */}
+                  {metadataLoading ? (
+                    <div className="app-detail-section">
+                      <p className="empty-hint">Loading metadata…</p>
+                    </div>
+                  ) : allLocalizations.length > 0 ? (() => {
+                    const loc = allLocalizations.find((l) => l.locale === selectedLocale) ?? allLocalizations[0];
+                    return (
+                      <div className="app-detail-section">
+                        <div className="metadata-header">
+                          <h3 className="section-label" style={{ margin: 0 }}>App Store Metadata</h3>
+                          <select
+                            className="locale-picker"
+                            value={selectedLocale}
+                            onChange={(e) => setSelectedLocale(e.target.value)}
+                          >
+                            {allLocalizations.map((l) => (
+                              <option key={l.locale} value={l.locale}>{l.locale}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {loc.promotionalText && (
+                          <div className="metadata-field">
+                            <p className="metadata-label">Promotional Text</p>
+                            <p className="metadata-value">{loc.promotionalText}</p>
+                          </div>
+                        )}
+                        {loc.description && (
+                          <div className="metadata-field">
+                            <p className="metadata-label">Description</p>
+                            <p className="metadata-value metadata-multiline">{loc.description}</p>
+                          </div>
+                        )}
+                        {loc.whatsNew && (
+                          <div className="metadata-field">
+                            <p className="metadata-label">What's New</p>
+                            <p className="metadata-value metadata-multiline">{loc.whatsNew}</p>
+                          </div>
+                        )}
+                        {loc.keywords && (
+                          <div className="metadata-field">
+                            <p className="metadata-label">Keywords</p>
+                            <p className="metadata-value mono">{loc.keywords}</p>
+                          </div>
+                        )}
+                        {(loc.supportUrl || loc.marketingUrl) && (
+                          <div className="metadata-field">
+                            <p className="metadata-label">URLs</p>
+                            {loc.supportUrl && <p className="metadata-value mono">{loc.supportUrl}</p>}
+                            {loc.marketingUrl && <p className="metadata-value mono">{loc.marketingUrl}</p>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })() : null}
                 </div>
               ) : null}
             </div>
