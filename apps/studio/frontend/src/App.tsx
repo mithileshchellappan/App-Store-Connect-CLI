@@ -450,6 +450,15 @@ function mapAppList(apps?: { id: string; name: string; subtitle: string }[]) {
   }));
 }
 
+function itemMatchesSearch(item: Record<string, unknown>, query: string): boolean {
+  const trimmed = query.trim().toLowerCase();
+  if (!trimmed) return true;
+  return Object.values(item).some((value) => {
+    if (value == null || typeof value === "object") return false;
+    return String(value).toLowerCase().includes(trimmed);
+  });
+}
+
 function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'\\''`)}'`;
 }
@@ -510,6 +519,8 @@ export default function App() {
   const [pricingOverview, setPricingOverview] = useState<{ loading: boolean; error?: string; availableInNewTerritories: boolean; currentPrice: string; currentProceeds: string; baseCurrency: string; territories: { territory: string; available: boolean; releaseDate: string }[]; subscriptionPricing: { name: string; productId: string; subscriptionPeriod: string; state: string; groupName: string; price: string; currency: string; proceeds: string }[] }>({ loading: false, availableInNewTerritories: false, currentPrice: "", currentProceeds: "", baseCurrency: "", territories: [], subscriptionPricing: [] });
   const [selectedSub, setSelectedSub] = useState<string | null>(null);
   const [bundleIDsPlatformSort, setBundleIDsPlatformSort] = useState<"asc" | "desc">("asc");
+  const [appSearchTerm, setAppSearchTerm] = useState("");
+  const [sectionSearchTerms, setSectionSearchTerms] = useState<Record<string, string>>({});
   const [showBundleIDSheet, setShowBundleIDSheet] = useState(false);
   const [bundleIDName, setBundleIDName] = useState("");
   const [bundleIDIdentifier, setBundleIDIdentifier] = useState("");
@@ -1008,6 +1019,10 @@ export default function App() {
 
   const authConfigured = authStatus.authenticated;
   const resolvedTheme = resolveTheme(studioSettings.theme, systemTheme);
+  const filteredApps = appList.filter((app) =>
+    `${app.name} ${app.subtitle}`.toLowerCase().includes(appSearchTerm.trim().toLowerCase()),
+  );
+  const activeSectionSearch = sectionSearchTerms[activeSection.id] ?? "";
 
   return (
     <div className="studio-shell" data-theme={resolvedTheme}>
@@ -1020,24 +1035,34 @@ export default function App() {
           {appsLoading ? (
             <div className="app-picker-placeholder">Loading apps…</div>
           ) : appList.length > 0 ? (
-            <select
-              className="app-picker-select"
-              value={selectedAppId ?? ""}
-              onChange={(e) => {
-                const id = e.target.value;
-                if (id) {
-                  handleSelectApp(id);
-                  setActiveSection(allSections[0]);
-                }
-              }}
-            >
-              <option value="" disabled>Select an app…</option>
-              {appList.map((app) => (
-                <option key={app.id} value={app.id}>
-                  {app.name}{app.subtitle ? ` — ${app.subtitle}` : ""}
-                </option>
-              ))}
-            </select>
+            <>
+              <input
+                className="app-picker-search"
+                type="search"
+                aria-label="Search apps"
+                placeholder="Search apps…"
+                value={appSearchTerm}
+                onChange={(e) => setAppSearchTerm(e.target.value)}
+              />
+              <div className="app-picker-list" role="listbox" aria-label="Apps">
+                {filteredApps.length > 0 ? filteredApps.map((app) => (
+                  <button
+                    key={app.id}
+                    type="button"
+                    className={`app-picker-item ${selectedAppId === app.id ? "is-active" : ""}`}
+                    onClick={() => {
+                      handleSelectApp(app.id);
+                      setActiveSection(allSections[0]);
+                    }}
+                  >
+                    <span className="app-picker-item-name">{app.name}</span>
+                    {app.subtitle && <span className="app-picker-item-subtitle">{app.subtitle}</span>}
+                  </button>
+                )) : (
+                  <div className="app-picker-placeholder">No matching apps</div>
+                )}
+              </div>
+            </>
           ) : (
             <div className="app-picker-placeholder">
               {authStatus.authenticated ? "No apps found" : "Not authenticated"}
@@ -2143,10 +2168,50 @@ export default function App() {
           const displayItems = activeSection.id === "bundle-ids"
             ? [...cache.items].sort((a, b) => compareBundleIDPlatforms(a.platform, b.platform, bundleIDsPlatformSort))
             : cache.items;
+          const showSectionSearch = !sectionRequiresApp(activeSection.id) && displayItems.length > 1;
+          const filteredItems = displayItems.filter((item) => itemMatchesSearch(item, activeSectionSearch));
+
+          if (filteredItems.length === 0) {
+            return (
+              <div className="app-detail-view">
+                <div className="app-detail-section">
+                  <div className="section-header-row">
+                    <div className="section-header-meta">
+                      <h3 className="section-label">{activeSection.label}</h3>
+                      {showSectionSearch && <span className="section-count">{displayItems.length} items</span>}
+                    </div>
+                    <div className="section-header-actions">
+                      {showSectionSearch && (
+                        <input
+                          type="search"
+                          className="section-search-input"
+                          aria-label={`${activeSection.label} search`}
+                          placeholder={`Search ${activeSection.label.toLowerCase()}…`}
+                          value={activeSectionSearch}
+                          onChange={(event) => setSectionSearchTerms((prev) => ({ ...prev, [activeSection.id]: event.target.value }))}
+                        />
+                      )}
+                      {activeSection.id === "bundle-ids" && (
+                        <button
+                          type="button"
+                          className="toolbar-btn section-create-btn"
+                          onClick={openBundleIDSheet}
+                        >
+                          <span aria-hidden="true">+</span>
+                          <span>New Bundle ID</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  <p className="empty-hint">No matching results.</p>
+                </div>
+              </div>
+            );
+          }
 
           // Build column list from all items' keys
           const allKeys = new Set<string>();
-          for (const item of displayItems) {
+          for (const item of filteredItems) {
             for (const [k, v] of Object.entries(item)) {
               if (k !== "id" && k !== "type" && v !== null && v !== undefined && v !== "" && typeof v !== "object") {
                 allKeys.add(k);
@@ -2155,8 +2220,8 @@ export default function App() {
           }
           const columns = [...allKeys];
           // Single-item views (like age-rating) render as key-value pairs
-          if (displayItems.length === 1) {
-            const item = displayItems[0];
+          if (filteredItems.length === 1) {
+            const item = filteredItems[0];
             return (
               <div className="app-detail-view">
                 <div className="app-detail-section">
@@ -2164,16 +2229,28 @@ export default function App() {
                     <div className="section-header-meta">
                       <h3 className="section-label">{activeSection.label}</h3>
                     </div>
-                    {activeSection.id === "bundle-ids" && (
-                      <button
-                        type="button"
-                        className="toolbar-btn section-create-btn"
-                        onClick={openBundleIDSheet}
-                      >
-                        <span aria-hidden="true">+</span>
-                        <span>New Bundle ID</span>
-                      </button>
-                    )}
+                    <div className="section-header-actions">
+                      {showSectionSearch && (
+                        <input
+                          type="search"
+                          className="section-search-input"
+                          aria-label={`${activeSection.label} search`}
+                          placeholder={`Search ${activeSection.label.toLowerCase()}…`}
+                          value={activeSectionSearch}
+                          onChange={(event) => setSectionSearchTerms((prev) => ({ ...prev, [activeSection.id]: event.target.value }))}
+                        />
+                      )}
+                      {activeSection.id === "bundle-ids" && (
+                        <button
+                          type="button"
+                          className="toolbar-btn section-create-btn"
+                          onClick={openBundleIDSheet}
+                        >
+                          <span aria-hidden="true">+</span>
+                          <span>New Bundle ID</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <table className="data-table">
                     <thead>
@@ -2203,20 +2280,32 @@ export default function App() {
                   <div className="section-header-row">
                     <div className="section-header-meta">
                       <h3 className="section-label">{activeSection.label}</h3>
-                      <span className="section-count">{displayItems.length} items</span>
+                      <span className="section-count">{filteredItems.length} of {displayItems.length}</span>
                     </div>
-                    {activeSection.id === "bundle-ids" && (
-                      <button
-                        type="button"
-                        className="toolbar-btn section-create-btn"
-                        onClick={openBundleIDSheet}
-                      >
-                        <span aria-hidden="true">+</span>
-                        <span>New Bundle ID</span>
-                      </button>
-                    )}
+                    <div className="section-header-actions">
+                      {showSectionSearch && (
+                        <input
+                          type="search"
+                          className="section-search-input"
+                          aria-label={`${activeSection.label} search`}
+                          placeholder={`Search ${activeSection.label.toLowerCase()}…`}
+                          value={activeSectionSearch}
+                          onChange={(event) => setSectionSearchTerms((prev) => ({ ...prev, [activeSection.id]: event.target.value }))}
+                        />
+                      )}
+                      {activeSection.id === "bundle-ids" && (
+                        <button
+                          type="button"
+                          className="toolbar-btn section-create-btn"
+                          onClick={openBundleIDSheet}
+                        >
+                          <span aria-hidden="true">+</span>
+                          <span>New Bundle ID</span>
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  {displayItems.map((item, idx) => (
+                  {filteredItems.map((item, idx) => (
                     <div key={item.id as string ?? idx} className="vertical-card">
                       <table className="data-table">
                         <tbody>
@@ -2245,18 +2334,30 @@ export default function App() {
                 <div className="section-header-row">
                   <div className="section-header-meta">
                     <h3 className="section-label">{activeSection.label}</h3>
-                    <span className="section-count">{displayItems.length} items</span>
+                    <span className="section-count">{filteredItems.length} of {displayItems.length}</span>
                   </div>
-                  {activeSection.id === "bundle-ids" && (
-                    <button
-                      type="button"
-                      className="toolbar-btn section-create-btn"
-                      onClick={openBundleIDSheet}
-                    >
-                      <span aria-hidden="true">+</span>
-                      <span>New Bundle ID</span>
-                    </button>
-                  )}
+                  <div className="section-header-actions">
+                    {showSectionSearch && (
+                      <input
+                        type="search"
+                        className="section-search-input"
+                        aria-label={`${activeSection.label} search`}
+                        placeholder={`Search ${activeSection.label.toLowerCase()}…`}
+                        value={activeSectionSearch}
+                        onChange={(event) => setSectionSearchTerms((prev) => ({ ...prev, [activeSection.id]: event.target.value }))}
+                      />
+                    )}
+                    {activeSection.id === "bundle-ids" && (
+                      <button
+                        type="button"
+                        className="toolbar-btn section-create-btn"
+                        onClick={openBundleIDSheet}
+                      >
+                        <span aria-hidden="true">+</span>
+                        <span>New Bundle ID</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <table className="data-table">
                   <thead>
@@ -2282,7 +2383,7 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {displayItems.map((item, idx) => (
+                    {filteredItems.map((item, idx) => (
                       <tr key={item.id as string ?? idx}>
                         {columns.map((col) => {
                           const val = item[col];
@@ -2313,7 +2414,7 @@ export default function App() {
             </p>
             <p className="empty-hint">
               {!selectedAppId && activeSection.id !== "settings"
-                ? "Use the dropdown in the sidebar to pick an app."
+                ? "Use search in the sidebar to pick an app."
                 : ""}
             </p>
           </div>

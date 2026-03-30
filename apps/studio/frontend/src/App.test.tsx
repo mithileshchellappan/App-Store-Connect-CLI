@@ -71,6 +71,11 @@ vi.mock("../wailsjs/go/models", () => ({
 
 import App, { insightsWeekStart } from "./App";
 
+async function pickApp(name: string) {
+  fireEvent.change(screen.getByLabelText("Search apps"), { target: { value: name } });
+  fireEvent.click(await screen.findByRole("button", { name: new RegExp(name, "i") }));
+}
+
 describe("App", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -199,7 +204,7 @@ describe("App", () => {
 
     await screen.findByText("Connected");
 
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "1" } });
+    await pickApp("Test App");
 
     await screen.findByRole("button", { name: "TestFlight" });
     fireEvent.click(screen.getByRole("button", { name: "TestFlight" }));
@@ -248,9 +253,8 @@ describe("App", () => {
 
     await screen.findByText("Connected");
 
-    const picker = screen.getByRole("combobox");
-    fireEvent.change(picker, { target: { value: "1" } });
-    fireEvent.change(picker, { target: { value: "2" } });
+    await pickApp("First App");
+    await pickApp("Second App");
 
     expect(await screen.findByText("Second App")).toBeInTheDocument();
 
@@ -275,7 +279,7 @@ describe("App", () => {
 
     await screen.findByText("Connected");
 
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "1" } });
+    await pickApp("Test App");
     await screen.findByText("Test App");
 
     await waitFor(() => {
@@ -290,7 +294,7 @@ describe("App", () => {
 
     await screen.findByText("Connected");
 
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "1" } });
+    await pickApp("Test App");
     await screen.findByText("Test App");
 
     await waitFor(() => {
@@ -305,7 +309,7 @@ describe("App", () => {
 
     await screen.findByText("Connected");
 
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "1" } });
+    await pickApp("Test App");
     await screen.findByText("Test App");
 
     await waitFor(() => {
@@ -313,6 +317,23 @@ describe("App", () => {
       expect(commands).toContain("certificates list --paginate --output json");
       expect(commands).toContain("profiles list --paginate --output json");
     });
+  });
+
+  it("filters the app picker with search", async () => {
+    mockListApps.mockResolvedValue({
+      apps: [
+        { id: "1", name: "Test App", subtitle: "A great app" },
+        { id: "2", name: "Music Box", subtitle: "Audio tools" },
+      ],
+    });
+
+    render(<App />);
+
+    await screen.findByText("Connected");
+    fireEvent.change(screen.getByLabelText("Search apps"), { target: { value: "music" } });
+
+    expect(screen.getByRole("button", { name: /Music Box/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Test App/i })).not.toBeInTheDocument();
   });
 
   it("loads signing sections without requiring an app selection", async () => {
@@ -368,6 +389,34 @@ describe("App", () => {
       expect(rowsAfter[1]).toHaveTextContent("com.example.universal");
       expect(rowsAfter[2]).toHaveTextContent("com.example.ios");
     });
+  });
+
+  it("filters standalone signing lists with search", async () => {
+    mockRunASCCommand.mockImplementation((cmd: string) => {
+      if (cmd === "bundle-ids list --paginate --output json") {
+        return Promise.resolve({
+          error: "",
+          data: JSON.stringify({
+            data: [
+              { id: "bundle-1", type: "bundleIds", attributes: { identifier: "com.example.alpha", platform: "IOS", seedId: "AAA" } },
+              { id: "bundle-2", type: "bundleIds", attributes: { identifier: "com.example.beta", platform: "MAC_OS", seedId: "BBB" } },
+            ],
+          }),
+        });
+      }
+      return Promise.resolve({ error: "", data: "{\"data\":[]}" });
+    });
+
+    render(<App />);
+
+    await screen.findByText("Connected");
+    fireEvent.click(screen.getByRole("button", { name: "Signing" }));
+    await screen.findByText("com.example.alpha");
+
+    fireEvent.change(screen.getByLabelText("Bundle IDs search"), { target: { value: "beta" } });
+
+    expect(screen.getByText("com.example.beta")).toBeInTheDocument();
+    expect(screen.queryByText("com.example.alpha")).not.toBeInTheDocument();
   });
 
   it("creates a bundle ID from the signing sheet", async () => {
@@ -534,7 +583,7 @@ describe("App", () => {
     render(<App />);
 
     await screen.findByText("Connected");
-    fireEvent.change(screen.getByRole("combobox"), { target: { value: "1" } });
+    await pickApp("Test App");
     fireEvent.click(await screen.findByRole("button", { name: "TestFlight" }));
 
     fireEvent.click((await screen.findAllByText("Internal"))[0].closest("tr")!);
