@@ -27,7 +27,7 @@ export function TestFlightView({
     return (
       <div className="app-detail-view">
         <div className="app-detail-section">
-          <button className="back-link" type="button" onClick={onBackToGroups}>&larr; TestFlight</button>
+          <button className="back-link" type="button" onClick={onBackToGroups} aria-label="Back to TestFlight groups">&larr; TestFlight</button>
           <p className="app-detail-name" style={{ marginTop: 8 }}>{group?.name ?? "Group"}</p>
           <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--text-secondary)" }}>
             {group?.isInternal ? "Internal" : "External"} &middot; {group?.testerCount ?? 0} testers

@@ -176,7 +176,7 @@ export default function App() {
       preferBundledASC: studioSettings.preferBundledASC,
       systemASCPath: studioSettings.systemASCPath,
       workspaceRoot: studioSettings.workspaceRoot,
-      theme: studioSettings.theme === "glass-light" ? "system" : studioSettings.theme,
+      theme: studioSettings.theme,
       windowMaterial: studioSettings.windowMaterial,
       showCommandPreviews: studioSettings.showCommandPreviews,
     });
@@ -940,6 +940,7 @@ export default function App() {
 
   return (
     <div className="studio-shell" data-theme={resolvedTheme}>
+      <a href="#main-content" className="skip-nav">Skip to main content</a>
       <Sidebar
         activeScope={activeScope}
         selectedAppId={selectedAppId}
@@ -958,7 +959,7 @@ export default function App() {
       <div className="shell-separator" />
 
       {/* Main area */}
-      <div className="main-area">
+      <main id="main-content" className="main-area">
         <ContextBar
           authStatus={authStatus}
           activeScope={activeScope}
@@ -980,7 +981,7 @@ export default function App() {
             setDockExpanded={setDockExpanded}
           />
         )}
-      </div>
+      </main>
 
       {showBundleIDSheet && (
         <div className="sheet-backdrop" role="presentation" onClick={closeBundleIDSheet}>

@@ -34,11 +34,13 @@ export function ContextBar({
         )}
       </div>
       <div className="toolbar-right">
-        <div className="scope-tabs">
+        <div className="scope-tabs" role="tablist" aria-label="Scope">
           {scopes.map((scope) => (
             <button
               key={scope.id}
               type="button"
+              role="tab"
+              aria-selected={activeScope === scope.id}
               className={`scope-tab ${activeScope === scope.id ? "is-active" : ""}`}
               onClick={() => {
                 setActiveScope(scope.id);
@@ -54,9 +56,10 @@ export function ContextBar({
           className="toolbar-btn"
           type="button"
           onClick={handleRefresh}
+          aria-label="Refresh (⌘R)"
           title="Refresh (⌘R)"
         >
-          ↻
+          <span aria-hidden="true">↻</span>
         </button>
         {!authConfigured && (
           <button
