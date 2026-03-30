@@ -2,7 +2,7 @@ import { FormEvent, startTransition, useEffect, useEffectEvent, useRef, useState
 
 import "./styles.css";
 import { ChatMessage, NavSection } from "./types";
-import { Bootstrap, CheckAuthStatus, GetAppDetail, GetFinanceRegions, GetOfferCodes, GetPricingOverview, GetScreenshots, GetSettings, GetSubscriptions, GetTestFlight, GetTestFlightTesters, GetVersionMetadata, ListApps, RunASCCommand, SaveSettings } from "../wailsjs/go/main/App";
+import { Bootstrap, CheckAuthStatus, GetAppDetail, GetFeedback, GetFinanceRegions, GetOfferCodes, GetPricingOverview, GetScreenshots, GetSettings, GetSubscriptions, GetTestFlight, GetTestFlightTesters, GetVersionMetadata, ListApps, RunASCCommand, SaveSettings } from "../wailsjs/go/main/App";
 import { environment, settings as settingsNS } from "../wailsjs/go/models";
 
 type SidebarGroup = { label: string; items: NavSection[] };
@@ -225,7 +225,6 @@ const sectionCommands: Record<string, string> = {
   "workflow": "workflow list --output json",
   "analytics": "analytics requests --app APP_ID --output json",
   "crashes": "performance diagnostics list --app APP_ID --output json",
-  "feedback": "testflight feedback list --app APP_ID --output json",
 };
 
 function sectionRequiresApp(sectionId: string): boolean {
@@ -515,6 +514,7 @@ export default function App() {
   const [bundleIDCreating, setBundleIDCreating] = useState(false);
   const [financeRegions, setFinanceRegions] = useState<{ loading: boolean; error?: string; regions: { reportRegion: string; reportCurrency: string; regionCode: string; countriesOrRegions: string }[] }>({ loading: false, regions: [] });
   const [offerCodes, setOfferCodes] = useState<{ loading: boolean; error?: string; codes: { subscriptionName: string; subscriptionId: string; name: string; offerEligibility: string; customerEligibilities: string[]; duration: string; offerMode: string; numberOfPeriods: number; totalNumberOfCodes: number; productionCodeCount: number }[] }>({ loading: false, codes: [] });
+  const [feedbackData, setFeedbackData] = useState<{ loading: boolean; error?: string; total: number; items: { id: string; comment: string; email: string; deviceModel: string; deviceFamily: string; osVersion: string; appPlatform: string; createdDate: string; locale: string; timeZone: string; connectionType: string; batteryPercentage: number }[] }>({ loading: false, total: 0, items: [] });
   const appSelectionRequestRef = useRef(0);
   const screenshotRequestRef = useRef(0);
   const groupTesterRequestRef = useRef(0);
@@ -716,6 +716,16 @@ export default function App() {
         else setFinanceRegions({ loading: false, regions: res.regions ?? [] });
       })
       .catch((e) => { if (!isStale()) setFinanceRegions({ loading: false, error: String(e), regions: [] }); });
+
+    // TestFlight feedback
+    setFeedbackData({ loading: true, total: 0, items: [] });
+    GetFeedback(appId)
+      .then((res) => {
+        if (isStale()) return;
+        if (res.error) setFeedbackData({ loading: false, error: res.error, total: 0, items: [] });
+        else setFeedbackData({ loading: false, total: res.total, items: res.feedback ?? [] });
+      })
+      .catch((e) => { if (!isStale()) setFeedbackData({ loading: false, error: String(e), total: 0, items: [] }); });
 
     // Offer codes for all subscriptions
     setOfferCodes({ loading: true, codes: [] });
@@ -1080,7 +1090,7 @@ export default function App() {
             className={`sidebar-row ${activeSection.id === "settings" ? "is-active" : ""}`}
             onClick={() => setActiveSection(allSections.find((s) => s.id === "settings")!)}
           >
-            <span className="sidebar-row-icon">⚙</span>
+            <span className="sidebar-row-icon sidebar-row-icon-settings">⚙</span>
             <span>Settings</span>
           </button>
         </div>
@@ -1977,6 +1987,52 @@ export default function App() {
               <p style={{ fontSize: 12, color: "var(--text-tertiary)", marginTop: 8 }}>
                 Use the ACP chat to run: <code>asc notarization submit --file ./MyApp.zip</code>
               </p>
+            </div>
+          </div>
+        ) : activeSection.id === "feedback" && selectedAppId ? (
+          <div className="app-detail-view">
+            <div className="app-detail-section">
+              <div className="section-header-row">
+                <h3 className="section-label">TestFlight Feedback</h3>
+                <span className="section-count">{feedbackData.total} submissions</span>
+              </div>
+              {feedbackData.loading ? (
+                <p className="empty-hint">Loading feedback…</p>
+              ) : feedbackData.error ? (
+                <p className="empty-hint">{feedbackData.error}</p>
+              ) : feedbackData.items.length === 0 ? (
+                <p className="empty-hint">No feedback submissions.</p>
+              ) : (
+                <div className="feedback-grid">
+                  {feedbackData.items.map((fb) => {
+                    const daysAgo = Math.floor((Date.now() - new Date(fb.createdDate).getTime()) / 86400000);
+                    const device = fb.deviceModel || "Unknown";
+                    const family = fb.deviceFamily === "IPAD" ? "iPad" : fb.deviceFamily === "IPHONE" ? "iPhone" : fb.deviceFamily === "MAC" ? "Mac" : fb.deviceFamily || "";
+                    return (
+                      <div key={fb.id} className="feedback-card">
+                        <div className="feedback-card-header">
+                          <span className="feedback-author">{fb.email || "Anonymous"}</span>
+                          <span className="feedback-date">{daysAgo}d ago</span>
+                        </div>
+                        <div className="feedback-device">
+                          {family} · {device} · {fmt(fb.appPlatform)} {fb.osVersion}
+                        </div>
+                        {fb.comment && (
+                          <p className="feedback-comment">{fb.comment}</p>
+                        )}
+                        {(fb.locale || fb.connectionType) && (
+                          <div className="feedback-meta">
+                            {fb.locale && <span>{fb.locale}</span>}
+                            {fb.timeZone && <span>{fb.timeZone}</span>}
+                            {fb.connectionType && <span>{fb.connectionType}</span>}
+                            {fb.batteryPercentage > 0 && <span>{fb.batteryPercentage}%</span>}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         ) : activeSection.id === "promo-codes" && selectedAppId ? (

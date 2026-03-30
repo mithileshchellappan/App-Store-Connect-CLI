@@ -296,6 +296,10 @@ textarea {
   flex-shrink: 0;
 }
 
+.sidebar-row-icon-settings {
+  font-size: 15px;
+}
+
 .sidebar-spacer {
   flex: 1;
 }
@@ -1433,4 +1437,60 @@ textarea {
   background: rgba(128, 128, 128, 0.15);
   color: var(--text-primary);
   font-weight: 600;
+}
+
+/* ── Feedback cards (TestFlight) ─────────────────── */
+
+.feedback-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+
+.feedback-card {
+  border: 1px solid var(--separator);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  background: var(--surface-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.feedback-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.feedback-author {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.feedback-date {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.feedback-device {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.feedback-comment {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.feedback-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
 }

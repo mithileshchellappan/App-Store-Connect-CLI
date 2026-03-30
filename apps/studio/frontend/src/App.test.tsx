@@ -17,6 +17,7 @@ const {
   mockGetSubscriptions,
   mockGetFinanceRegions,
   mockGetOfferCodes,
+  mockGetFeedback,
 } = vi.hoisted(() => ({
   mockListApps: vi.fn(),
   mockCheckAuthStatus: vi.fn(),
@@ -33,6 +34,7 @@ const {
   mockGetSubscriptions: vi.fn(),
   mockGetFinanceRegions: vi.fn(),
   mockGetOfferCodes: vi.fn(),
+  mockGetFeedback: vi.fn(),
 }));
 
 // Mock the Wails bindings since they don't exist in test environment
@@ -52,6 +54,7 @@ vi.mock("../wailsjs/go/main/App", () => ({
   GetSubscriptions: mockGetSubscriptions,
   GetFinanceRegions: mockGetFinanceRegions,
   GetOfferCodes: mockGetOfferCodes,
+  GetFeedback: mockGetFeedback,
 }));
 
 vi.mock("../wailsjs/go/models", () => ({
@@ -136,6 +139,7 @@ describe("App", () => {
     mockGetSubscriptions.mockResolvedValue({ subscriptions: [] });
     mockGetFinanceRegions.mockResolvedValue({ regions: [] });
     mockGetOfferCodes.mockResolvedValue({ offerCodes: [] });
+    mockGetFeedback.mockResolvedValue({ feedback: [], total: 0 });
   });
 
   it("renders and calls Bootstrap on mount", async () => {

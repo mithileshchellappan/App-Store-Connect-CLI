@@ -219,6 +219,27 @@ type FinanceRegion struct {
 	Countries string `json:"countriesOrRegions"`
 }
 
+type FeedbackItem struct {
+	ID             string `json:"id"`
+	Comment        string `json:"comment"`
+	Email          string `json:"email"`
+	DeviceModel    string `json:"deviceModel"`
+	DeviceFamily   string `json:"deviceFamily"`
+	OSVersion      string `json:"osVersion"`
+	AppPlatform    string `json:"appPlatform"`
+	CreatedDate    string `json:"createdDate"`
+	Locale         string `json:"locale"`
+	TimeZone       string `json:"timeZone"`
+	ConnectionType string `json:"connectionType"`
+	Battery        int    `json:"batteryPercentage"`
+}
+
+type FeedbackResponse struct {
+	Feedback []FeedbackItem `json:"feedback"`
+	Total    int            `json:"total"`
+	Error    string         `json:"error,omitempty"`
+}
+
 type FinanceResponse struct {
 	Regions []FinanceRegion `json:"regions"`
 	Error   string          `json:"error,omitempty"`
@@ -930,6 +951,117 @@ func (a *App) GetPricingOverview(appID string) (PricingOverview, error) {
 		Territories:               avail.territories,
 		SubscriptionPricing:       pricing.items,
 	}, nil
+}
+
+// GetFeedback fetches TestFlight feedback list, then enriches each with detail view concurrently.
+func (a *App) GetFeedback(appID string) (FeedbackResponse, error) {
+	if strings.TrimSpace(appID) == "" {
+		return FeedbackResponse{Error: "app ID is required"}, nil
+	}
+	defer configGuard()()
+	ascPath, err := a.resolveASCPath()
+	if err != nil {
+		return FeedbackResponse{Error: err.Error()}, nil
+	}
+	ctx, cancel := context.WithTimeout(a.contextOrBackground(), 60*time.Second)
+	defer cancel()
+
+	// Fetch feedback list
+	cmd := a.newASCCommand(ctx, ascPath, "testflight", "feedback", "list",
+		"--app", appID, "--sort", "-createdDate", "--paginate", "--output", "json")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return FeedbackResponse{Error: strings.TrimSpace(string(out))}, nil
+	}
+
+	type rawFeedback struct {
+		ID         string `json:"id"`
+		Attributes struct {
+			Comment      string `json:"comment"`
+			Email        string `json:"email"`
+			DeviceModel  string `json:"deviceModel"`
+			OSVersion    string `json:"osVersion"`
+			AppPlatform  string `json:"appPlatform"`
+			CreatedDate  string `json:"createdDate"`
+			DeviceFamily string `json:"deviceFamily"`
+		} `json:"attributes"`
+	}
+	var listEnv struct {
+		Data []rawFeedback `json:"data"`
+		Meta struct {
+			Paging struct {
+				Total int `json:"total"`
+			} `json:"paging"`
+		} `json:"meta"`
+	}
+	if json.Unmarshal(out, &listEnv) != nil {
+		return FeedbackResponse{Error: "failed to parse feedback list"}, nil
+	}
+
+	// Enrich each feedback item with detail view (concurrent, best-effort)
+	type detailResult struct {
+		idx    int
+		locale string
+		tz     string
+		conn   string
+		batt   int
+	}
+	ch := make(chan detailResult, len(listEnv.Data))
+	for i, fb := range listEnv.Data {
+		go func(idx int, fbID string) {
+			cmd := a.newASCCommand(ctx, ascPath, "testflight", "feedback", "view",
+				"--submission-id", fbID, "--output", "json")
+			out, err := cmd.CombinedOutput()
+			if err != nil {
+				ch <- detailResult{idx: idx}
+				return
+			}
+			var env struct {
+				Data struct {
+					Attributes struct {
+						Locale         string `json:"locale"`
+						TimeZone       string `json:"timeZone"`
+						ConnectionType string `json:"connectionType"`
+						Battery        int    `json:"batteryPercentage"`
+					} `json:"attributes"`
+				} `json:"data"`
+			}
+			if json.Unmarshal(out, &env) == nil {
+				ch <- detailResult{
+					idx:    idx,
+					locale: env.Data.Attributes.Locale,
+					tz:     env.Data.Attributes.TimeZone,
+					conn:   env.Data.Attributes.ConnectionType,
+					batt:   env.Data.Attributes.Battery,
+				}
+			} else {
+				ch <- detailResult{idx: idx}
+			}
+		}(i, fb.ID)
+	}
+
+	items := make([]FeedbackItem, len(listEnv.Data))
+	for i, fb := range listEnv.Data {
+		items[i] = FeedbackItem{
+			ID:           fb.ID,
+			Comment:      fb.Attributes.Comment,
+			Email:        fb.Attributes.Email,
+			DeviceModel:  fb.Attributes.DeviceModel,
+			DeviceFamily: fb.Attributes.DeviceFamily,
+			OSVersion:    fb.Attributes.OSVersion,
+			AppPlatform:  fb.Attributes.AppPlatform,
+			CreatedDate:  fb.Attributes.CreatedDate,
+		}
+	}
+	for range listEnv.Data {
+		r := <-ch
+		items[r.idx].Locale = r.locale
+		items[r.idx].TimeZone = r.tz
+		items[r.idx].ConnectionType = r.conn
+		items[r.idx].Battery = r.batt
+	}
+
+	return FeedbackResponse{Feedback: items, Total: listEnv.Meta.Paging.Total}, nil
 }
 
 // GetFinanceRegions fetches finance report region codes.
