@@ -93,11 +93,10 @@ func (c *Client) doAppComplianceRequest(ctx context.Context, appID, method, path
 func normalizeMedicalDeviceRegion(value string) string {
 	value = strings.ToUpper(strings.TrimSpace(value))
 	switch value {
-	case "", "EU":
-		if value == "EU" {
-			return "EEA"
-		}
+	case "":
 		return ""
+	case "EU":
+		return "EEA"
 	default:
 		return value
 	}
