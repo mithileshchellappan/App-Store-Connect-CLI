@@ -77,7 +77,7 @@ const sectionCommands: Record<string, string> = {
   "ppo": "product-pages experiments list --v2 --app APP_ID --output json",
   "game-center": "game-center achievements list --app APP_ID --output json",
   "iap": "iap list --app APP_ID --output json",
-  "nominations": "nominations list --output json",
+  "nominations": "nominations list --status DRAFT,SUBMITTED,ARCHIVED --output json",
   "performance": "performance metrics list --app APP_ID --output json",
 };
 

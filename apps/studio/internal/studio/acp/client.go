@@ -187,6 +187,11 @@ func (c *Client) Prompt(ctx context.Context, sessionID string, prompt string) (P
 func (c *Client) Call(ctx context.Context, method string, params interface{}, out interface{}) error {
 	id := c.nextID.Add(1)
 	responseCh := make(chan rpcResponse, 1)
+	cleanupPending := func() {
+		c.mu.Lock()
+		delete(c.pending, id)
+		c.mu.Unlock()
+	}
 
 	c.mu.Lock()
 	c.pending[id] = responseCh
@@ -200,15 +205,18 @@ func (c *Client) Call(ctx context.Context, method string, params interface{}, ou
 	}
 	payload, err := json.Marshal(request)
 	if err != nil {
+		cleanupPending()
 		return fmt.Errorf("marshal request: %w", err)
 	}
 	payload = append(payload, '\n')
 	if _, err := c.stdin.Write(payload); err != nil {
+		cleanupPending()
 		return fmt.Errorf("write request: %w", err)
 	}
 
 	select {
 	case <-ctx.Done():
+		cleanupPending()
 		return ctx.Err()
 	case response := <-responseCh:
 		if response.Error != nil {

@@ -257,4 +257,23 @@ describe("App", () => {
     });
     expect(screen.queryByText("First App")).not.toBeInTheDocument();
   });
+
+  it("includes required statuses when loading nominations", async () => {
+    render(<App />);
+
+    await screen.findByText("Connected");
+
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "1" } });
+    await screen.findByText("Test App");
+
+    mockRunASCCommand.mockClear();
+
+    fireEvent.click(screen.getByRole("button", { name: "Nominations" }));
+
+    await waitFor(() => {
+      expect(mockRunASCCommand).toHaveBeenCalledWith(
+        "nominations list --status DRAFT,SUBMITTED,ARCHIVED --output json",
+      );
+    });
+  });
 });

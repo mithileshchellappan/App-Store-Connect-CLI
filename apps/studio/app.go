@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -24,6 +25,8 @@ import (
 	"github.com/rudrankriyam/App-Store-Connect-CLI/apps/studio/internal/studio/settings"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/apps/studio/internal/studio/threads"
 )
+
+var ascConfigGuardMu sync.Mutex
 
 type App struct {
 	ctx         context.Context
@@ -253,6 +256,17 @@ type AppScreenshot struct {
 	Height       int    `json:"height"`
 }
 
+type appPriceReference struct {
+	Territory  string
+	PricePoint string
+}
+
+type appPricePointLookupResult struct {
+	Price    string
+	Proceeds string
+	Currency string
+}
+
 type ScreenshotSet struct {
 	DisplayType string          `json:"displayType"`
 	Screenshots []AppScreenshot `json:"screenshots"`
@@ -474,9 +488,6 @@ func (a *App) fetchSubtitle(ctx context.Context, ascPath, appID string) string {
 	return envelope.Data[0].Attributes.Subtitle
 }
 
-// RunASCCommand runs an arbitrary asc CLI command and returns the raw JSON output.
-// args is a space-separated command string, e.g. "reviews list --app 123 --limit 10 --output json".
-// GetSubscriptions fetches subscription groups, then subscriptions for each group concurrently.
 // GetTestFlight fetches beta groups and tester counts concurrently.
 func (a *App) GetTestFlight(appID string) (TestFlightResponse, error) {
 	if strings.TrimSpace(appID) == "" {
@@ -625,6 +636,7 @@ func (a *App) GetTestFlightTesters(groupID string) (TestFlightResponse, error) {
 	return TestFlightResponse{Testers: testers}, nil
 }
 
+// GetSubscriptions fetches subscription groups, then subscriptions for each group concurrently.
 func (a *App) GetSubscriptions(appID string) (SubscriptionsResponse, error) {
 	defer configGuard()()
 	if strings.TrimSpace(appID) == "" {
@@ -751,72 +763,16 @@ func (a *App) GetPricingOverview(appID string) (PricingOverview, error) {
 			return
 		}
 
-		cmd := a.newASCCommand(ctx, ascPath, "pricing", "schedule", "manual-prices", "--schedule", scheduleID, "--output", "json")
-		out, err := cmd.CombinedOutput()
+		price, err := a.fetchCurrentAppPrice(ctx, ascPath, appID, scheduleID)
 		if err != nil {
 			priceCh <- priceResult{}
 			return
 		}
-		type rawPrice struct {
-			ID string `json:"id"`
+		priceCh <- priceResult{
+			price:    price.Price,
+			proceeds: price.Proceeds,
+			currency: price.Currency,
 		}
-		var env struct {
-			Data []rawPrice `json:"data"`
-		}
-		if json.Unmarshal(out, &env) != nil || len(env.Data) == 0 {
-			priceCh <- priceResult{}
-			return
-		}
-		// Decode base64 ID to get territory
-		decoded, err := base64Decode(env.Data[0].ID)
-		if err != nil {
-			priceCh <- priceResult{}
-			return
-		}
-		var priceInfo struct {
-			Territory  string `json:"t"`
-			PricePoint string `json:"p"`
-		}
-		if json.Unmarshal(decoded, &priceInfo) != nil {
-			priceCh <- priceResult{}
-			return
-		}
-		// Use price-points endpoint which includes the free tier ($0.00)
-		cmd2 := a.newASCCommand(ctx, ascPath, "pricing", "price-points", "--app", appID, "--territory", priceInfo.Territory, "--output", "json")
-		out2, err := cmd2.CombinedOutput()
-		if err != nil {
-			priceCh <- priceResult{}
-			return
-		}
-		type rawPP struct {
-			ID         string `json:"id"`
-			Attributes struct {
-				CustomerPrice string `json:"customerPrice"`
-				Proceeds      string `json:"proceeds"`
-			} `json:"attributes"`
-		}
-		var ppEnv struct {
-			Data []rawPP `json:"data"`
-		}
-		if json.Unmarshal(out2, &ppEnv) != nil {
-			priceCh <- priceResult{}
-			return
-		}
-		// Match by decoding each price point's base64 ID to find matching "p" value
-		for _, pp := range ppEnv.Data {
-			ppDecoded, err := base64Decode(pp.ID)
-			if err != nil {
-				continue
-			}
-			var ppInfo struct {
-				PricePoint string `json:"p"`
-			}
-			if json.Unmarshal(ppDecoded, &ppInfo) == nil && ppInfo.PricePoint == priceInfo.PricePoint {
-				priceCh <- priceResult{price: pp.Attributes.CustomerPrice, proceeds: pp.Attributes.Proceeds, currency: "USD"}
-				return
-			}
-		}
-		priceCh <- priceResult{}
 	}()
 
 	// Availability + territories (sequential: need avail ID first, but it's the app ID)
@@ -938,6 +894,8 @@ func (a *App) GetPricingOverview(appID string) (PricingOverview, error) {
 	}, nil
 }
 
+// RunASCCommand runs an arbitrary asc CLI command and returns the raw output.
+// Args is a shell-style command string, e.g. `reviews list --app "123" --limit 10 --output json`.
 func (a *App) RunASCCommand(args string) (ASCCommandResponse, error) {
 	defer configGuard()()
 	if strings.TrimSpace(args) == "" {
@@ -1242,16 +1200,19 @@ func configGuard() func() {
 		return func() {}
 	}
 	path := filepath.Join(home, ".asc", "config.json")
+
+	ascConfigGuardMu.Lock()
 	original, err := os.ReadFile(path)
 	if err != nil {
+		ascConfigGuardMu.Unlock()
 		return func() {}
 	}
 	return func() {
+		defer ascConfigGuardMu.Unlock()
 		current, err := os.ReadFile(path)
-		if err != nil || string(current) == string(original) {
+		if err != nil || bytes.Equal(current, original) {
 			return
 		}
-		// Config was changed — restore the original
 		_ = os.WriteFile(path, original, 0o600)
 	}
 }
@@ -1307,6 +1268,98 @@ func parseAvailabilityViewOutput(out []byte) (string, bool, error) {
 	return strings.TrimSpace(envelope.Data.ID), envelope.Data.Attributes.AvailableInNewTerritories, nil
 }
 
+func parseFirstAppPriceReference(out []byte) (appPriceReference, bool, error) {
+	type rawPrice struct {
+		ID string `json:"id"`
+	}
+	var env struct {
+		Data []rawPrice `json:"data"`
+	}
+	if err := json.Unmarshal(out, &env); err != nil {
+		return appPriceReference{}, false, err
+	}
+	if len(env.Data) == 0 {
+		return appPriceReference{}, false, nil
+	}
+
+	decoded, err := base64Decode(env.Data[0].ID)
+	if err != nil {
+		return appPriceReference{}, false, err
+	}
+
+	var ref struct {
+		Territory  string `json:"t"`
+		PricePoint string `json:"p"`
+	}
+	if err := json.Unmarshal(decoded, &ref); err != nil {
+		return appPriceReference{}, false, err
+	}
+	if strings.TrimSpace(ref.Territory) == "" || strings.TrimSpace(ref.PricePoint) == "" {
+		return appPriceReference{}, false, errors.New("missing territory or price point")
+	}
+
+	return appPriceReference{
+		Territory:  strings.TrimSpace(ref.Territory),
+		PricePoint: strings.TrimSpace(ref.PricePoint),
+	}, true, nil
+}
+
+func parseAppPricePointLookup(out []byte, territoryID, wantedPricePoint string) (appPricePointLookupResult, bool, error) {
+	type rawPricePoint struct {
+		ID         string `json:"id"`
+		Attributes struct {
+			CustomerPrice string `json:"customerPrice"`
+			Proceeds      string `json:"proceeds"`
+		} `json:"attributes"`
+	}
+	type rawIncluded struct {
+		Type       string `json:"type"`
+		ID         string `json:"id"`
+		Attributes struct {
+			Currency string `json:"currency"`
+		} `json:"attributes"`
+	}
+
+	var env struct {
+		Data     []rawPricePoint `json:"data"`
+		Included []rawIncluded   `json:"included"`
+	}
+	if err := json.Unmarshal(out, &env); err != nil {
+		return appPricePointLookupResult{}, false, err
+	}
+
+	currencyByTerritory := make(map[string]string, len(env.Included))
+	for _, included := range env.Included {
+		if included.Type != "territories" {
+			continue
+		}
+		currencyByTerritory[included.ID] = strings.TrimSpace(included.Attributes.Currency)
+	}
+
+	for _, point := range env.Data {
+		decoded, err := base64Decode(point.ID)
+		if err != nil {
+			continue
+		}
+		var ref struct {
+			PricePoint string `json:"p"`
+		}
+		if err := json.Unmarshal(decoded, &ref); err != nil {
+			continue
+		}
+		if strings.TrimSpace(ref.PricePoint) != wantedPricePoint {
+			continue
+		}
+		return appPricePointLookupResult{
+			Price:    point.Attributes.CustomerPrice,
+			Proceeds: point.Attributes.Proceeds,
+			Currency: currencyByTerritory[territoryID],
+		}, true, nil
+	}
+
+	return appPricePointLookupResult{}, false, nil
+}
+
 func parseASCCommandArgs(args string) ([]string, error) {
 	return shellquote.Split(strings.TrimSpace(args))
 }
@@ -1322,6 +1375,43 @@ func (a *App) fetchPricingScheduleID(ctx context.Context, ascPath, appID string)
 		return "", err
 	}
 	return parseResourceIDOutput(out)
+}
+
+func (a *App) fetchSchedulePriceReference(ctx context.Context, ascPath, scheduleID, priceMode string) (appPriceReference, bool, error) {
+	cmd := a.newASCCommand(ctx, ascPath, "pricing", "schedule", priceMode, "--schedule", scheduleID, "--output", "json")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return appPriceReference{}, false, err
+	}
+	return parseFirstAppPriceReference(out)
+}
+
+func (a *App) fetchCurrentAppPrice(ctx context.Context, ascPath, appID, scheduleID string) (appPricePointLookupResult, error) {
+	for _, priceMode := range []string{"manual-prices", "automatic-prices"} {
+		ref, found, err := a.fetchSchedulePriceReference(ctx, ascPath, scheduleID, priceMode)
+		if err != nil {
+			continue
+		}
+		if !found {
+			continue
+		}
+
+		cmd := a.newASCCommand(ctx, ascPath, "pricing", "price-points", "--app", appID, "--territory", ref.Territory, "--output", "json")
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return appPricePointLookupResult{}, err
+		}
+
+		price, matched, err := parseAppPricePointLookup(out, ref.Territory, ref.PricePoint)
+		if err != nil {
+			return appPricePointLookupResult{}, err
+		}
+		if matched {
+			return price, nil
+		}
+	}
+
+	return appPricePointLookupResult{}, nil
 }
 
 func (a *App) bundledASCPath() string {

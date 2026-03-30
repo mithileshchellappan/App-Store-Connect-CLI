@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"context"
 	"os"
 	"path/filepath"
@@ -34,6 +35,39 @@ func TestParseAvailabilityViewOutputReturnsResourceID(t *testing.T) {
 	}
 	if !available {
 		t.Fatal("available = false, want true")
+	}
+}
+
+func TestParseFirstAppPriceReference(t *testing.T) {
+	priceID := base64.RawURLEncoding.EncodeToString([]byte(`{"t":"CAN","p":"price-point-42"}`))
+
+	ref, found, err := parseFirstAppPriceReference([]byte(`{"data":[{"id":"` + priceID + `"}]}`))
+	if err != nil {
+		t.Fatalf("parseFirstAppPriceReference() error = %v", err)
+	}
+	if !found {
+		t.Fatal("found = false, want true")
+	}
+	if ref.Territory != "CAN" || ref.PricePoint != "price-point-42" {
+		t.Fatalf("ref = %+v, want territory CAN and price point price-point-42", ref)
+	}
+}
+
+func TestParseAppPricePointLookupUsesIncludedTerritoryCurrency(t *testing.T) {
+	pricePointID := base64.RawURLEncoding.EncodeToString([]byte(`{"p":"price-point-42"}`))
+
+	result, found, err := parseAppPricePointLookup([]byte(`{
+		"data":[{"id":"`+pricePointID+`","attributes":{"customerPrice":"4.99","proceeds":"3.49"}}],
+		"included":[{"type":"territories","id":"CAN","attributes":{"currency":"CAD"}}]
+	}`), "CAN", "price-point-42")
+	if err != nil {
+		t.Fatalf("parseAppPricePointLookup() error = %v", err)
+	}
+	if !found {
+		t.Fatal("found = false, want true")
+	}
+	if result.Price != "4.99" || result.Proceeds != "3.49" || result.Currency != "CAD" {
+		t.Fatalf("result = %+v, want price 4.99, proceeds 3.49, currency CAD", result)
 	}
 }
 
@@ -87,6 +121,68 @@ func TestBundledASCPathPrefersAppBundleResources(t *testing.T) {
 	app := &App{}
 	if got := app.bundledASCPath(); got != bundled {
 		t.Fatalf("bundledASCPath() = %q, want %q", got, bundled)
+	}
+}
+
+func TestConfigGuardSerializesConcurrentSnapshots(t *testing.T) {
+	tmpHome := t.TempDir()
+	configDir := filepath.Join(tmpHome, ".asc")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	configPath := filepath.Join(configDir, "config.json")
+	if err := os.WriteFile(configPath, []byte(`{"profile":"good"}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	originalHome := os.Getenv("HOME")
+	if err := os.Setenv("HOME", tmpHome); err != nil {
+		t.Fatalf("Setenv() error = %v", err)
+	}
+	t.Cleanup(func() {
+		if originalHome == "" {
+			_ = os.Unsetenv("HOME")
+			return
+		}
+		_ = os.Setenv("HOME", originalHome)
+	})
+
+	restoreFirst := configGuard()
+	if err := os.WriteFile(configPath, []byte(`{"profile":"corrupted"}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	secondReady := make(chan func(), 1)
+	go func() {
+		secondReady <- configGuard()
+	}()
+
+	select {
+	case <-secondReady:
+		t.Fatal("second configGuard() returned before the first restore unlocked it")
+	case <-time.After(150 * time.Millisecond):
+	}
+
+	restoreFirst()
+
+	var restoreSecond func()
+	select {
+	case restoreSecond = <-secondReady:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for second configGuard()")
+	}
+
+	if err := os.WriteFile(configPath, []byte(`{"profile":"second-corruption"}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	restoreSecond()
+
+	got, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if string(got) != `{"profile":"good"}` {
+		t.Fatalf("config contents = %q, want original snapshot", string(got))
 	}
 }
 

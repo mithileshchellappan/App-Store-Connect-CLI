@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -199,6 +200,21 @@ func TestPromptRoundTripHandlesLargeEvents(t *testing.T) {
 	}
 }
 
+func TestCallRemovesPendingEntryWhenWriteFails(t *testing.T) {
+	client := &Client{
+		stdin:   failingWriteCloser{err: errors.New("broken pipe")},
+		pending: make(map[int64]chan rpcResponse),
+	}
+
+	err := client.Call(context.Background(), "initialize", map[string]any{}, nil)
+	if err == nil || !strings.Contains(err.Error(), "write request") {
+		t.Fatalf("Call() error = %v, want write failure", err)
+	}
+	if len(client.pending) != 0 {
+		t.Fatalf("len(client.pending) = %d, want 0", len(client.pending))
+	}
+}
+
 func TestACPLargeEventHelperProcess(*testing.T) {
 	if os.Getenv("GO_WANT_ACP_LARGE_EVENT_HELPER_PROCESS") != "1" {
 		return
@@ -233,6 +249,18 @@ func TestACPLargeEventHelperProcess(*testing.T) {
 		}
 	}
 	os.Exit(0)
+}
+
+type failingWriteCloser struct {
+	err error
+}
+
+func (f failingWriteCloser) Write([]byte) (int, error) {
+	return 0, f.err
+}
+
+func (f failingWriteCloser) Close() error {
+	return nil
 }
 
 func respond(id int64, result any) {
