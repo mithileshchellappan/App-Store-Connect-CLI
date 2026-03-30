@@ -63,12 +63,11 @@ const sectionCommands: Record<string, string> = {
   "ratings-reviews": "reviews list --app APP_ID --limit 20 --output json",
   "in-app-events": "app-events list --app APP_ID --output json",
   "custom-product-pages": "product-pages custom-pages list --app APP_ID --output json",
-  "ppo": "product-pages experiments list --app APP_ID --output json",
-  "promo-codes": "offercodes list --app APP_ID --output json",
+  "ppo": "product-pages experiments list --v2 --app APP_ID --output json",
   "game-center": "game-center achievements list --app APP_ID --output json",
   "pricing": "pricing schedule view --app APP_ID --output json",
   "iap": "iap list --app APP_ID --output json",
-  "subscriptions": "subscriptions list --app APP_ID --output json",
+  "subscriptions": "subscriptions groups list --app APP_ID --output json",
   "nominations": "nominations list --output json",
 };
 

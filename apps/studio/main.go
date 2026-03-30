@@ -44,7 +44,7 @@ func main() {
 				TitlebarAppearsTransparent: true,
 				HideTitle:                  true,
 				FullSizeContent:            true,
-				UseToolbar:                 false,
+				UseToolbar:                 true,
 				HideToolbarSeparator:       true,
 			},
 		},

@@ -67,7 +67,9 @@ textarea {
 /* ── Sidebar ────────────────────────────────────── */
 
 .sidebar {
-  background: rgba(246, 246, 248, 0.6);
+  background: rgba(246, 246, 248, 0.45);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
   display: flex;
   flex-direction: column;
   overflow-y: auto;
@@ -222,7 +224,7 @@ textarea {
   width: 100%;
   padding: 6px 10px;
   border: none;
-  border-left: 2px solid transparent;
+  border-left: none;
   border-radius: var(--radius-sm);
   background: transparent;
   text-align: left;
@@ -239,7 +241,6 @@ textarea {
 .sidebar-row.is-active {
   background: var(--accent-bg);
   color: var(--accent);
-  border-left-color: var(--accent);
 }
 
 .sidebar-row.is-active .sidebar-row-icon {
@@ -828,18 +829,18 @@ textarea {
 }
 
 .composer-card {
-  border: 1px solid rgba(0, 0, 0, 0.10);
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  background: transparent;
+  box-shadow: none;
   overflow: hidden;
   cursor: text;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .composer-card:focus-within {
-  border-color: rgba(0, 0, 0, 0.16);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.14);
+  box-shadow: none;
 }
 
 .composer-card textarea {
