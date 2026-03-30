@@ -6,7 +6,6 @@ import { Bootstrap, CheckAuthStatus, GetAppDetail, GetScreenshots, GetSettings, 
 import { environment, settings as settingsNS } from "../wailsjs/go/models";
 
 const sections: NavSection[] = [
-  { id: "apps", label: "Apps", description: "Your apps" },
   { id: "overview", label: "Overview", description: "Release cockpit" },
   { id: "builds", label: "Builds", description: "TestFlight and processing" },
   { id: "submission", label: "Submission", description: "Validation and publish" },
@@ -14,7 +13,6 @@ const sections: NavSection[] = [
 ];
 
 const sectionIcons: Record<string, string> = {
-  apps: "□",
   overview: "◎",
   builds: "⏣",
   submission: "↗",
@@ -253,8 +251,59 @@ export default function App() {
       <aside className="sidebar">
         <div className="sidebar-header">
           <span className="sidebar-title">ASC Studio</span>
-          <button className="sidebar-action" type="button" aria-label="New thread">+</button>
         </div>
+
+        {/* App picker dropdown */}
+        <div className="sidebar-app-picker">
+          {appsLoading ? (
+            <div className="app-picker-placeholder">Loading apps…</div>
+          ) : appList.length > 0 ? (
+            <select
+              className="app-picker-select"
+              value={selectedAppId ?? ""}
+              onChange={(e) => {
+                const id = e.target.value;
+                if (id) {
+                  handleSelectApp(id);
+                  setActiveSection(sections[0]);
+                }
+              }}
+            >
+              <option value="" disabled>Select an app…</option>
+              {appList.map((app) => (
+                <option key={app.id} value={app.id}>
+                  {app.name}{app.subtitle ? ` — ${app.subtitle}` : ""}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <div className="app-picker-placeholder">
+              {authStatus.authenticated ? "No apps found" : "Not authenticated"}
+            </div>
+          )}
+        </div>
+
+        {/* Version badges when an app is selected */}
+        {appDetail && appDetail.versions.length > 0 && (
+          <div className="sidebar-section">
+            {(["IOS", "MAC_OS", "VISION_OS"] as const).map((platform) => {
+              const v = appDetail.versions.find((ver) => ver.platform === platform);
+              if (!v) return null;
+              const label = platform === "IOS" ? "iOS App" : platform === "MAC_OS" ? "macOS App" : "visionOS App";
+              return (
+                <div key={platform} className="sidebar-version-group">
+                  <p className="sidebar-version-platform">{label}</p>
+                  <div className="sidebar-version-row">
+                    <span className={`sidebar-version-dot state-${v.state.toLowerCase().replace(/_/g, "-")}`} />
+                    <span className="sidebar-version-text">
+                      {v.version} {v.state.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         <div className="sidebar-section">
           <p className="sidebar-section-label">Workspace</p>
@@ -466,193 +515,132 @@ export default function App() {
               Open Settings
             </button>
           </div>
-        ) : activeSection.id === "apps" ? (
-          <div className="apps-view">
-            {/* Left: app list */}
-            <div className="apps-list-pane">
-              <div className="workspace-section">
-                <h3 className="section-label">Apps</h3>
-                {appsLoading ? (
-                  <p className="empty-hint">Loading…</p>
-                ) : appList.length > 0 ? (
-                  <div className="app-list">
-                    {appList.map((app) => (
-                      <button
-                        key={app.id}
-                        type="button"
-                        className={`app-list-row${selectedAppId === app.id ? " is-selected" : ""}`}
-                        onClick={() => handleSelectApp(app.id)}
-                      >
-                        <span className="app-list-name">{app.name}</span>
-                        {app.subtitle && <span className="app-list-subtitle">{app.subtitle}</span>}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="empty-hint">No apps found</p>
-                )}
+        ) : activeSection.id === "overview" && appDetail ? (
+          <div className="app-detail-view">
+            {/* Header */}
+            <div className="app-detail-header">
+              <p className="app-detail-name">{appDetail.name}</p>
+              {appDetail.subtitle && <p className="app-detail-subtitle">{appDetail.subtitle}</p>}
+            </div>
+
+            {/* General info */}
+            <div className="app-detail-section">
+              <h3 className="section-label">General</h3>
+              <div className="env-grid">
+                <div className="env-row">
+                  <span className="env-key">Bundle ID</span>
+                  <span className="env-value mono">{appDetail.bundleId}</span>
+                </div>
+                <div className="env-row">
+                  <span className="env-key">SKU</span>
+                  <span className="env-value mono">{appDetail.sku}</span>
+                </div>
+                <div className="env-row">
+                  <span className="env-key">Primary locale</span>
+                  <span className="env-value">{appDetail.primaryLocale}</span>
+                </div>
               </div>
             </div>
 
-            {/* Right: app detail */}
-            <div className="apps-detail-pane">
-              {!selectedAppId ? (
-                <div className="apps-detail-empty">
-                  <p className="empty-hint">Select an app to view details</p>
-                </div>
-              ) : detailLoading ? (
-                <div className="apps-detail-empty">
-                  <p className="empty-hint">Loading…</p>
-                </div>
-              ) : appDetail?.error ? (
-                <div className="apps-detail-empty">
-                  <p className="empty-hint">{appDetail.error}</p>
-                </div>
-              ) : appDetail ? (
-                <div className="app-detail-content">
-                  {/* Header */}
-                  <div className="app-detail-header">
-                    <p className="app-detail-name">{appDetail.name}</p>
-                    {appDetail.subtitle && <p className="app-detail-subtitle">{appDetail.subtitle}</p>}
+            {/* App Store metadata */}
+            {metadataLoading ? (
+              <div className="app-detail-section">
+                <p className="empty-hint">Loading metadata…</p>
+              </div>
+            ) : allLocalizations.length > 0 ? (() => {
+              const loc = allLocalizations.find((l) => l.locale === selectedLocale) ?? allLocalizations[0];
+              return (
+                <div className="app-detail-section">
+                  <div className="metadata-header">
+                    <h3 className="section-label" style={{ margin: 0 }}>App Store Metadata</h3>
+                    <select
+                      className="locale-picker"
+                      value={selectedLocale}
+                      onChange={(e) => handleLocaleChange(e.target.value)}
+                    >
+                      {allLocalizations.map((l) => (
+                        <option key={l.locale} value={l.locale}>{l.locale}</option>
+                      ))}
+                    </select>
                   </div>
 
-                  {/* Latest version per platform */}
-                  {(["IOS", "MAC_OS", "VISION_OS"] as const).map((platform) => {
-                    const latest = appDetail.versions.find((v) => v.platform === platform);
-                    if (!latest) return null;
-                    const platformLabel = platform === "IOS" ? "iOS App" : platform === "MAC_OS" ? "macOS App" : "visionOS App";
-                    return (
-                      <div key={platform} className="app-detail-section">
-                        <h3 className="section-label">{platformLabel}</h3>
-                        <div className="app-version-row">
-                          <span className="app-version-string">{latest.version}</span>
-                          <span className={`app-version-state state-${latest.state.toLowerCase().replace(/_/g, "-")}`}>
-                            {latest.state.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* General info */}
-                  <div className="app-detail-section">
-                    <h3 className="section-label">General</h3>
-                    <div className="env-grid">
-                      <div className="env-row">
-                        <span className="env-key">Bundle ID</span>
-                        <span className="env-value mono">{appDetail.bundleId}</span>
-                      </div>
-                      <div className="env-row">
-                        <span className="env-key">SKU</span>
-                        <span className="env-value mono">{appDetail.sku}</span>
-                      </div>
-                      <div className="env-row">
-                        <span className="env-key">Primary locale</span>
-                        <span className="env-value">{appDetail.primaryLocale}</span>
-                      </div>
+                  {/* Screenshots */}
+                  {screenshotsLoading ? (
+                    <div className="metadata-field">
+                      <p className="metadata-label">Screenshots</p>
+                      <p className="empty-hint" style={{ margin: 0 }}>Loading…</p>
                     </div>
-                  </div>
-
-                  {/* App Store metadata */}
-                  {metadataLoading ? (
-                    <div className="app-detail-section">
-                      <p className="empty-hint">Loading metadata…</p>
+                  ) : screenshotSets.length > 0 ? (
+                    <div className="metadata-field">
+                      <p className="metadata-label">Screenshots</p>
+                      {screenshotSets.map((set) => {
+                        const label = set.displayType
+                          .replace(/^APP_/, "")
+                          .replace(/_/g, " ")
+                          .replace(/\b\w/g, (c) => c.toUpperCase());
+                        return (
+                          <div key={set.displayType} className="screenshot-set">
+                            <p className="screenshot-set-label">{label}</p>
+                            <div className="screenshot-row">
+                              {set.screenshots.map((s, i) => (
+                                <img
+                                  key={i}
+                                  src={s.thumbnailUrl}
+                                  alt={`Screenshot ${i + 1}`}
+                                  className={`screenshot-thumb ${s.width > s.height ? "landscape" : ""}`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
-                  ) : allLocalizations.length > 0 ? (() => {
-                    const loc = allLocalizations.find((l) => l.locale === selectedLocale) ?? allLocalizations[0];
-                    return (
-                      <div className="app-detail-section">
-                        <div className="metadata-header">
-                          <h3 className="section-label" style={{ margin: 0 }}>App Store Metadata</h3>
-                          <select
-                            className="locale-picker"
-                            value={selectedLocale}
-                            onChange={(e) => handleLocaleChange(e.target.value)}
-                          >
-                            {allLocalizations.map((l) => (
-                              <option key={l.locale} value={l.locale}>{l.locale}</option>
-                            ))}
-                          </select>
-                        </div>
+                  ) : null}
 
-                        {/* Screenshots */}
-                        {screenshotsLoading ? (
-                          <div className="metadata-field">
-                            <p className="metadata-label">Screenshots</p>
-                            <p className="empty-hint" style={{ margin: 0 }}>Loading…</p>
-                          </div>
-                        ) : screenshotSets.length > 0 ? (
-                          <div className="metadata-field">
-                            <p className="metadata-label">Screenshots</p>
-                            {screenshotSets.map((set) => {
-                              const label = set.displayType
-                                .replace(/^APP_/, "")
-                                .replace(/_/g, " ")
-                                .replace(/\b\w/g, (c) => c.toUpperCase());
-                              return (
-                                <div key={set.displayType} className="screenshot-set">
-                                  <p className="screenshot-set-label">{label}</p>
-                                  <div className="screenshot-row">
-                                    {set.screenshots.map((s, i) => (
-                                      <img
-                                        key={i}
-                                        src={s.thumbnailUrl}
-                                        alt={`Screenshot ${i + 1}`}
-                                        className={`screenshot-thumb ${s.width > s.height ? "landscape" : ""}`}
-                                      />
-                                    ))}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : null}
-
-                        {loc.promotionalText && (
-                          <div className="metadata-field">
-                            <p className="metadata-label">Promotional Text</p>
-                            <p className="metadata-value">{loc.promotionalText}</p>
-                          </div>
-                        )}
-                        {loc.description && (
-                          <div className="metadata-field">
-                            <p className="metadata-label">Description</p>
-                            <p className="metadata-value metadata-multiline">{loc.description}</p>
-                          </div>
-                        )}
-                        {loc.whatsNew && (
-                          <div className="metadata-field">
-                            <p className="metadata-label">What's New</p>
-                            <p className="metadata-value metadata-multiline">{loc.whatsNew}</p>
-                          </div>
-                        )}
-                        {loc.keywords && (
-                          <div className="metadata-field">
-                            <p className="metadata-label">Keywords</p>
-                            <p className="metadata-value mono">{loc.keywords}</p>
-                          </div>
-                        )}
-                        {(loc.supportUrl || loc.marketingUrl) && (
-                          <div className="metadata-field">
-                            <p className="metadata-label">URLs</p>
-                            {loc.supportUrl && <p className="metadata-value mono">{loc.supportUrl}</p>}
-                            {loc.marketingUrl && <p className="metadata-value mono">{loc.marketingUrl}</p>}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })() : null}
+                  {loc.promotionalText && (
+                    <div className="metadata-field">
+                      <p className="metadata-label">Promotional Text</p>
+                      <p className="metadata-value">{loc.promotionalText}</p>
+                    </div>
+                  )}
+                  {loc.description && (
+                    <div className="metadata-field">
+                      <p className="metadata-label">Description</p>
+                      <p className="metadata-value metadata-multiline">{loc.description}</p>
+                    </div>
+                  )}
+                  {loc.whatsNew && (
+                    <div className="metadata-field">
+                      <p className="metadata-label">What's New</p>
+                      <p className="metadata-value metadata-multiline">{loc.whatsNew}</p>
+                    </div>
+                  )}
+                  {loc.keywords && (
+                    <div className="metadata-field">
+                      <p className="metadata-label">Keywords</p>
+                      <p className="metadata-value mono">{loc.keywords}</p>
+                    </div>
+                  )}
+                  {(loc.supportUrl || loc.marketingUrl) && (
+                    <div className="metadata-field">
+                      <p className="metadata-label">URLs</p>
+                      {loc.supportUrl && <p className="metadata-value mono">{loc.supportUrl}</p>}
+                      {loc.marketingUrl && <p className="metadata-value mono">{loc.marketingUrl}</p>}
+                    </div>
+                  )}
                 </div>
-              ) : null}
-            </div>
+              );
+            })() : null}
           </div>
         ) : (
           <div className="empty-state">
             <p className="empty-title">
-              {activeSection.label}
+              {!selectedAppId && activeSection.id !== "settings" ? "Select an App" : activeSection.label}
             </p>
             <p className="empty-hint">
-              This workspace section is not wired to live data yet. Use the ACP chat below to run commands.
+              {!selectedAppId && activeSection.id !== "settings"
+                ? "Use the dropdown in the sidebar to pick an app."
+                : "This workspace section is not wired to live data yet."}
             </p>
           </div>
         )}
