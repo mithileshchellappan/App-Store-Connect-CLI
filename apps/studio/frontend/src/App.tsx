@@ -119,6 +119,19 @@ const scopes: Scope[] = [
           { id: "profiles", label: "Profiles", description: "Provisioning profiles" },
         ],
       },
+      {
+        label: "Commerce",
+        items: [
+          { id: "merchant-ids", label: "Merchant IDs", description: "Payment merchant IDs" },
+          { id: "pass-type-ids", label: "Pass Type IDs", description: "Wallet pass types" },
+        ],
+      },
+      {
+        label: "Distribution",
+        items: [
+          { id: "notarization", label: "Notarization", description: "macOS notarization" },
+        ],
+      },
     ],
   },
   {
@@ -181,7 +194,13 @@ const sectionCommands: Record<string, string> = {
   "eula": "eula list --app APP_ID --output json",
   "build-localizations": "build-localizations list --app APP_ID --output json",
   "sandbox": "sandbox list --output json",
+  "merchant-ids": "merchant-ids list --output json",
+  "pass-type-ids": "pass-type-ids list --output json",
 };
+
+function sectionRequiresApp(sectionId: string): boolean {
+  return sectionCommands[sectionId]?.includes("APP_ID") ?? false;
+}
 
 // Human-readable field labels for known attribute keys
 const fieldLabels: Record<string, string> = {
