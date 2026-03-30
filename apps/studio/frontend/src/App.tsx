@@ -895,6 +895,19 @@ export default function App() {
         {/* Context bar */}
         <header className="context-bar">
           <div className="context-app">
+            {authConfigured ? (
+              <>
+                <span className="context-badge">{authStatus.storage || "Authenticated"}</span>
+                {authStatus.profile && (
+                  <span className="context-version">{authStatus.profile}</span>
+                )}
+                <span className="context-status state-ready">Connected</span>
+              </>
+            ) : (
+              <span className="context-status state-processing">Not authenticated</span>
+            )}
+          </div>
+          <div className="toolbar-right">
             <div className="scope-tabs">
               {scopes.map((scope) => (
                 <button
@@ -911,19 +924,6 @@ export default function App() {
                 </button>
               ))}
             </div>
-            {authConfigured ? (
-              <>
-                <span className="context-badge">{authStatus.storage || "Authenticated"}</span>
-                {authStatus.profile && (
-                  <span className="context-version">{authStatus.profile}</span>
-                )}
-                <span className="context-status state-ready">Connected</span>
-              </>
-            ) : (
-              <span className="context-status state-processing">Not authenticated</span>
-            )}
-          </div>
-          <div className="toolbar-right">
             <button
               className="toolbar-btn"
               type="button"

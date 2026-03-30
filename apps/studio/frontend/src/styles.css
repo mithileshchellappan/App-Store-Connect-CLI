@@ -1236,14 +1236,20 @@ textarea {
   color: var(--accent);
 }
 
-/* ── Scope tabs (header) ─────────────────────────── */
+/* ── Scope tabs (header) — Liquid Glass ──────────── */
 
 .scope-tabs {
   display: flex;
-  gap: 2px;
-  background: rgba(128, 128, 128, 0.12);
-  border-radius: 8px;
+  gap: 1px;
+  background: rgba(128, 128, 128, 0.1);
+  backdrop-filter: blur(12px) saturate(150%);
+  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
   padding: 2px;
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 
 .scope-tab {
@@ -1253,18 +1259,24 @@ textarea {
   color: var(--text-secondary);
   background: transparent;
   border: none;
-  border-radius: 6px;
-  padding: 4px 12px;
+  border-radius: 8px;
+  padding: 4px 14px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s ease;
 }
 
 .scope-tab:hover {
   color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .scope-tab.is-active {
-  background: var(--accent-bg);
-  color: var(--accent);
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--text-primary);
   font-weight: 600;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
 }
