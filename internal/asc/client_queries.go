@@ -553,7 +553,18 @@ type linkagesQuery struct {
 
 type pricePointsQuery struct {
 	listQuery
-	territory string
+	territory       string
+	fields          []string
+	territoryFields []string
+	include         []string
+}
+
+type appPriceSchedulePricesQuery struct {
+	listQuery
+	include          []string
+	priceFields      []string
+	pricePointFields []string
+	territoryFields  []string
 }
 
 type accessibilityDeclarationsQuery struct {
@@ -1547,6 +1558,19 @@ func buildPricePointsQuery(query *pricePointsQuery) string {
 	if strings.TrimSpace(query.territory) != "" {
 		values.Set("filter[territory]", strings.TrimSpace(query.territory))
 	}
+	addCSV(values, "fields[appPricePoints]", query.fields)
+	addCSV(values, "fields[territories]", query.territoryFields)
+	addCSV(values, "include", query.include)
+	addLimit(values, query.limit)
+	return values.Encode()
+}
+
+func buildAppPriceSchedulePricesQuery(query *appPriceSchedulePricesQuery) string {
+	values := url.Values{}
+	addCSV(values, "include", query.include)
+	addCSV(values, "fields[appPrices]", query.priceFields)
+	addCSV(values, "fields[appPricePoints]", query.pricePointFields)
+	addCSV(values, "fields[territories]", query.territoryFields)
 	addLimit(values, query.limit)
 	return values.Encode()
 }

@@ -314,9 +314,22 @@ func (c *Client) GetAppPriceScheduleBaseTerritoryRelationship(ctx context.Contex
 }
 
 // GetAppPriceScheduleManualPrices retrieves manual prices for a schedule.
-func (c *Client) GetAppPriceScheduleManualPrices(ctx context.Context, scheduleID string) (*AppPricesResponse, error) {
+func (c *Client) GetAppPriceScheduleManualPrices(ctx context.Context, scheduleID string, opts ...AppPriceSchedulePricesOption) (*AppPricesResponse, error) {
+	query := &appPriceSchedulePricesQuery{}
+	for _, opt := range opts {
+		opt(query)
+	}
+
 	scheduleID = strings.TrimSpace(scheduleID)
 	path := fmt.Sprintf("/v1/appPriceSchedules/%s/manualPrices", scheduleID)
+	if query.nextURL != "" {
+		if err := validateNextURL(query.nextURL); err != nil {
+			return nil, fmt.Errorf("appPriceScheduleManualPrices: %w", err)
+		}
+		path = query.nextURL
+	} else if queryString := buildAppPriceSchedulePricesQuery(query); queryString != "" {
+		path += "?" + queryString
+	}
 
 	data, err := c.do(ctx, "GET", path, nil)
 	if err != nil {
@@ -367,9 +380,22 @@ func (c *Client) GetAppPriceScheduleManualPricesRelationships(ctx context.Contex
 }
 
 // GetAppPriceScheduleAutomaticPrices retrieves automatic prices for a schedule.
-func (c *Client) GetAppPriceScheduleAutomaticPrices(ctx context.Context, scheduleID string) (*AppPricesResponse, error) {
+func (c *Client) GetAppPriceScheduleAutomaticPrices(ctx context.Context, scheduleID string, opts ...AppPriceSchedulePricesOption) (*AppPricesResponse, error) {
+	query := &appPriceSchedulePricesQuery{}
+	for _, opt := range opts {
+		opt(query)
+	}
+
 	scheduleID = strings.TrimSpace(scheduleID)
 	path := fmt.Sprintf("/v1/appPriceSchedules/%s/automaticPrices", scheduleID)
+	if query.nextURL != "" {
+		if err := validateNextURL(query.nextURL); err != nil {
+			return nil, fmt.Errorf("appPriceScheduleAutomaticPrices: %w", err)
+		}
+		path = query.nextURL
+	} else if queryString := buildAppPriceSchedulePricesQuery(query); queryString != "" {
+		path += "?" + queryString
+	}
 
 	data, err := c.do(ctx, "GET", path, nil)
 	if err != nil {

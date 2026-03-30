@@ -294,6 +294,7 @@ func TestPricingCommands_DefaultOutputJSON(t *testing.T) {
 		name string
 		cmd  func() *ffcli.Command
 	}{
+		{"current", PricingCurrentCommand},
 		{"territories list", PricingTerritoriesListCommand},
 		{"tiers", PricingTiersCommand},
 		{"price-points", PricingPricePointsCommand},
@@ -319,6 +320,31 @@ func TestPricingCommands_DefaultOutputJSON(t *testing.T) {
 				t.Fatalf("expected --output default to be 'json', got %q", f.DefValue)
 			}
 		})
+	}
+}
+
+func TestPricingCurrentCommand_MissingApp(t *testing.T) {
+	t.Setenv("ASC_APP_ID", "")
+	cmd := PricingCurrentCommand()
+
+	if err := cmd.FlagSet.Parse([]string{}); err != nil {
+		t.Fatalf("failed to parse flags: %v", err)
+	}
+
+	if err := cmd.Exec(context.Background(), []string{}); !errors.Is(err, flag.ErrHelp) {
+		t.Fatalf("expected flag.ErrHelp when --app is missing, got %v", err)
+	}
+}
+
+func TestPricingCurrentCommand_MutuallyExclusiveTerritorySelection(t *testing.T) {
+	cmd := PricingCurrentCommand()
+
+	if err := cmd.FlagSet.Parse([]string{"--app", "APP", "--territory", "USA", "--all-territories"}); err != nil {
+		t.Fatalf("failed to parse flags: %v", err)
+	}
+
+	if err := cmd.Exec(context.Background(), []string{}); !errors.Is(err, flag.ErrHelp) {
+		t.Fatalf("expected flag.ErrHelp when --territory and --all-territories are both set, got %v", err)
 	}
 }
 

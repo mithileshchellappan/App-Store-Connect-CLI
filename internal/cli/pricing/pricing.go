@@ -23,6 +23,7 @@ func PricingCommand() *ffcli.Command {
 		LongHelp: `Manage app pricing and availability.
 
 Examples:
+  asc pricing current --app "123456789"
   asc pricing territories list
   asc pricing price-points --app "123456789"
   asc pricing price-points --app "123456789" --territory "USA"
@@ -42,6 +43,7 @@ Examples:
   asc pricing availability territory-availabilities --availability "AVAILABILITY_ID"`,
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
+			PricingCurrentCommand(),
 			PricingTerritoriesCommand(),
 			PricingPricePointsCommand(),
 			PricingTiersCommand(),

@@ -275,6 +275,9 @@ type LinkagesOption func(*linkagesQuery)
 // PricePointsOption is a functional option for GetAppPricePoints.
 type PricePointsOption func(*pricePointsQuery)
 
+// AppPriceSchedulePricesOption is a functional option for app price schedule price endpoints.
+type AppPriceSchedulePricesOption func(*appPriceSchedulePricesQuery)
+
 // AccessibilityDeclarationsOption is a functional option for accessibility declarations.
 type AccessibilityDeclarationsOption func(*accessibilityDeclarationsQuery)
 
@@ -3212,6 +3215,73 @@ func WithPricePointsTerritory(territory string) PricePointsOption {
 		if strings.TrimSpace(territory) != "" {
 			q.territory = strings.ToUpper(strings.TrimSpace(territory))
 		}
+	}
+}
+
+// WithPricePointsFields sets fields[appPricePoints] for app price point responses.
+func WithPricePointsFields(fields []string) PricePointsOption {
+	return func(q *pricePointsQuery) {
+		q.fields = normalizeList(fields)
+	}
+}
+
+// WithPricePointsTerritoryFields sets fields[territories] for included territory responses.
+func WithPricePointsTerritoryFields(fields []string) PricePointsOption {
+	return func(q *pricePointsQuery) {
+		q.territoryFields = normalizeList(fields)
+	}
+}
+
+// WithPricePointsInclude sets include values for app price point responses.
+func WithPricePointsInclude(include []string) PricePointsOption {
+	return func(q *pricePointsQuery) {
+		q.include = normalizeList(include)
+	}
+}
+
+// WithAppPriceSchedulePricesLimit sets the max number of schedule prices to return.
+func WithAppPriceSchedulePricesLimit(limit int) AppPriceSchedulePricesOption {
+	return func(q *appPriceSchedulePricesQuery) {
+		if limit > 0 {
+			q.limit = limit
+		}
+	}
+}
+
+// WithAppPriceSchedulePricesNextURL uses a next page URL directly.
+func WithAppPriceSchedulePricesNextURL(next string) AppPriceSchedulePricesOption {
+	return func(q *appPriceSchedulePricesQuery) {
+		if strings.TrimSpace(next) != "" {
+			q.nextURL = strings.TrimSpace(next)
+		}
+	}
+}
+
+// WithAppPriceSchedulePricesInclude sets include values for app schedule price responses.
+func WithAppPriceSchedulePricesInclude(include []string) AppPriceSchedulePricesOption {
+	return func(q *appPriceSchedulePricesQuery) {
+		q.include = normalizeList(include)
+	}
+}
+
+// WithAppPriceSchedulePricesFields sets fields[appPrices] for app schedule price responses.
+func WithAppPriceSchedulePricesFields(fields []string) AppPriceSchedulePricesOption {
+	return func(q *appPriceSchedulePricesQuery) {
+		q.priceFields = normalizeList(fields)
+	}
+}
+
+// WithAppPriceSchedulePricesPricePointFields sets fields[appPricePoints] for included app price points.
+func WithAppPriceSchedulePricesPricePointFields(fields []string) AppPriceSchedulePricesOption {
+	return func(q *appPriceSchedulePricesQuery) {
+		q.pricePointFields = normalizeList(fields)
+	}
+}
+
+// WithAppPriceSchedulePricesTerritoryFields sets fields[territories] for included territories.
+func WithAppPriceSchedulePricesTerritoryFields(fields []string) AppPriceSchedulePricesOption {
+	return func(q *appPriceSchedulePricesQuery) {
+		q.territoryFields = normalizeList(fields)
 	}
 }
 

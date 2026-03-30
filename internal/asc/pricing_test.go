@@ -208,6 +208,48 @@ func TestGetAppPriceScheduleManualPrices(t *testing.T) {
 	}
 }
 
+func TestGetAppPriceScheduleManualPrices_WithOptions(t *testing.T) {
+	resp := AppPricesResponse{
+		Data: []Resource[AppPriceAttributes]{{Type: ResourceTypeAppPrices, ID: "price-1"}},
+	}
+	body, _ := json.Marshal(resp)
+
+	client := newTestClient(t, func(req *http.Request) {
+		assertAuthorized(t, req)
+		if req.URL.Path != "/v1/appPriceSchedules/schedule-1/manualPrices" {
+			t.Fatalf("expected path /v1/appPriceSchedules/schedule-1/manualPrices, got %s", req.URL.Path)
+		}
+		query := req.URL.Query()
+		if query.Get("include") != "appPricePoint,territory" {
+			t.Fatalf("expected include=appPricePoint,territory, got %q", query.Get("include"))
+		}
+		if query.Get("fields[appPrices]") != "manual,startDate,endDate,appPricePoint,territory" {
+			t.Fatalf("unexpected fields[appPrices]: %q", query.Get("fields[appPrices]"))
+		}
+		if query.Get("fields[appPricePoints]") != "customerPrice,proceeds,territory" {
+			t.Fatalf("unexpected fields[appPricePoints]: %q", query.Get("fields[appPricePoints]"))
+		}
+		if query.Get("fields[territories]") != "currency" {
+			t.Fatalf("unexpected fields[territories]: %q", query.Get("fields[territories]"))
+		}
+		if query.Get("limit") != "200" {
+			t.Fatalf("expected limit=200, got %q", query.Get("limit"))
+		}
+	}, jsonResponse(http.StatusOK, string(body)))
+
+	if _, err := client.GetAppPriceScheduleManualPrices(
+		context.Background(),
+		"schedule-1",
+		WithAppPriceSchedulePricesInclude([]string{"appPricePoint", "territory"}),
+		WithAppPriceSchedulePricesFields([]string{"manual", "startDate", "endDate", "appPricePoint", "territory"}),
+		WithAppPriceSchedulePricesPricePointFields([]string{"customerPrice", "proceeds", "territory"}),
+		WithAppPriceSchedulePricesTerritoryFields([]string{"currency"}),
+		WithAppPriceSchedulePricesLimit(200),
+	); err != nil {
+		t.Fatalf("GetAppPriceScheduleManualPrices() error: %v", err)
+	}
+}
+
 func TestGetAppPriceScheduleAutomaticPrices(t *testing.T) {
 	resp := AppPricesResponse{
 		Data: []Resource[AppPriceAttributes]{{Type: ResourceTypeAppPrices, ID: "price-1"}},
@@ -222,6 +264,48 @@ func TestGetAppPriceScheduleAutomaticPrices(t *testing.T) {
 	}, jsonResponse(http.StatusOK, string(body)))
 
 	if _, err := client.GetAppPriceScheduleAutomaticPrices(context.Background(), "schedule-1"); err != nil {
+		t.Fatalf("GetAppPriceScheduleAutomaticPrices() error: %v", err)
+	}
+}
+
+func TestGetAppPriceScheduleAutomaticPrices_WithOptions(t *testing.T) {
+	resp := AppPricesResponse{
+		Data: []Resource[AppPriceAttributes]{{Type: ResourceTypeAppPrices, ID: "price-1"}},
+	}
+	body, _ := json.Marshal(resp)
+
+	client := newTestClient(t, func(req *http.Request) {
+		assertAuthorized(t, req)
+		if req.URL.Path != "/v1/appPriceSchedules/schedule-1/automaticPrices" {
+			t.Fatalf("expected path /v1/appPriceSchedules/schedule-1/automaticPrices, got %s", req.URL.Path)
+		}
+		query := req.URL.Query()
+		if query.Get("include") != "appPricePoint,territory" {
+			t.Fatalf("expected include=appPricePoint,territory, got %q", query.Get("include"))
+		}
+		if query.Get("fields[appPrices]") != "manual,startDate,endDate,appPricePoint,territory" {
+			t.Fatalf("unexpected fields[appPrices]: %q", query.Get("fields[appPrices]"))
+		}
+		if query.Get("fields[appPricePoints]") != "customerPrice,proceeds,territory" {
+			t.Fatalf("unexpected fields[appPricePoints]: %q", query.Get("fields[appPricePoints]"))
+		}
+		if query.Get("fields[territories]") != "currency" {
+			t.Fatalf("unexpected fields[territories]: %q", query.Get("fields[territories]"))
+		}
+		if query.Get("limit") != "200" {
+			t.Fatalf("expected limit=200, got %q", query.Get("limit"))
+		}
+	}, jsonResponse(http.StatusOK, string(body)))
+
+	if _, err := client.GetAppPriceScheduleAutomaticPrices(
+		context.Background(),
+		"schedule-1",
+		WithAppPriceSchedulePricesInclude([]string{"appPricePoint", "territory"}),
+		WithAppPriceSchedulePricesFields([]string{"manual", "startDate", "endDate", "appPricePoint", "territory"}),
+		WithAppPriceSchedulePricesPricePointFields([]string{"customerPrice", "proceeds", "territory"}),
+		WithAppPriceSchedulePricesTerritoryFields([]string{"currency"}),
+		WithAppPriceSchedulePricesLimit(200),
+	); err != nil {
 		t.Fatalf("GetAppPriceScheduleAutomaticPrices() error: %v", err)
 	}
 }
