@@ -56,3 +56,34 @@ func TestBuildNumberNextIncrementsLastSegment(t *testing.T) {
 		t.Fatalf("expected next build number 1.2.4, got %q", next.String())
 	}
 }
+
+func TestParseBuildTimestamp(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		wantErr bool
+	}{
+		{name: "rfc3339", input: "2026-02-10T08:00:00Z"},
+		{name: "rfc3339nano", input: "2026-02-10T08:00:00.123456789Z"},
+		{name: "empty", input: "", wantErr: true},
+		{name: "invalid", input: "2026/02/10", wantErr: true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := ParseBuildTimestamp(test.input)
+			if test.wantErr {
+				if err == nil {
+					t.Fatal("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got.IsZero() {
+				t.Fatal("expected non-zero parsed timestamp")
+			}
+		})
+	}
+}

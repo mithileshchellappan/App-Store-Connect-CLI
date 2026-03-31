@@ -447,8 +447,8 @@ func isMoreRecentUploadedBuild(candidate, current asc.Resource[asc.BuildAttribut
 }
 
 func compareUploadedDate(left, right string) int {
-	leftParsed, leftErr := parseBuildTimestamp(left)
-	rightParsed, rightErr := parseBuildTimestamp(right)
+	leftParsed, leftErr := ParseBuildTimestamp(left)
+	rightParsed, rightErr := ParseBuildTimestamp(right)
 
 	switch {
 	case leftErr == nil && rightErr == nil:
@@ -468,7 +468,8 @@ func compareUploadedDate(left, right string) int {
 	}
 }
 
-func parseBuildTimestamp(value string) (time.Time, error) {
+// ParseBuildTimestamp parses ASC uploadedDate values used across build helpers.
+func ParseBuildTimestamp(value string) (time.Time, error) {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
 		return time.Time{}, fmt.Errorf("uploadedDate is empty")

@@ -619,6 +619,68 @@ func TestPublishTestFlightLocalBuildUsesFreshUploadTimeoutAfterArchive(t *testin
 	}
 }
 
+func TestRunPublishLocalBuildRejectsMissingExportedIPAWithoutUploading(t *testing.T) {
+	restore := overridePublishCommandTestHooks(t)
+	defer restore()
+
+	runPublishArchiveFn = func(_ context.Context, _ localxcode.ArchiveOptions) (*localxcode.ArchiveResult, error) {
+		return &localxcode.ArchiveResult{
+			ArchivePath:   ".asc/artifacts/Demo-IOS-1.2.3-42.xcarchive",
+			BundleID:      "com.example.demo",
+			Version:       "1.2.3",
+			BuildNumber:   "42",
+			Scheme:        "Demo",
+			Configuration: "Release",
+		}, nil
+	}
+	runPublishExportFn = func(_ context.Context, _ localxcode.ExportOptions) (*localxcode.ExportResult, error) {
+		return &localxcode.ExportResult{
+			ArchivePath: ".asc/artifacts/Demo-IOS-1.2.3-42.xcarchive",
+			IPAPath:     "",
+			BundleID:    "com.example.demo",
+			Version:     "1.2.3",
+			BuildNumber: "42",
+		}, nil
+	}
+	validatePublishIPAPathFn = func(string) (os.FileInfo, error) {
+		t.Fatal("did not expect IPA validation when export produced no IPA")
+		return nil, nil
+	}
+	uploadBuildAndWaitForIDFn = func(_ context.Context, _ *asc.Client, _ string, _ string, _ os.FileInfo, _ string, _ string, _ asc.Platform, _ time.Duration, _ time.Duration, _ bool) (*publishUploadResult, error) {
+		t.Fatal("did not expect upload when export produced no IPA")
+		return nil, nil
+	}
+
+	result, err := runPublishLocalBuild(
+		context.Background(),
+		nil,
+		"app-123",
+		"IOS",
+		"1.2.3",
+		"42",
+		5*time.Second,
+		30*time.Second,
+		false,
+		publishLocalBuildConfig{
+			WorkspacePath:     "Demo.xcworkspace",
+			Scheme:            "Demo",
+			Configuration:     "Release",
+			ExportOptionsPath: "ExportOptions.plist",
+			ArchivePath:       ".asc/artifacts/Demo-IOS-1.2.3-42.xcarchive",
+			IPAPath:           ".asc/artifacts/Demo-IOS-1.2.3-42.ipa",
+		},
+	)
+	if err == nil {
+		t.Fatal("expected missing IPA error, got nil")
+	}
+	if result != nil {
+		t.Fatalf("expected nil result, got %+v", result)
+	}
+	if !strings.Contains(err.Error(), "expected a local IPA artifact for publish upload") {
+		t.Fatalf("expected missing IPA error, got %v", err)
+	}
+}
+
 func TestPublishTestFlightIPAUploadResolvesAppIDBeforeGroupLookupAndUpload(t *testing.T) {
 	restore := overridePublishCommandTestHooks(t)
 	defer restore()

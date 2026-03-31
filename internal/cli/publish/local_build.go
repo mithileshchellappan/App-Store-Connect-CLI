@@ -255,7 +255,6 @@ func runPublishLocalBuild(ctx context.Context, client *asc.Client, appID, platfo
 		},
 		Version:     firstNonEmpty(strings.TrimSpace(exportResult.Version), strings.TrimSpace(archiveResult.Version), strings.TrimSpace(version)),
 		BuildNumber: firstNonEmpty(strings.TrimSpace(exportResult.BuildNumber), strings.TrimSpace(archiveResult.BuildNumber), strings.TrimSpace(buildNumber)),
-		Uploaded:    true,
 	}
 
 	if strings.TrimSpace(exportResult.IPAPath) == "" {
@@ -287,6 +286,7 @@ func runPublishLocalBuild(ctx context.Context, client *asc.Client, appID, platfo
 	result.Build = uploadResult.Build
 	result.Version = uploadResult.Version
 	result.BuildNumber = uploadResult.BuildNumber
+	result.Uploaded = true
 	result.Export.Version = uploadResult.Version
 	result.Export.BuildNumber = uploadResult.BuildNumber
 	result.Archive.Version = firstNonEmpty(result.Archive.Version, uploadResult.Version)
