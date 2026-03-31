@@ -272,19 +272,6 @@ func ensureCustomPageLocalizationPreviewSet(ctx context.Context, client *asc.Cli
 	return created.Data, nil
 }
 
-func deleteAllScreenshotsInSet(ctx context.Context, client *asc.Client, setID string) error {
-	resp, err := client.GetAppScreenshots(ctx, setID)
-	if err != nil {
-		return err
-	}
-	for _, screenshot := range resp.Data {
-		if err := client.DeleteAppScreenshot(ctx, screenshot.ID); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 func deleteAllPreviewsInSet(ctx context.Context, client *asc.Client, setID string) error {
 	resp, err := client.GetAppPreviews(ctx, setID)
 	if err != nil {
