@@ -24,8 +24,8 @@ func TestSubscriptionsPricingAvailabilityGetWarnsAndMatchesCanonicalViewOutput(t
 		if req.Method != http.MethodGet {
 			t.Fatalf("expected GET, got %s", req.Method)
 		}
-		if req.URL.Path != "/v1/subscriptions/sub-1/subscriptionAvailability" {
-			t.Fatalf("expected path /v1/subscriptions/sub-1/subscriptionAvailability, got %s", req.URL.Path)
+		if req.URL.Path != "/v1/subscriptions/8000000001/subscriptionAvailability" {
+			t.Fatalf("expected path /v1/subscriptions/8000000001/subscriptionAvailability, got %s", req.URL.Path)
 		}
 		return jsonHTTPResponse(http.StatusOK, `{"data":{"type":"subscriptionAvailabilities","id":"avail-1","attributes":{"availableInNewTerritories":false}}}`), nil
 	})
@@ -44,8 +44,8 @@ func TestSubscriptionsPricingAvailabilityGetWarnsAndMatchesCanonicalViewOutput(t
 		})
 	}
 
-	canonicalStdout, canonicalStderr := run([]string{"subscriptions", "pricing", "availability", "view", "--subscription-id", "sub-1", "--output", "json"})
-	aliasStdout, aliasStderr := run([]string{"subscriptions", "pricing", "availability", "get", "--subscription-id", "sub-1", "--output", "json"})
+	canonicalStdout, canonicalStderr := run([]string{"subscriptions", "pricing", "availability", "view", "--subscription-id", "8000000001", "--output", "json"})
+	aliasStdout, aliasStderr := run([]string{"subscriptions", "pricing", "availability", "get", "--subscription-id", "8000000001", "--output", "json"})
 
 	if canonicalStderr != "" {
 		t.Fatalf("expected canonical command to avoid warnings, got %q", canonicalStderr)
@@ -88,8 +88,8 @@ func TestSubscriptionsPricingAvailabilitySetWarnsAndMatchesCanonicalEditOutput(t
 		if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
 			t.Fatalf("decode payload: %v", err)
 		}
-		if payload.Data.Relationships.Subscription.Data.ID != "sub-1" {
-			t.Fatalf("expected subscription relationship sub-1, got %q", payload.Data.Relationships.Subscription.Data.ID)
+		if payload.Data.Relationships.Subscription.Data.ID != "8000000001" {
+			t.Fatalf("expected subscription relationship 8000000001, got %q", payload.Data.Relationships.Subscription.Data.ID)
 		}
 		if payload.Data.Attributes.AvailableInNewTerritories {
 			t.Fatalf("expected availableInNewTerritories false")
@@ -115,8 +115,8 @@ func TestSubscriptionsPricingAvailabilitySetWarnsAndMatchesCanonicalEditOutput(t
 		})
 	}
 
-	canonicalStdout, canonicalStderr := run([]string{"subscriptions", "pricing", "availability", "edit", "--subscription-id", "sub-1", "--available-in-new-territories", "false", "--territories", "USA,CAN", "--output", "json"})
-	aliasStdout, aliasStderr := run([]string{"subscriptions", "pricing", "availability", "set", "--subscription-id", "sub-1", "--available-in-new-territories", "false", "--territories", "USA,CAN", "--output", "json"})
+	canonicalStdout, canonicalStderr := run([]string{"subscriptions", "pricing", "availability", "edit", "--subscription-id", "8000000001", "--available-in-new-territories", "false", "--territories", "USA,CAN", "--output", "json"})
+	aliasStdout, aliasStderr := run([]string{"subscriptions", "pricing", "availability", "set", "--subscription-id", "8000000001", "--available-in-new-territories", "false", "--territories", "USA,CAN", "--output", "json"})
 
 	if canonicalStderr != "" {
 		t.Fatalf("expected canonical command to avoid warnings, got %q", canonicalStderr)
@@ -162,8 +162,8 @@ func TestSubscriptionsPricingAvailabilityEditAcceptsSpacedTrueBoolValue(t *testi
 		if !payload.Data.Attributes.AvailableInNewTerritories {
 			t.Fatalf("expected availableInNewTerritories true")
 		}
-		if payload.Data.Relationships.Subscription.Data.ID != "sub-1" {
-			t.Fatalf("expected subscription relationship sub-1, got %q", payload.Data.Relationships.Subscription.Data.ID)
+		if payload.Data.Relationships.Subscription.Data.ID != "8000000001" {
+			t.Fatalf("expected subscription relationship 8000000001, got %q", payload.Data.Relationships.Subscription.Data.ID)
 		}
 
 		return jsonHTTPResponse(http.StatusCreated, `{"data":{"type":"subscriptionAvailabilities","id":"avail-1","attributes":{"availableInNewTerritories":true}}}`), nil
@@ -173,7 +173,7 @@ func TestSubscriptionsPricingAvailabilityEditAcceptsSpacedTrueBoolValue(t *testi
 	root.FlagSet.SetOutput(io.Discard)
 
 	stdout, stderr := captureOutput(t, func() {
-		if err := root.Parse([]string{"subscriptions", "pricing", "availability", "edit", "--subscription-id", "sub-1", "--available-in-new-territories", "true", "--territories", "USA", "--output", "json"}); err != nil {
+		if err := root.Parse([]string{"subscriptions", "pricing", "availability", "edit", "--subscription-id", "8000000001", "--available-in-new-territories", "true", "--territories", "USA", "--output", "json"}); err != nil {
 			t.Fatalf("parse error: %v", err)
 		}
 		if err := root.Run(context.Background()); err != nil {
@@ -206,7 +206,7 @@ func TestSubscriptionsPricingAvailabilitySetAliasUsesPricingErrorPrefix(t *testi
 
 	var runErr error
 	_, stderr := captureOutput(t, func() {
-		if err := root.Parse([]string{"subscriptions", "pricing", "availability", "set", "--subscription-id", "sub-1", "--available-in-new-territories", "false", "--territories", "USA"}); err != nil {
+		if err := root.Parse([]string{"subscriptions", "pricing", "availability", "set", "--subscription-id", "8000000001", "--available-in-new-territories", "false", "--territories", "USA"}); err != nil {
 			t.Fatalf("parse error: %v", err)
 		}
 		runErr = root.Run(context.Background())

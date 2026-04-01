@@ -182,7 +182,7 @@ func (a *App) GetFeedback(appID string) (FeedbackResponse, error) {
 	for i, fb := range listEnv.Data {
 		var shots []FeedbackScreenshot
 		for _, s := range fb.Attributes.Screenshots {
-			shots = append(shots, FeedbackScreenshot{URL: s.URL, Width: s.Width, Height: s.Height})
+			shots = append(shots, FeedbackScreenshot(s))
 		}
 		items[i] = FeedbackItem{
 			ID:           fb.ID,

@@ -3752,6 +3752,36 @@ func TestPublishValidationErrors(t *testing.T) {
 			wantErr: "--version is only supported when --ipa is provided",
 		},
 		{
+			name:    "publish testflight local build requires exactly one selector",
+			args:    []string{"publish", "testflight", "--app", "APP_123", "--workspace", "App.xcworkspace", "--project", "App.xcodeproj", "--scheme", "App", "--version", "1.2.3", "--group", "GROUP_ID"},
+			wantErr: "exactly one of --workspace or --project is required",
+		},
+		{
+			name:    "publish testflight local build missing scheme",
+			args:    []string{"publish", "testflight", "--app", "APP_123", "--workspace", "App.xcworkspace", "--version", "1.2.3", "--group", "GROUP_ID"},
+			wantErr: "--scheme is required",
+		},
+		{
+			name:    "publish testflight local build missing version",
+			args:    []string{"publish", "testflight", "--app", "APP_123", "--workspace", "App.xcworkspace", "--scheme", "App", "--group", "GROUP_ID"},
+			wantErr: "--version is required",
+		},
+		{
+			name:    "publish testflight local build rejects ipa",
+			args:    []string{"publish", "testflight", "--app", "APP_123", "--workspace", "App.xcworkspace", "--scheme", "App", "--version", "1.2.3", "--ipa", "app.ipa", "--group", "GROUP_ID"},
+			wantErr: "--ipa cannot be combined with --workspace or --project",
+		},
+		{
+			name:    "publish testflight local build rejects build",
+			args:    []string{"publish", "testflight", "--app", "APP_123", "--workspace", "App.xcworkspace", "--scheme", "App", "--version", "1.2.3", "--build", "BUILD_123", "--group", "GROUP_ID"},
+			wantErr: "--build cannot be combined with --workspace or --project",
+		},
+		{
+			name:    "publish testflight local build only flag without selector",
+			args:    []string{"publish", "testflight", "--app", "APP_123", "--ipa", "app.ipa", "--group", "GROUP_ID", "--archive-path", ".asc/artifacts/App.xcarchive"},
+			wantErr: "--archive-path requires --workspace or --project",
+		},
+		{
 			name:    "publish appstore invalid poll interval",
 			args:    []string{"publish", "appstore", "--app", "APP_123", "--ipa", "app.ipa", "--version", "1.0.0", "--poll-interval", "0s"},
 			wantErr: "--poll-interval must be greater than 0",
@@ -3760,6 +3790,31 @@ func TestPublishValidationErrors(t *testing.T) {
 			name:    "publish appstore invalid timeout",
 			args:    []string{"publish", "appstore", "--app", "APP_123", "--ipa", "app.ipa", "--version", "1.0.0", "--timeout", "-1s"},
 			wantErr: "--timeout must be greater than 0",
+		},
+		{
+			name:    "publish appstore local build requires exactly one selector",
+			args:    []string{"publish", "appstore", "--app", "APP_123", "--workspace", "App.xcworkspace", "--project", "App.xcodeproj", "--scheme", "App", "--version", "1.2.3"},
+			wantErr: "exactly one of --workspace or --project is required",
+		},
+		{
+			name:    "publish appstore local build missing scheme",
+			args:    []string{"publish", "appstore", "--app", "APP_123", "--workspace", "App.xcworkspace", "--version", "1.2.3"},
+			wantErr: "--scheme is required",
+		},
+		{
+			name:    "publish appstore local build missing version",
+			args:    []string{"publish", "appstore", "--app", "APP_123", "--workspace", "App.xcworkspace", "--scheme", "App"},
+			wantErr: "--version is required",
+		},
+		{
+			name:    "publish appstore local build rejects ipa",
+			args:    []string{"publish", "appstore", "--app", "APP_123", "--workspace", "App.xcworkspace", "--scheme", "App", "--version", "1.2.3", "--ipa", "app.ipa"},
+			wantErr: "--ipa cannot be combined with --workspace or --project",
+		},
+		{
+			name:    "publish appstore local build only flag without selector",
+			args:    []string{"publish", "appstore", "--app", "APP_123", "--ipa", "app.ipa", "--version", "1.2.3", "--export-options", "ExportOptions.plist"},
+			wantErr: "--export-options requires --workspace or --project",
 		},
 	}
 
@@ -3788,7 +3843,7 @@ func TestPublishValidationErrors(t *testing.T) {
 	}
 }
 
-func TestPublishRejectsSymlinkIPAPath(t *testing.T) {
+func TestCommandsRejectSymlinkIPAPath(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "target.ipa")
 	if err := os.WriteFile(target, []byte("dummy"), 0o600); err != nil {
@@ -3818,6 +3873,14 @@ func TestPublishRejectsSymlinkIPAPath(t *testing.T) {
 			args: []string{"publish", "appstore", "--app", "APP_123", "--ipa", link, "--version", "1.0.0"},
 			wantErr: fmt.Sprintf(
 				`publish appstore: refusing to read symlink %q`,
+				link,
+			),
+		},
+		{
+			name: "builds upload rejects symlink",
+			args: []string{"builds", "upload", "--app", "APP_123", "--ipa", link, "--version", "1.0.0", "--build-number", "42"},
+			wantErr: fmt.Sprintf(
+				`builds upload: refusing to read symlink %q`,
 				link,
 			),
 		},

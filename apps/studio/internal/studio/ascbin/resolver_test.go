@@ -71,7 +71,7 @@ func TestResolveFallsBackToPathLookup(t *testing.T) {
 func TestResolveErrorsWhenNothingAvailable(t *testing.T) {
 	_, err := Resolve(ResolveOptions{
 		LookPath: func(string) (string, error) {
-			return "", execErrNotFound
+			return "", errExecNotFound
 		},
 	})
 	if err == nil {

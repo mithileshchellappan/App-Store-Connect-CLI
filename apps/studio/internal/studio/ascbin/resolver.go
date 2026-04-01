@@ -62,7 +62,7 @@ func Resolve(opts ResolveOptions) (Resolution, error) {
 				BundledEligible: fileExists(bundled),
 			}, nil
 		}
-		if !errors.Is(err, os.ErrNotExist) && !errors.Is(err, exec.ErrNotFound) && !errors.Is(err, execErrNotFound) {
+		if !errors.Is(err, os.ErrNotExist) && !errors.Is(err, exec.ErrNotFound) && !errors.Is(err, errExecNotFound) {
 			return Resolution{}, err
 		}
 	}
@@ -82,7 +82,7 @@ func Resolve(opts ResolveOptions) (Resolution, error) {
 	return Resolution{}, fmt.Errorf("could not resolve asc binary from %v", checked)
 }
 
-var execErrNotFound = errors.New("not found")
+var errExecNotFound = errors.New("not found")
 
 var statFile = func(path string) error {
 	info, err := os.Stat(filepath.Clean(path))

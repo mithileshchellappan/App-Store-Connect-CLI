@@ -248,8 +248,32 @@ func init() {
 	registerRows(appClipHeaderImageDeleteResultRows)
 	registerRows(betaAppClipInvocationDeleteResultRows)
 	registerRows(betaAppClipInvocationLocalizationDeleteResultRows)
-	registerRows(testFlightPublishResultRows)
-	registerRows(appStorePublishResultRows)
+	registerDirect(func(v *TestFlightPublishResult, render func([]string, [][]string)) error {
+		h, r := testFlightPublishResultRows(v)
+		render(h, r)
+		if v.Archive != nil {
+			ah, ar := publishArchiveStageRows(v.Archive)
+			render(ah, ar)
+		}
+		if v.Export != nil {
+			eh, er := publishExportStageRows(v.Export)
+			render(eh, er)
+		}
+		return nil
+	})
+	registerDirect(func(v *AppStorePublishResult, render func([]string, [][]string)) error {
+		h, r := appStorePublishResultRows(v)
+		render(h, r)
+		if v.Archive != nil {
+			ah, ar := publishArchiveStageRows(v.Archive)
+			render(ah, ar)
+		}
+		if v.Export != nil {
+			eh, er := publishExportStageRows(v.Export)
+			render(eh, er)
+		}
+		return nil
+	})
 	registerRows(salesReportResultRows)
 	registerRows(financeReportResultRows)
 	registerRows(financeRegionsRows)

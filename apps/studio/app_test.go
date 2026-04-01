@@ -476,11 +476,11 @@ func TestResolveASCMatchesCommandResolution(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ResolveASC() error = %v", err)
 	}
-	if resp.Resolution.Path != bundled {
-		t.Fatalf("ResolveASC().Resolution.Path = %q, want %q", resp.Resolution.Path, bundled)
+	if resp.Path != bundled {
+		t.Fatalf("ResolveASC().Path = %q, want %q", resp.Path, bundled)
 	}
-	if resp.Resolution.Source != "bundled" {
-		t.Fatalf("ResolveASC().Resolution.Source = %q, want bundled", resp.Resolution.Source)
+	if resp.Source != "bundled" {
+		t.Fatalf("ResolveASC().Source = %q, want bundled", resp.Source)
 	}
 }
 

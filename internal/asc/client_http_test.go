@@ -6191,6 +6191,68 @@ func TestGetInAppPurchasesV2_WithLimit(t *testing.T) {
 	}
 }
 
+func TestGetInAppPurchasesV2_WithProductIDAndNameFilters(t *testing.T) {
+	response := jsonResponse(http.StatusOK, `{"data":[{"type":"inAppPurchases","id":"iap-1","attributes":{"name":"Pro","productId":"com.example.pro","inAppPurchaseType":"CONSUMABLE"}}]}`)
+	client := newTestClient(t, func(req *http.Request) {
+		if req.Method != http.MethodGet {
+			t.Fatalf("expected GET, got %s", req.Method)
+		}
+		if req.URL.Path != "/v1/apps/123/inAppPurchasesV2" {
+			t.Fatalf("expected path /v1/apps/123/inAppPurchasesV2, got %s", req.URL.Path)
+		}
+		values := req.URL.Query()
+		if values.Get("filter[productId]") != "com.example.pro" {
+			t.Fatalf("expected filter[productId]=com.example.pro, got %q", values.Get("filter[productId]"))
+		}
+		if values.Get("filter[name]") != "Pro" {
+			t.Fatalf("expected filter[name]=Pro, got %q", values.Get("filter[name]"))
+		}
+		assertAuthorized(t, req)
+	}, response)
+
+	if _, err := client.GetInAppPurchasesV2(
+		context.Background(),
+		"123",
+		WithIAPProductIDs([]string{"com.example.pro"}),
+		WithIAPNames([]string{"Pro"}),
+	); err != nil {
+		t.Fatalf("GetInAppPurchasesV2() error: %v", err)
+	}
+}
+
+func TestGetInAppPurchasesV2_WithNextURLIgnoresLocalFilters(t *testing.T) {
+	response := jsonResponse(http.StatusOK, `{"data":[]}`)
+	client := newTestClient(t, func(req *http.Request) {
+		if req.Method != http.MethodGet {
+			t.Fatalf("expected GET, got %s", req.Method)
+		}
+		if req.URL.Path != "/v1/apps/123/inAppPurchasesV2" {
+			t.Fatalf("expected path /v1/apps/123/inAppPurchasesV2, got %s", req.URL.Path)
+		}
+		values := req.URL.Query()
+		if values.Get("cursor") != "abc" {
+			t.Fatalf("expected cursor=abc, got %q", values.Get("cursor"))
+		}
+		if values.Get("filter[productId]") != "" {
+			t.Fatalf("expected filter[productId] to be omitted for nextURL, got %q", values.Get("filter[productId]"))
+		}
+		if values.Get("filter[name]") != "" {
+			t.Fatalf("expected filter[name] to be omitted for nextURL, got %q", values.Get("filter[name]"))
+		}
+		assertAuthorized(t, req)
+	}, response)
+
+	if _, err := client.GetInAppPurchasesV2(
+		context.Background(),
+		"123",
+		WithIAPProductIDs([]string{"com.example.pro"}),
+		WithIAPNames([]string{"Pro"}),
+		WithIAPNextURL("https://api.appstoreconnect.apple.com/v1/apps/123/inAppPurchasesV2?cursor=abc"),
+	); err != nil {
+		t.Fatalf("GetInAppPurchasesV2() error: %v", err)
+	}
+}
+
 func TestGetBundleIDs_WithLimit(t *testing.T) {
 	response := jsonResponse(http.StatusOK, `{"data":[{"type":"bundleIds","id":"b1","attributes":{"name":"Demo","identifier":"com.example.demo","platform":"IOS"}}]}`)
 	client := newTestClient(t, func(req *http.Request) {
@@ -7570,6 +7632,68 @@ func TestGetSubscriptions_WithLimit(t *testing.T) {
 	}, response)
 
 	if _, err := client.GetSubscriptions(context.Background(), "group-1", WithSubscriptionsLimit(5)); err != nil {
+		t.Fatalf("GetSubscriptions() error: %v", err)
+	}
+}
+
+func TestGetSubscriptions_WithProductIDAndNameFilters(t *testing.T) {
+	response := jsonResponse(http.StatusOK, `{"data":[{"type":"subscriptions","id":"sub-1","attributes":{"name":"Monthly","productId":"com.example.sub.monthly"}}]}`)
+	client := newTestClient(t, func(req *http.Request) {
+		if req.Method != http.MethodGet {
+			t.Fatalf("expected GET, got %s", req.Method)
+		}
+		if req.URL.Path != "/v1/subscriptionGroups/group-1/subscriptions" {
+			t.Fatalf("expected path /v1/subscriptionGroups/group-1/subscriptions, got %s", req.URL.Path)
+		}
+		values := req.URL.Query()
+		if values.Get("filter[productId]") != "com.example.sub.monthly" {
+			t.Fatalf("expected filter[productId]=com.example.sub.monthly, got %q", values.Get("filter[productId]"))
+		}
+		if values.Get("filter[name]") != "Monthly" {
+			t.Fatalf("expected filter[name]=Monthly, got %q", values.Get("filter[name]"))
+		}
+		assertAuthorized(t, req)
+	}, response)
+
+	if _, err := client.GetSubscriptions(
+		context.Background(),
+		"group-1",
+		WithSubscriptionsProductIDs([]string{"com.example.sub.monthly"}),
+		WithSubscriptionsNames([]string{"Monthly"}),
+	); err != nil {
+		t.Fatalf("GetSubscriptions() error: %v", err)
+	}
+}
+
+func TestGetSubscriptions_WithNextURLIgnoresLocalFilters(t *testing.T) {
+	response := jsonResponse(http.StatusOK, `{"data":[]}`)
+	client := newTestClient(t, func(req *http.Request) {
+		if req.Method != http.MethodGet {
+			t.Fatalf("expected GET, got %s", req.Method)
+		}
+		if req.URL.Path != "/v1/subscriptionGroups/group-1/subscriptions" {
+			t.Fatalf("expected path /v1/subscriptionGroups/group-1/subscriptions, got %s", req.URL.Path)
+		}
+		values := req.URL.Query()
+		if values.Get("cursor") != "abc" {
+			t.Fatalf("expected cursor=abc, got %q", values.Get("cursor"))
+		}
+		if values.Get("filter[productId]") != "" {
+			t.Fatalf("expected filter[productId] to be omitted for nextURL, got %q", values.Get("filter[productId]"))
+		}
+		if values.Get("filter[name]") != "" {
+			t.Fatalf("expected filter[name] to be omitted for nextURL, got %q", values.Get("filter[name]"))
+		}
+		assertAuthorized(t, req)
+	}, response)
+
+	if _, err := client.GetSubscriptions(
+		context.Background(),
+		"group-1",
+		WithSubscriptionsProductIDs([]string{"com.example.sub.monthly"}),
+		WithSubscriptionsNames([]string{"Monthly"}),
+		WithSubscriptionsNextURL("https://api.appstoreconnect.apple.com/v1/subscriptionGroups/group-1/subscriptions?cursor=abc"),
+	); err != nil {
 		t.Fatalf("GetSubscriptions() error: %v", err)
 	}
 }

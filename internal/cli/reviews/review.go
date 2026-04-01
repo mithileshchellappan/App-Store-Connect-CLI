@@ -19,6 +19,8 @@ func ReviewCommand() *ffcli.Command {
 		LongHelp: `Manage App Store review details, attachments, submissions, and items.
 
 Examples:
+  asc review status --app "123456789"
+  asc review doctor --app "123456789"
   asc review details-get --id "DETAIL_ID"
   asc review details-for-version --version-id "VERSION_ID"
   asc review details-create --version-id "VERSION_ID" --contact-email "dev@example.com"
@@ -36,6 +38,8 @@ Examples:
 		FlagSet:   fs,
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
+			ReviewStatusCommand(),
+			ReviewDoctorCommand(),
 			ReviewDetailsGetCommand(),
 			ReviewDetailsForVersionCommand(),
 			ReviewDetailsCreateCommand(),
