@@ -720,6 +720,62 @@ USAGE
         self.assertIn("--build", errors[0])
         self.assertIn("--confirm", errors[0])
 
+    def test_hidden_deprecated_alias_examples_do_not_absorb_extra_positionals(self) -> None:
+        index = {
+            (): check_website_commands.CommandSpec(
+                path=(),
+                usage="asc <subcommand> [flags]",
+                flags={},
+                subcommands={"submit"},
+            ),
+            ("submit",): check_website_commands.CommandSpec(
+                path=("submit",),
+                usage="asc submit <subcommand> [flags]",
+                flags={},
+                subcommands={"preflight", "status", "cancel"},
+            ),
+        }
+
+        original_hidden_alias = check_website_commands.hidden_deprecated_alias_replacement
+        self.addCleanup(
+            setattr,
+            check_website_commands,
+            "hidden_deprecated_alias_replacement",
+            original_hidden_alias,
+        )
+        check_website_commands.hidden_deprecated_alias_replacement = (
+            lambda _binary_path, _example, _root_flags: "asc publish appstore --submit"
+        )
+        original_path_help = check_website_commands.path_help
+        self.addCleanup(
+            setattr,
+            check_website_commands,
+            "path_help",
+            original_path_help,
+        )
+        check_website_commands.path_help = (
+            lambda _binary_path, _path: (
+                "USAGE\n"
+                "  asc submit create [flags]\n\n"
+                "FLAGS\n"
+                "  --app          App Store Connect app ID\n"
+                "  --version      App Store version string\n"
+                "  --build        Build ID to attach\n"
+                "  --confirm      Confirm submission (required) (default: false)\n"
+            )
+        )
+
+        example = check_website_commands.Example(
+            path=Path("/tmp/docs/commands/submit.mdx"),
+            line_number=1,
+            raw="asc submit create extra --build build-1 --confirm",
+            tokens=("asc", "submit", "create", "extra", "--build", "build-1", "--confirm"),
+        )
+
+        errors = check_website_commands.validate_example(example, index, binary_path=Path("/tmp/asc"))
+        self.assertEqual(len(errors), 1)
+        self.assertIn("unexpected positional argument 'extra'", errors[0])
+
     def test_website_command_checks_reject_valid_hidden_deprecated_alias_examples(self) -> None:
         index = {
             (): check_website_commands.CommandSpec(

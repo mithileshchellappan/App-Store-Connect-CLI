@@ -414,6 +414,21 @@ def usage_position_style(spec: CommandSpec) -> str:
     return "flags_after_positionals"
 
 
+def usage_command_path(usage: str) -> tuple[str, ...]:
+    tokens = usage.split()
+    if not tokens or tokens[0] != "asc":
+        return ()
+
+    path: list[str] = []
+    for token in tokens[1:]:
+        if token == "[flags]" or META_TOKEN_RE.match(token):
+            break
+        if token.startswith("--"):
+            break
+        path.append(token)
+    return tuple(path)
+
+
 def deprecation_replacement(help_text: str) -> str | None:
     for pattern in (DEPRECATED_USE_RE, DEPRECATED_ALIAS_RE):
         match = pattern.search(help_text)
@@ -465,12 +480,13 @@ def hidden_deprecated_alias_spec(
 
     deprecated_help = path_help(binary_path, deprecated_path)
     deprecated_spec = parse_help_text(deprecated_help, is_root=False)
+    canonical_path = usage_command_path(deprecated_spec.usage) or deprecated_path
     flags = dict(deprecated_spec.flags)
     if not flags:
-        flags = dict(HIDDEN_DEPRECATED_ALIAS_FLAGS.get(deprecated_path, {}))
+        flags = dict(HIDDEN_DEPRECATED_ALIAS_FLAGS.get(canonical_path, {}))
 
     return CommandSpec(
-        path=deprecated_path,
+        path=canonical_path,
         usage=deprecated_spec.usage,
         flags=flags,
         subcommands=deprecated_spec.subcommands,
