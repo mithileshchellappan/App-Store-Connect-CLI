@@ -181,6 +181,61 @@ func TestIAPContentGetFallsBackToNumericIDWhenLookupErrors(t *testing.T) {
 	}
 }
 
+func TestIAPContentGetFallsBackToNumericIDAfterLookupTimeout(t *testing.T) {
+	setupStableSelectorAuth(t)
+	t.Setenv("ASC_APP_ID", "")
+	t.Setenv("ASC_TIMEOUT", "10ms")
+	t.Setenv("ASC_TIMEOUT_SECONDS", "")
+
+	originalTransport := http.DefaultTransport
+	t.Cleanup(func() { http.DefaultTransport = originalTransport })
+
+	requests := 0
+	http.DefaultTransport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		requests++
+		switch req.URL.Path {
+		case "/v1/apps/app-123/inAppPurchasesV2":
+			<-req.Context().Done()
+			return nil, req.Context().Err()
+		case "/v2/inAppPurchases/2024/content":
+			if err := req.Context().Err(); err != nil {
+				t.Fatalf("expected fresh fetch context after lookup timeout, got %v", err)
+			}
+			return selectorJSONResponse(`{"data":{"type":"inAppPurchaseContents","id":"content-2024"}}`), nil
+		default:
+			t.Fatalf("unexpected request: %s %s", req.Method, req.URL.String())
+			return nil, nil
+		}
+	})
+
+	stdout, stderr, runErr := runRootCommand(t, []string{
+		"iap", "content", "view",
+		"--app", "app-123",
+		"--iap-id", "2024",
+	})
+	if runErr != nil {
+		t.Fatalf("expected nil error, got %v", runErr)
+	}
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+	if requests != 2 {
+		t.Fatalf("expected lookup timeout followed by direct fetch, got %d requests", requests)
+	}
+
+	var out struct {
+		Data struct {
+			ID string `json:"id"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &out); err != nil {
+		t.Fatalf("unmarshal output: %v\nstdout: %s", err, stdout)
+	}
+	if out.Data.ID != "content-2024" {
+		t.Fatalf("expected content id content-2024, got %q", out.Data.ID)
+	}
+}
+
 func TestIAPLocalizationsListDoesNotSuppressNumericAmbiguity(t *testing.T) {
 	setupStableSelectorAuth(t)
 	t.Setenv("ASC_APP_ID", "")

@@ -70,10 +70,10 @@ Examples:
 				return fmt.Errorf("iap content get: %w", err)
 			}
 
-			requestCtx, cancel := shared.ContextWithTimeout(ctx)
-			defer cancel()
-
 			if contentValue != "" {
+				requestCtx, cancel := shared.ContextWithTimeout(ctx)
+				defer cancel()
+
 				resp, err := client.GetInAppPurchaseContentByID(requestCtx, contentValue)
 				if err != nil {
 					return fmt.Errorf("iap content get: failed to fetch: %w", err)
@@ -82,10 +82,15 @@ Examples:
 				return shared.PrintOutput(resp, *output.Output, *output.Pretty)
 			}
 
-			iapValue, err = resolveIAPLookupID(requestCtx, client, *appID, iapValue)
+			resolveCtx, resolveCancel := shared.ContextWithTimeout(ctx)
+			iapValue, err = resolveIAPLookupID(resolveCtx, client, *appID, iapValue)
+			resolveCancel()
 			if err != nil {
 				return err
 			}
+
+			requestCtx, cancel := shared.ContextWithTimeout(ctx)
+			defer cancel()
 
 			resp, err := client.GetInAppPurchaseContent(requestCtx, iapValue)
 			if err != nil {
