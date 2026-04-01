@@ -113,11 +113,18 @@ export default function App() {
   }
 
   function handleRefresh() {
-    if (sectionCommands[activeSection.id] && !sectionRequiresApp(activeSection.id)) {
-      app.loadStandaloneSection(activeSection.id, true);
-      return;
-    }
-    bootstrap.handleRefresh(app.selectedAppId, (id) => app.handleSelectApp(id));
+    const selectedAppId = app.selectedAppId;
+    const activeSectionId = activeSection.id;
+
+    void bootstrap.handleRefresh().then(() => {
+      if (sectionCommands[activeSectionId] && !sectionRequiresApp(activeSectionId)) {
+        app.loadStandaloneSection(activeSectionId, true);
+        return;
+      }
+      if (selectedAppId) {
+        app.handleSelectApp(selectedAppId);
+      }
+    });
   }
 
   function renderContent() {

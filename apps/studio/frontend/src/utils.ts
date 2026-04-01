@@ -8,6 +8,21 @@ export function fmt(val: string): string {
   return val;
 }
 
+export function statusClassName(value?: string | null): string {
+  if (!value) return "unknown";
+  return value.toLowerCase().replace(/_/g, "-");
+}
+
+export function formatOptionalValue(value?: string | null, fallback = "\u2014"): string {
+  if (!value) return fallback;
+  return fmt(value);
+}
+
+export function formatOptionalDate(value?: string | null, fallback = "\u2014"): string {
+  if (!value) return fallback;
+  return /^\d{4}-\d{2}-\d{2}T/.test(value) ? value.split("T")[0] : value;
+}
+
 export function screenshotLabel(displayType: string): string {
   return screenshotDisplayLabels[displayType] ?? displayType.replace(/^APP_/, "").replace(/_/g, " ");
 }

@@ -1,4 +1,5 @@
 import { SubscriptionsState } from "../../types";
+import { formatOptionalValue, statusClassName } from "../../utils";
 
 type SubscriptionsViewProps = {
   subscriptions: SubscriptionsState;
@@ -21,7 +22,11 @@ export function SubscriptionsView({ subscriptions, selectedSub, onSelectSub }: S
           <div className="env-grid" style={{ marginTop: 12 }}>
             <div className="env-row">
               <span className="env-key">Status</span>
-              <span className="env-value"><span className={`status-pill status-${sub.state.toLowerCase()}`}>{sub.state}</span></span>
+              <span className="env-value">
+                <span className={`status-pill status-${statusClassName(sub.state)}`}>
+                  {formatOptionalValue(sub.state, "Unknown")}
+                </span>
+              </span>
             </div>
             <div className="env-row">
               <span className="env-key">Product ID</span>
@@ -29,7 +34,7 @@ export function SubscriptionsView({ subscriptions, selectedSub, onSelectSub }: S
             </div>
             <div className="env-row">
               <span className="env-key">Subscription Duration</span>
-              <span className="env-value">{sub.subscriptionPeriod.replace(/_/g, " ").toLowerCase()}</span>
+              <span className="env-value">{formatOptionalValue(sub.subscriptionPeriod)}</span>
             </div>
             <div className="env-row">
               <span className="env-key">Group</span>
@@ -92,9 +97,13 @@ export function SubscriptionsView({ subscriptions, selectedSub, onSelectSub }: S
                       <tr key={s.productId} className="clickable-row" onClick={() => onSelectSub(s.id)}>
                         <td>{s.name}</td>
                         <td className="mono">{s.productId}</td>
-                        <td>{s.subscriptionPeriod.replace(/_/g, " ").toLowerCase()}</td>
+                        <td>{formatOptionalValue(s.subscriptionPeriod)}</td>
                         <td>{s.groupLevel}</td>
-                        <td><span className={`status-pill status-${s.state.toLowerCase()}`}>{s.state}</span></td>
+                        <td>
+                          <span className={`status-pill status-${statusClassName(s.state)}`}>
+                            {formatOptionalValue(s.state, "Unknown")}
+                          </span>
+                        </td>
                       </tr>
                     ))}
                 </tbody>

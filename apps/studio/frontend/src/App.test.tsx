@@ -564,6 +564,41 @@ describe("App", () => {
     expect(screen.queryByText("Select an App")).not.toBeInTheDocument();
   });
 
+  it("retries standalone sections after a cached transient error when revisiting them", async () => {
+    mockRunASCCommand.mockImplementation((cmd: string) => {
+      if (cmd === "bundle-ids list --paginate --output json") {
+        return Promise.resolve(
+          mockRunASCCommand.mock.calls.filter(([calledCmd]) => calledCmd === cmd).length === 1
+            ? { error: "temporary failure", data: "" }
+            : {
+                error: "",
+                data: JSON.stringify({
+                  data: [
+                    { id: "bundle-1", type: "bundleIds", attributes: { identifier: "com.example.recovered", platform: "IOS", seedId: "AAA" } },
+                  ],
+                }),
+              },
+        );
+      }
+      return Promise.resolve({ error: "", data: "{\"data\":[]}" });
+    });
+
+    render(<App />);
+
+    await screen.findByRole("img", { name: /Connected/i });
+    fireEvent.click(screen.getByRole("tab", { name: "Signing" }));
+
+    expect(await screen.findByText("temporary failure")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Team" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Signing" }));
+
+    expect(await screen.findByText("com.example.recovered")).toBeInTheDocument();
+    expect(
+      mockRunASCCommand.mock.calls.filter(([cmd]) => cmd === "bundle-ids list --paginate --output json"),
+    ).toHaveLength(2);
+  });
+
   it("renders top-level account status checks in the team scope", async () => {
     mockRunASCCommand.mockImplementation((cmd: string) => {
       if (cmd === "account status --output json") {
@@ -620,6 +655,51 @@ describe("App", () => {
     expect(
       mockRunASCCommand.mock.calls.filter(([cmd]) => cmd === "bundle-ids list --paginate --output json"),
     ).toHaveLength(1);
+  });
+
+  it("refreshes bootstrap data and the visible standalone section even when an app is selected", async () => {
+    mockRunASCCommand.mockImplementation((cmd: string) => {
+      if (cmd === "bundle-ids list --paginate --output json") {
+        return Promise.resolve(
+          mockRunASCCommand.mock.calls.filter(([calledCmd]) => calledCmd === cmd).length === 1
+            ? {
+                error: "",
+                data: JSON.stringify({
+                  data: [
+                    { id: "bundle-1", type: "bundleIds", attributes: { identifier: "com.example.initial", platform: "IOS", seedId: "AAA" } },
+                  ],
+                }),
+              }
+            : {
+                error: "",
+                data: JSON.stringify({
+                  data: [
+                    { id: "bundle-2", type: "bundleIds", attributes: { identifier: "com.example.refreshed", platform: "IOS", seedId: "BBB" } },
+                  ],
+                }),
+              },
+        );
+      }
+      return Promise.resolve({ error: "", data: "{\"data\":[]}" });
+    });
+
+    render(<App />);
+
+    await screen.findByRole("img", { name: /Connected/i });
+    await pickApp("Test App");
+    fireEvent.click(screen.getByRole("tab", { name: "Signing" }));
+
+    expect(await screen.findByText("com.example.initial")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Refresh/i }));
+
+    expect(await screen.findByText("com.example.refreshed")).toBeInTheDocument();
+    expect(mockBootstrap).toHaveBeenCalledTimes(2);
+    expect(mockCheckAuthStatus).toHaveBeenCalledTimes(2);
+    expect(mockListApps).toHaveBeenCalledTimes(2);
+    expect(
+      mockRunASCCommand.mock.calls.filter(([cmd]) => cmd === "bundle-ids list --paginate --output json"),
+    ).toHaveLength(2);
   });
 
   it("quotes app IDs when running app-scoped commands", async () => {
@@ -1307,5 +1387,88 @@ describe("App", () => {
 
     expect(await screen.findByText("auth expired")).toBeInTheDocument();
     expect(screen.queryByText("No testers in this group.")).not.toBeInTheDocument();
+  });
+
+  it("renders TestFlight views safely when optional fields are missing", async () => {
+    mockGetTestFlight.mockResolvedValue({
+      groups: [
+        { id: "group-1", name: "Internal", isInternal: true, publicLink: "", feedbackEnabled: false, createdDate: null as unknown as string, testerCount: 1 },
+      ],
+    });
+    mockGetTestFlightTesters.mockResolvedValue({
+      testers: [{ email: "", firstName: "", lastName: "", inviteType: null as unknown as string, state: null as unknown as string }],
+    });
+
+    render(<App />);
+
+    await screen.findByRole("img", { name: /Connected/i });
+    await pickApp("Test App");
+    fireEvent.click(await screen.findByRole("button", { name: "Groups" }));
+
+    expect(await screen.findAllByText("Internal")).not.toHaveLength(0);
+
+    fireEvent.click((await screen.findAllByText("Internal"))[0].closest("tr")!);
+
+    expect((await screen.findAllByText("Unknown")).length).toBeGreaterThan(0);
+    expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
+  });
+
+  it("renders subscription views safely when status fields are missing", async () => {
+    mockGetSubscriptions.mockResolvedValue({
+      subscriptions: [
+        {
+          id: "sub-1",
+          groupName: "Main Group",
+          name: "Pro Monthly",
+          productId: "pro.monthly",
+          state: null as unknown as string,
+          subscriptionPeriod: null as unknown as string,
+          reviewNote: "",
+          groupLevel: 1,
+        },
+      ],
+    });
+
+    render(<App />);
+
+    await screen.findByRole("img", { name: /Connected/i });
+    await pickApp("Test App");
+    fireEvent.click(await screen.findByRole("button", { name: "Subscriptions" }));
+
+    expect(await screen.findByText("Pro Monthly")).toBeInTheDocument();
+    expect(screen.getByText("Unknown")).toBeInTheDocument();
+    expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
+  });
+
+  it("renders pricing subscription rows safely when status fields are missing", async () => {
+    mockGetPricingOverview.mockResolvedValue({
+      availableInNewTerritories: false,
+      currentPrice: "1.99",
+      currentProceeds: "1.39",
+      baseCurrency: "USD",
+      territories: [],
+      subscriptionPricing: [
+        {
+          name: "Pro Monthly",
+          productId: "pro.monthly",
+          subscriptionPeriod: "ONE_MONTH",
+          state: null as unknown as string,
+          groupName: "Main Group",
+          price: "1.99",
+          currency: "USD",
+          proceeds: "1.39",
+        },
+      ],
+    });
+
+    render(<App />);
+
+    await screen.findByRole("img", { name: /Connected/i });
+    await pickApp("Test App");
+    fireEvent.click(await screen.findByRole("button", { name: "Pricing and Availability" }));
+
+    expect(await screen.findByText("Pro Monthly")).toBeInTheDocument();
+    expect(screen.getByText("Unknown")).toBeInTheDocument();
+    expect(screen.queryByText("Something went wrong")).not.toBeInTheDocument();
   });
 });

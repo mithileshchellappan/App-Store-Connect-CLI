@@ -1,5 +1,5 @@
 import { GroupTestersState, TestFlightState } from "../../types";
-import { fmt } from "../../utils";
+import { fmt, formatOptionalDate, formatOptionalValue, statusClassName } from "../../utils";
 
 type TestFlightViewProps = {
   testflightData: TestFlightState;
@@ -22,7 +22,8 @@ export function TestFlightView({
     // Compute state breakdown
     const stateCounts: Record<string, number> = {};
     for (const t of groupTesters.testers) {
-      stateCounts[t.state] = (stateCounts[t.state] || 0) + 1;
+      const state = formatOptionalValue(t.state, "Unknown");
+      stateCounts[state] = (stateCounts[state] || 0) + 1;
     }
     return (
       <div className="app-detail-view">
@@ -67,8 +68,12 @@ export function TestFlightView({
                     <tr key={i}>
                       <td className="mono">{t.email || "\u2014"}</td>
                       <td>{[t.firstName, t.lastName].filter(Boolean).join(" ") || "Anonymous"}</td>
-                      <td>{fmt(t.inviteType)}</td>
-                      <td><span className={`status-pill status-${t.state.toLowerCase()}`}>{fmt(t.state)}</span></td>
+                      <td>{formatOptionalValue(t.inviteType)}</td>
+                      <td>
+                        <span className={`status-pill status-${statusClassName(t.state)}`}>
+                          {formatOptionalValue(t.state, "Unknown")}
+                        </span>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -122,7 +127,7 @@ export function TestFlightView({
                   <td>{g.testerCount}</td>
                   <td>{g.publicLink ? <a href={g.publicLink} target="_blank" rel="noopener" style={{ color: "var(--accent)" }} onClick={(e) => e.stopPropagation()}>{g.publicLink.replace("https://testflight.apple.com/join/", "")}</a> : "\u2014"}</td>
                   <td>{g.feedbackEnabled ? "On" : "Off"}</td>
-                  <td>{g.createdDate.split("T")[0]}</td>
+                  <td>{formatOptionalDate(g.createdDate)}</td>
                 </tr>
               ))}
             </tbody>

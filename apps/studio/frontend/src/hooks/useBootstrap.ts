@@ -108,15 +108,11 @@ export function useBootstrap() {
       .catch((err) => console.error("save settings:", err));
   }
 
-  function handleRefresh(selectedAppId: string | null, reselectApp: (id: string) => void) {
-    if (selectedAppId) {
-      reselectApp(selectedAppId);
-    } else {
-      const requestId = ++requestRef.current;
-      setLoading(true);
-      setBootstrapError("");
-      void loadStudioShell({ clearApps: true, requestId });
-    }
+  async function handleRefresh() {
+    const requestId = ++requestRef.current;
+    setLoading(true);
+    setBootstrapError("");
+    await loadStudioShell({ clearApps: true, requestId });
   }
 
   return {

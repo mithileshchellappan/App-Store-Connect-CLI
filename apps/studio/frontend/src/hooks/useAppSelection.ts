@@ -1,4 +1,4 @@
-import { startTransition, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import { useAppMetadata } from "./appSelection/useAppMetadata";
 import { useAppSectionData } from "./appSelection/useAppSectionData";
@@ -17,13 +17,11 @@ export function useAppSelection() {
     const requestID = appSelectionRequestRef.current + 1;
     appSelectionRequestRef.current = requestID;
 
-    startTransition(() => {
-      setSelectionVersion(requestID);
-      setSelectedAppId(id);
-      metadata.resetSelection();
-      sectionData.resetSelection();
-      testFlight.resetSelection();
-    });
+    setSelectionVersion(requestID);
+    setSelectedAppId(id);
+    metadata.resetSelection();
+    sectionData.resetSelection();
+    testFlight.resetSelection();
 
     metadata.loadAppDetail(id, requestID);
   }

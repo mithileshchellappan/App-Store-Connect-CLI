@@ -369,8 +369,10 @@ export function useAppSectionData(appSelectionRequestRef: MutableRefObject<numbe
   }
 
   function loadStandaloneSectionIfNeeded(sectionId: string) {
-    if (sectionCache[sectionId]) return;
-    loadStandaloneSection(sectionId);
+    const existing = sectionCache[sectionId];
+    if (existing?.loading) return;
+    if (existing && !existing.error) return;
+    loadStandaloneSection(sectionId, Boolean(existing?.error));
   }
 
   function loadOfferCodesIfNeeded(sectionId: string, appId: string | null, force = false) {

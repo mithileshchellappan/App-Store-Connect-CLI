@@ -1,5 +1,5 @@
 import { PricingOverviewState } from "../../types";
-import { fmt } from "../../utils";
+import { formatOptionalValue, statusClassName } from "../../utils";
 
 type PricingViewProps = {
   pricingOverview: PricingOverviewState;
@@ -90,10 +90,14 @@ export function PricingView({ pricingOverview }: PricingViewProps) {
                       <tr key={s.productId}>
                         <td>{s.groupName}</td>
                         <td>{s.name}</td>
-                        <td>{fmt(s.subscriptionPeriod)}</td>
+                        <td>{formatOptionalValue(s.subscriptionPeriod)}</td>
                         <td>{s.currency} {s.price}</td>
                         <td>{s.currency} {s.proceeds}</td>
-                        <td><span className={`status-pill status-${s.state.toLowerCase()}`}>{fmt(s.state)}</span></td>
+                        <td>
+                          <span className={`status-pill status-${statusClassName(s.state)}`}>
+                            {formatOptionalValue(s.state, "Unknown")}
+                          </span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
