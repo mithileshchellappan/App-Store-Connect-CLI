@@ -15,7 +15,8 @@ import (
 func SubscriptionsSubmitCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("submit", flag.ExitOnError)
 
-	subscriptionID := fs.String("subscription-id", "", "Subscription ID")
+	subscriptionID := fs.String("subscription-id", "", "Subscription ID, product ID, or exact current name")
+	appID := addSubscriptionLookupAppFlag(fs)
 	confirm := fs.Bool("confirm", false, "Confirm submission")
 	output := shared.BindOutputFlags(fs)
 
@@ -47,6 +48,11 @@ Examples:
 
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()
+
+			id, err = resolveSubscriptionLookupID(requestCtx, client, *appID, id)
+			if err != nil {
+				return err
+			}
 
 			resp, err := client.CreateSubscriptionSubmission(requestCtx, id)
 			if err != nil {

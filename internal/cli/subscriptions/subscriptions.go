@@ -759,7 +759,8 @@ Examples:
 func SubscriptionsPricesListCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("prices list", flag.ExitOnError)
 
-	subID := fs.String("subscription-id", "", "Subscription ID")
+	subID := fs.String("subscription-id", "", "Subscription ID, product ID, or exact current name")
+	appID := addSubscriptionLookupAppFlag(fs)
 	limit := fs.Int("limit", 0, "Maximum results per page (1-200)")
 	next := fs.String("next", "", "Fetch next page using a links.next URL")
 	paginate := fs.Bool("paginate", false, "Automatically fetch all pages (aggregate results)")
@@ -803,6 +804,13 @@ Examples:
 
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()
+
+			if strings.TrimSpace(*next) == "" {
+				id, err = resolveSubscriptionLookupID(requestCtx, client, *appID, id)
+				if err != nil {
+					return err
+				}
+			}
 
 			if *resolved {
 				resp, err := fetchResolvedSubscriptionPrices(requestCtx, client, id, *limit, *next, time.Now().UTC())
@@ -848,8 +856,8 @@ Examples:
 func SubscriptionsPricesAddCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("prices add", flag.ExitOnError)
 
-	subID := fs.String("subscription-id", "", "Subscription ID")
-	appID := fs.String("app", "", "App ID (optional; retained for backward compatibility)")
+	subID := fs.String("subscription-id", "", "Subscription ID, product ID, or exact current name")
+	appID := fs.String("app", "", subscriptionLookupAppUsage)
 	pricePointID := fs.String("price-point", "", "Subscription price point ID")
 	tier := fs.Int("tier", 0, "Pricing tier number (mutually exclusive with --price-point and --price)")
 	price := fs.String("price", "", "Customer price to select price point (mutually exclusive with --price-point and --tier)")
@@ -882,7 +890,6 @@ Examples:
 			pricePoint := strings.TrimSpace(*pricePointID)
 			tierValue := *tier
 			priceValue := strings.TrimSpace(*price)
-			_ = strings.TrimSpace(*appID)
 
 			if err := shared.ValidatePriceSelectionFlags(pricePoint, tierValue, priceValue); err != nil {
 				fmt.Fprintln(os.Stderr, "Error:", err)
@@ -894,21 +901,27 @@ Examples:
 			}
 
 			territoryID := strings.ToUpper(strings.TrimSpace(*territory))
-
 			if tierValue > 0 || priceValue != "" {
 				if territoryID == "" {
 					fmt.Fprintln(os.Stderr, "Error: --territory is required when using --tier or --price")
 					return flag.ErrHelp
 				}
+			}
 
-				client, err := shared.GetASCClient()
-				if err != nil {
-					return fmt.Errorf("subscriptions prices add: %w", err)
-				}
+			client, err := shared.GetASCClient()
+			if err != nil {
+				return fmt.Errorf("subscriptions prices add: %w", err)
+			}
 
-				requestCtx, cancel := shared.ContextWithTimeout(ctx)
-				defer cancel()
+			requestCtx, cancel := shared.ContextWithTimeout(ctx)
+			defer cancel()
 
+			id, err = resolveSubscriptionLookupID(requestCtx, client, *appID, id)
+			if err != nil {
+				return err
+			}
+
+			if tierValue > 0 || priceValue != "" {
 				tiers, err := shared.ResolveSubscriptionTiers(requestCtx, client, id, territoryID, *refresh)
 				if err != nil {
 					return fmt.Errorf("subscriptions prices add: resolve tiers: %w", err)
@@ -923,14 +936,6 @@ Examples:
 					return fmt.Errorf("subscriptions prices add: %w", err)
 				}
 			}
-
-			client, err := shared.GetASCClient()
-			if err != nil {
-				return fmt.Errorf("subscriptions prices add: %w", err)
-			}
-
-			requestCtx, cancel := shared.ContextWithTimeout(ctx)
-			defer cancel()
 
 			// Check if the subscription already has prices.
 			// New subscriptions without prices require PATCH /v1/subscriptions/{id}
@@ -1052,7 +1057,8 @@ func SubscriptionsAvailabilityViewCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("availability view", flag.ExitOnError)
 
 	availabilityID := fs.String("availability-id", "", "Subscription availability ID")
-	subscriptionID := fs.String("subscription-id", "", "Subscription ID")
+	subscriptionID := fs.String("subscription-id", "", "Subscription ID, product ID, or exact current name")
+	appID := addSubscriptionLookupAppFlag(fs)
 	output := shared.BindOutputFlags(fs)
 
 	return &ffcli.Command{
@@ -1092,6 +1098,11 @@ Examples:
 					return fmt.Errorf("subscriptions availability view: failed to fetch: %w", err)
 				}
 				return shared.PrintOutput(resp, *output.Output, *output.Pretty)
+			}
+
+			subscriptionValue, err = resolveSubscriptionLookupID(requestCtx, client, *appID, subscriptionValue)
+			if err != nil {
+				return err
 			}
 
 			resp, err := client.GetSubscriptionAvailabilityForSubscription(requestCtx, subscriptionValue)
@@ -1183,7 +1194,8 @@ Examples:
 func SubscriptionsAvailabilityEditCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("availability edit", flag.ExitOnError)
 
-	subID := fs.String("subscription-id", "", "Subscription ID")
+	subID := fs.String("subscription-id", "", "Subscription ID, product ID, or exact current name")
+	appID := addSubscriptionLookupAppFlag(fs)
 	territories := fs.String("territories", "", "Territory IDs, comma-separated")
 	availableInNew := fs.Bool("available-in-new-territories", false, "Include new territories automatically")
 	output := shared.BindOutputFlags(fs)
@@ -1222,6 +1234,11 @@ Examples:
 
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()
+
+			id, err = resolveSubscriptionLookupID(requestCtx, client, *appID, id)
+			if err != nil {
+				return err
+			}
 
 			attrs := asc.SubscriptionAvailabilityAttributes{
 				AvailableInNewTerritories: *availableInNew,

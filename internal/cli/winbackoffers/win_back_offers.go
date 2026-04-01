@@ -125,7 +125,8 @@ Examples:
 func WinBackOffersListCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("list", flag.ExitOnError)
 
-	subscriptionID := fs.String("subscription-id", "", "Subscription ID")
+	subscriptionID := fs.String("subscription-id", "", "Subscription ID, product ID, or exact current name")
+	appID := fs.String("app", "", "App Store Connect app ID (or ASC_APP_ID env; required when --subscription-id uses a product ID or name)")
 	fields := fs.String("fields", "", "Fields to include: "+strings.Join(winBackOfferFieldsList(), ", "))
 	priceFields := fs.String("price-fields", "", "Price fields to include: "+strings.Join(winBackOfferPriceFieldsList(), ", "))
 	include := fs.String("include", "", "Include related resources: "+strings.Join(winBackOfferIncludeList(), ", "))
@@ -193,6 +194,17 @@ Examples:
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()
 
+			if strings.TrimSpace(*next) == "" {
+				resolvedAppID := shared.ResolveAppID(strings.TrimSpace(*appID))
+				if err := shared.RequireAppForStableSelector(resolvedAppID, id, "--subscription-id"); err != nil {
+					return err
+				}
+				id, err = shared.ResolveSubscriptionID(requestCtx, client, resolvedAppID, id)
+				if err != nil {
+					return err
+				}
+			}
+
 			opts := []asc.WinBackOffersOption{
 				asc.WithWinBackOffersLimit(*limit),
 				asc.WithWinBackOffersNextURL(*next),
@@ -253,7 +265,8 @@ Examples:
 func WinBackOffersCreateCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("create", flag.ExitOnError)
 
-	subscriptionID := fs.String("subscription-id", "", "Subscription ID")
+	subscriptionID := fs.String("subscription-id", "", "Subscription ID, product ID, or exact current name")
+	appID := fs.String("app", "", "App Store Connect app ID (or ASC_APP_ID env; required when --subscription-id uses a product ID or name)")
 	referenceName := fs.String("reference-name", "", "Reference name")
 	offerID := fs.String("offer-id", "", "Offer ID")
 	duration := fs.String("duration", "", "Offer duration: "+strings.Join(winBackOfferDurationValues, ", "))
@@ -430,6 +443,15 @@ Examples:
 
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()
+
+			resolvedAppID := shared.ResolveAppID(strings.TrimSpace(*appID))
+			if err := shared.RequireAppForStableSelector(resolvedAppID, subscription, "--subscription-id"); err != nil {
+				return err
+			}
+			subscription, err = shared.ResolveSubscriptionID(requestCtx, client, resolvedAppID, subscription)
+			if err != nil {
+				return err
+			}
 
 			req := asc.WinBackOfferCreateRequest{
 				Data: asc.WinBackOfferCreateData{
@@ -795,28 +817,89 @@ Examples:
 
 // WinBackOffersRelationshipsCommand returns the win-back offer links subcommand.
 func WinBackOffersRelationshipsCommand() *ffcli.Command {
-	return shared.BuildPaginatedListCommand(shared.PaginatedListCommandConfig{
-		FlagSetName: "links",
-		Name:        "links",
-		ShortUsage:  "asc win-back-offers links --subscription-id SUB_ID [flags]",
-		ShortHelp:   "List win-back offer relationships for a subscription.",
+	fs := flag.NewFlagSet("links", flag.ExitOnError)
+
+	subscriptionID := fs.String("subscription-id", "", "Subscription ID, product ID, or exact current name")
+	appID := fs.String("app", "", "App Store Connect app ID (or ASC_APP_ID env; required when --subscription-id uses a product ID or name)")
+	limit := fs.Int("limit", 0, fmt.Sprintf("Maximum results per page (1-%d)", winBackOffersMaxLimit))
+	next := fs.String("next", "", "Fetch next page using a links.next URL")
+	paginate := fs.Bool("paginate", false, "Automatically fetch all pages (aggregate results)")
+	output := shared.BindOutputFlags(fs)
+
+	return &ffcli.Command{
+		Name:       "links",
+		ShortUsage: "asc win-back-offers links --subscription-id SUB_ID [flags]",
+		ShortHelp:  "List win-back offer relationships for a subscription.",
 		LongHelp: `List win-back offer relationships for a subscription.
 
 Examples:
   asc win-back-offers links --subscription-id "SUB_ID"
   asc win-back-offers links --subscription-id "SUB_ID" --paginate`,
-		ParentFlag:  "subscription-id",
-		ParentUsage: "Subscription ID",
-		LimitMax:    winBackOffersMaxLimit,
-		ErrorPrefix: "win-back-offers links",
-		FetchPage: func(ctx context.Context, client *asc.Client, subscriptionID string, limit int, next string) (asc.PaginatedResponse, error) {
-			opts := []asc.LinkagesOption{
-				asc.WithLinkagesLimit(limit),
-				asc.WithLinkagesNextURL(next),
+		FlagSet:   fs,
+		UsageFunc: shared.DefaultUsageFunc,
+		Exec: func(ctx context.Context, args []string) error {
+			if *limit != 0 && (*limit < 1 || *limit > winBackOffersMaxLimit) {
+				return fmt.Errorf("win-back-offers links: --limit must be between 1 and %d", winBackOffersMaxLimit)
 			}
-			return client.GetSubscriptionWinBackOffersRelationships(ctx, subscriptionID, opts...)
+			if err := shared.ValidateNextURL(*next); err != nil {
+				return fmt.Errorf("win-back-offers links: %w", err)
+			}
+
+			id := strings.TrimSpace(*subscriptionID)
+			if id == "" && strings.TrimSpace(*next) == "" {
+				return shared.UsageError("--subscription-id is required")
+			}
+
+			client, err := shared.GetASCClient()
+			if err != nil {
+				return fmt.Errorf("win-back-offers links: %w", err)
+			}
+
+			requestCtx, cancel := shared.ContextWithTimeout(ctx)
+			defer cancel()
+
+			if strings.TrimSpace(*next) == "" {
+				resolvedAppID := shared.ResolveAppID(strings.TrimSpace(*appID))
+				if err := shared.RequireAppForStableSelector(resolvedAppID, id, "--subscription-id"); err != nil {
+					return err
+				}
+				id, err = shared.ResolveSubscriptionID(requestCtx, client, resolvedAppID, id)
+				if err != nil {
+					return err
+				}
+			}
+
+			fetchPage := func(ctx context.Context, perPage int, nextURL string) (asc.PaginatedResponse, error) {
+				opts := []asc.LinkagesOption{
+					asc.WithLinkagesLimit(perPage),
+					asc.WithLinkagesNextURL(nextURL),
+				}
+				return client.GetSubscriptionWinBackOffersRelationships(ctx, id, opts...)
+			}
+
+			if *paginate {
+				resp, err := shared.PaginateWithSpinner(
+					requestCtx,
+					func(ctx context.Context) (asc.PaginatedResponse, error) {
+						return fetchPage(ctx, winBackOffersMaxLimit, *next)
+					},
+					func(ctx context.Context, nextURL string) (asc.PaginatedResponse, error) {
+						return fetchPage(ctx, 0, nextURL)
+					},
+				)
+				if err != nil {
+					return fmt.Errorf("win-back-offers links: %w", err)
+				}
+				return shared.PrintOutput(resp, *output.Output, *output.Pretty)
+			}
+
+			resp, err := fetchPage(requestCtx, *limit, *next)
+			if err != nil {
+				return fmt.Errorf("win-back-offers links: %w", err)
+			}
+			return shared.PrintOutput(resp, *output.Output, *output.Pretty)
 		},
-	})
+	}
 }
 
 type optionalInt struct {

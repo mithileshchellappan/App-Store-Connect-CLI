@@ -58,8 +58,8 @@ func TestIAPOfferCodesCreateUsesDefaultEligibilitiesAndParsedPrices(t *testing.T
 
 		relationships := data["relationships"].(map[string]any)
 		iapRelationship := relationships["inAppPurchase"].(map[string]any)["data"].(map[string]any)
-		if iapRelationship["id"] != "iap-1" {
-			t.Fatalf("expected inAppPurchase id iap-1, got %#v", iapRelationship["id"])
+		if iapRelationship["id"] != "9000000001" {
+			t.Fatalf("expected inAppPurchase id 9000000001, got %#v", iapRelationship["id"])
 		}
 
 		included := payload["included"].([]any)
@@ -91,7 +91,7 @@ func TestIAPOfferCodesCreateUsesDefaultEligibilitiesAndParsedPrices(t *testing.T
 	stdout, stderr := captureOutput(t, func() {
 		if err := root.Parse([]string{
 			"iap", "offer-codes", "create",
-			"--iap-id", "iap-1",
+			"--iap-id", "9000000001",
 			"--name", "SPRING",
 			"--prices", "usa:pp-us,jpn:pp-jp",
 		}); err != nil {
@@ -150,7 +150,7 @@ func TestIAPOfferCodesCreateReturnsCreateFailure(t *testing.T) {
 	stdout, _ := captureOutput(t, func() {
 		if err := root.Parse([]string{
 			"iap", "offer-codes", "create",
-			"--iap-id", "iap-1",
+			"--iap-id", "9000000001",
 			"--name", "SPRING",
 			"--prices", "usa:pp-us",
 		}); err != nil {
@@ -178,7 +178,7 @@ func TestIAPOfferCodesListRejectsInvalidNextURL(t *testing.T) {
 	stdout, stderr := captureOutput(t, func() {
 		if err := root.Parse([]string{
 			"iap", "offer-codes", "list",
-			"--next", "https://example.com/v2/inAppPurchases/iap-1/offerCodes?cursor=AQ",
+			"--next", "https://example.com/v2/inAppPurchases/9000000001/offerCodes?cursor=AQ",
 		}); err != nil {
 			t.Fatalf("parse error: %v", err)
 		}
@@ -207,7 +207,7 @@ func TestIAPOfferCodesListRejectsMalformedNextURL(t *testing.T) {
 	}{
 		{
 			name:    "invalid scheme",
-			next:    "http://api.appstoreconnect.apple.com/v2/inAppPurchases/iap-1/offerCodes?cursor=AQ",
+			next:    "http://api.appstoreconnect.apple.com/v2/inAppPurchases/9000000001/offerCodes?cursor=AQ",
 			wantErr: "iap offer-codes list: --next must be an App Store Connect URL",
 		},
 		{
@@ -262,8 +262,8 @@ func TestIAPOfferCodesListOutputErrors(t *testing.T) {
 		if req.Method != http.MethodGet {
 			t.Fatalf("expected GET, got %s", req.Method)
 		}
-		if req.URL.Path != "/v2/inAppPurchases/iap-1/offerCodes" {
-			t.Fatalf("expected path /v2/inAppPurchases/iap-1/offerCodes, got %s", req.URL.Path)
+		if req.URL.Path != "/v2/inAppPurchases/9000000001/offerCodes" {
+			t.Fatalf("expected path /v2/inAppPurchases/9000000001/offerCodes, got %s", req.URL.Path)
 		}
 		body := `{"data":[{"type":"inAppPurchaseOfferCodes","id":"offer-1"}],"links":{"next":""}}`
 		return &http.Response{
@@ -280,12 +280,12 @@ func TestIAPOfferCodesListOutputErrors(t *testing.T) {
 	}{
 		{
 			name:    "unsupported output",
-			args:    []string{"iap", "offer-codes", "list", "--iap-id", "iap-1", "--output", "yaml"},
+			args:    []string{"iap", "offer-codes", "list", "--iap-id", "9000000001", "--output", "yaml"},
 			wantErr: "unsupported format: yaml",
 		},
 		{
 			name:    "pretty with table",
-			args:    []string{"iap", "offer-codes", "list", "--iap-id", "iap-1", "--output", "table", "--pretty"},
+			args:    []string{"iap", "offer-codes", "list", "--iap-id", "9000000001", "--output", "table", "--pretty"},
 			wantErr: "--pretty is only valid with JSON output",
 		},
 	}
@@ -320,8 +320,8 @@ func TestIAPOfferCodesListPaginateFromNextWithoutIAP(t *testing.T) {
 	setupAuth(t)
 	t.Setenv("ASC_CONFIG_PATH", filepath.Join(t.TempDir(), "nonexistent.json"))
 
-	const firstURL = "https://api.appstoreconnect.apple.com/v2/inAppPurchases/iap-1/offerCodes?cursor=AQ&limit=200"
-	const secondURL = "https://api.appstoreconnect.apple.com/v2/inAppPurchases/iap-1/offerCodes?cursor=BQ&limit=200"
+	const firstURL = "https://api.appstoreconnect.apple.com/v2/inAppPurchases/9000000001/offerCodes?cursor=AQ&limit=200"
+	const secondURL = "https://api.appstoreconnect.apple.com/v2/inAppPurchases/9000000001/offerCodes?cursor=BQ&limit=200"
 
 	originalTransport := http.DefaultTransport
 	t.Cleanup(func() {
@@ -397,8 +397,8 @@ func TestIAPOfferCodesListTableOutput(t *testing.T) {
 		if req.Method != http.MethodGet {
 			t.Fatalf("expected GET, got %s", req.Method)
 		}
-		if req.URL.Path != "/v2/inAppPurchases/iap-1/offerCodes" {
-			t.Fatalf("expected path /v2/inAppPurchases/iap-1/offerCodes, got %s", req.URL.Path)
+		if req.URL.Path != "/v2/inAppPurchases/9000000001/offerCodes" {
+			t.Fatalf("expected path /v2/inAppPurchases/9000000001/offerCodes, got %s", req.URL.Path)
 		}
 		body := `{
 			"data":[{"type":"inAppPurchaseOfferCodes","id":"offer-table-1","attributes":{"name":"Spring","active":true}}],
@@ -415,7 +415,7 @@ func TestIAPOfferCodesListTableOutput(t *testing.T) {
 	root.FlagSet.SetOutput(io.Discard)
 
 	stdout, stderr := captureOutput(t, func() {
-		if err := root.Parse([]string{"iap", "offer-codes", "list", "--iap-id", "iap-1", "--output", "table"}); err != nil {
+		if err := root.Parse([]string{"iap", "offer-codes", "list", "--iap-id", "9000000001", "--output", "table"}); err != nil {
 			t.Fatalf("parse error: %v", err)
 		}
 		if err := root.Run(context.Background()); err != nil {

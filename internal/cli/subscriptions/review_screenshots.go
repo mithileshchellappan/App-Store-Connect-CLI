@@ -89,7 +89,8 @@ Examples:
 func SubscriptionsReviewScreenshotsCreateCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("review-screenshots create", flag.ExitOnError)
 
-	subscriptionID := fs.String("subscription-id", "", "Subscription ID")
+	subscriptionID := fs.String("subscription-id", "", "Subscription ID, product ID, or exact current name")
+	appID := addSubscriptionLookupAppFlag(fs)
 	filePath := fs.String("file", "", "Path to review screenshot file")
 	output := shared.BindOutputFlags(fs)
 
@@ -129,6 +130,11 @@ Examples:
 
 			requestCtx, cancel := shared.ContextWithUploadTimeout(ctx)
 			defer cancel()
+
+			id, err = resolveSubscriptionLookupID(requestCtx, client, *appID, id)
+			if err != nil {
+				return err
+			}
 
 			resp, err := client.CreateSubscriptionAppStoreReviewScreenshot(requestCtx, id, info.Name(), info.Size())
 			if err != nil {

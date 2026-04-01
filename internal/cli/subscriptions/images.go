@@ -45,7 +45,8 @@ Examples:
 func SubscriptionsImagesListCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("images list", flag.ExitOnError)
 
-	subscriptionID := fs.String("subscription-id", "", "Subscription ID")
+	subscriptionID := fs.String("subscription-id", "", "Subscription ID, product ID, or exact current name")
+	appID := addSubscriptionLookupAppFlag(fs)
 	limit := fs.Int("limit", 0, "Maximum results per page (1-200)")
 	next := fs.String("next", "", "Fetch next page using a links.next URL")
 	paginate := fs.Bool("paginate", false, "Automatically fetch all pages (aggregate results)")
@@ -83,6 +84,13 @@ Examples:
 
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()
+
+			if strings.TrimSpace(*next) == "" {
+				id, err = resolveSubscriptionLookupID(requestCtx, client, *appID, id)
+				if err != nil {
+					return err
+				}
+			}
 
 			opts := []asc.SubscriptionImagesOption{
 				asc.WithSubscriptionImagesLimit(*limit),
@@ -162,7 +170,8 @@ Examples:
 func SubscriptionsImagesCreateCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("images create", flag.ExitOnError)
 
-	subscriptionID := fs.String("subscription-id", "", "Subscription ID")
+	subscriptionID := fs.String("subscription-id", "", "Subscription ID, product ID, or exact current name")
+	appID := addSubscriptionLookupAppFlag(fs)
 	filePath := fs.String("file", "", "Path to image file")
 	output := shared.BindOutputFlags(fs)
 
@@ -202,6 +211,11 @@ Examples:
 
 			requestCtx, cancel := shared.ContextWithUploadTimeout(ctx)
 			defer cancel()
+
+			id, err = resolveSubscriptionLookupID(requestCtx, client, *appID, id)
+			if err != nil {
+				return err
+			}
 
 			resp, err := client.CreateSubscriptionImage(requestCtx, id, info.Name(), info.Size())
 			if err != nil {

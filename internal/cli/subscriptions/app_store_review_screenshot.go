@@ -38,7 +38,8 @@ Examples:
 func SubscriptionsAppStoreReviewScreenshotGetCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("app-store-review-screenshot get", flag.ExitOnError)
 
-	subscriptionID := fs.String("subscription-id", "", "Subscription ID")
+	subscriptionID := fs.String("subscription-id", "", "Subscription ID, product ID, or exact current name")
+	appID := addSubscriptionLookupAppFlag(fs)
 	output := shared.BindOutputFlags(fs)
 
 	return &ffcli.Command{
@@ -65,6 +66,11 @@ Examples:
 
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()
+
+			id, err = resolveSubscriptionLookupID(requestCtx, client, *appID, id)
+			if err != nil {
+				return err
+			}
 
 			resp, err := client.GetSubscriptionAppStoreReviewScreenshotForSubscription(requestCtx, id)
 			if err != nil {

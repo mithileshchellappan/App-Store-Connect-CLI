@@ -18,7 +18,7 @@ func TestSubscriptionsPricesAdd_TierAndPricePointMutualExclusion(t *testing.T) {
 	_, stderr := captureOutput(t, func() {
 		if err := root.Parse([]string{
 			"subscriptions", "pricing", "prices", "set",
-			"--subscription-id", "SUB_ID",
+			"--subscription-id", "8000000003",
 			"--price-point", "PP",
 			"--tier", "5",
 			"--territory", "USA",
@@ -51,7 +51,7 @@ func TestSubscriptionsPricesAdd_TierUsesSubscriptionPricePoints(t *testing.T) {
 				Body:       io.NopCloser(strings.NewReader(body)),
 				Header:     http.Header{"Content-Type": []string{"application/json"}},
 			}, nil
-		case req.Method == http.MethodGet && strings.Contains(req.URL.Path, "/subscriptions/SUB_ID/pricePoints"):
+		case req.Method == http.MethodGet && strings.Contains(req.URL.Path, "/subscriptions/8000000003/pricePoints"):
 			body := `{
 				"data":[
 					{"type":"subscriptionPricePoints","id":"sub-pp-1","attributes":{"customerPrice":"0.99","proceeds":"0.70"}},
@@ -93,7 +93,7 @@ func TestSubscriptionsPricesAdd_TierUsesSubscriptionPricePoints(t *testing.T) {
 	stdout, stderr := captureOutput(t, func() {
 		if err := root.Parse([]string{
 			"subscriptions", "pricing", "prices", "set",
-			"--subscription-id", "SUB_ID",
+			"--subscription-id", "8000000003",
 			"--tier", "2",
 			"--territory", "USA",
 			"--refresh",
@@ -149,7 +149,7 @@ func TestSubscriptionsPricesAdd_ProbeErrorReturnsWithoutWrite(t *testing.T) {
 	_, stderr := captureOutput(t, func() {
 		if err := root.Parse([]string{
 			"subscriptions", "pricing", "prices", "set",
-			"--subscription-id", "SUB_ID",
+			"--subscription-id", "8000000003",
 			"--price-point", "PP_ID",
 		}); err != nil {
 			t.Fatalf("parse error: %v", err)
@@ -183,7 +183,7 @@ func TestSubscriptionsPricesAdd_InitialPriceForwardsAttributes(t *testing.T) {
 				Body:       io.NopCloser(strings.NewReader(body)),
 				Header:     http.Header{"Content-Type": []string{"application/json"}},
 			}, nil
-		case req.Method == http.MethodPatch && strings.Contains(req.URL.Path, "/v1/subscriptions/SUB_ID"):
+		case req.Method == http.MethodPatch && strings.Contains(req.URL.Path, "/v1/subscriptions/8000000003"):
 			var payload map[string]any
 			if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
 				t.Fatalf("failed to decode patch payload: %v", err)
@@ -225,7 +225,7 @@ func TestSubscriptionsPricesAdd_InitialPriceForwardsAttributes(t *testing.T) {
 				t.Fatalf("expected territory id USA, got %#v", territoryData["id"])
 			}
 
-			resp := `{"data":{"type":"subscriptions","id":"SUB_ID","attributes":{"name":"Monthly","productId":"com.example.sub.monthly"}}}`
+			resp := `{"data":{"type":"subscriptions","id":"8000000003","attributes":{"name":"Monthly","productId":"com.example.sub.monthly"}}}`
 			return &http.Response{
 				StatusCode: http.StatusOK,
 				Body:       io.NopCloser(strings.NewReader(resp)),
@@ -247,7 +247,7 @@ func TestSubscriptionsPricesAdd_InitialPriceForwardsAttributes(t *testing.T) {
 	stdout, stderr := captureOutput(t, func() {
 		if err := root.Parse([]string{
 			"subscriptions", "pricing", "prices", "set",
-			"--subscription-id", "SUB_ID",
+			"--subscription-id", "8000000003",
 			"--price-point", "PP_ID",
 			"--territory", "USA",
 			"--start-date", "2026-05-01",
@@ -263,7 +263,7 @@ func TestSubscriptionsPricesAdd_InitialPriceForwardsAttributes(t *testing.T) {
 	if stderr != "" {
 		t.Fatalf("expected empty stderr, got %q", stderr)
 	}
-	if !strings.Contains(stdout, `"id":"SUB_ID"`) {
+	if !strings.Contains(stdout, `"id":"8000000003"`) {
 		t.Fatalf("expected subscription response in stdout, got %q", stdout)
 	}
 }
@@ -275,7 +275,7 @@ func TestSubscriptionsPricesAdd_TierRequiresTerritory(t *testing.T) {
 	_, stderr := captureOutput(t, func() {
 		if err := root.Parse([]string{
 			"subscriptions", "pricing", "prices", "set",
-			"--subscription-id", "SUB_ID",
+			"--subscription-id", "8000000003",
 			"--tier", "5",
 		}); err != nil {
 			t.Fatalf("parse error: %v", err)
@@ -298,7 +298,7 @@ func TestSubscriptionsPricesAdd_InvalidPriceValue(t *testing.T) {
 	_, stderr := captureOutput(t, func() {
 		if err := root.Parse([]string{
 			"subscriptions", "pricing", "prices", "set",
-			"--subscription-id", "SUB_ID",
+			"--subscription-id", "8000000003",
 			"--price", "abc",
 			"--territory", "USA",
 		}); err != nil {
@@ -322,7 +322,7 @@ func TestSubscriptionsPricesAdd_NegativeTier(t *testing.T) {
 	_, stderr := captureOutput(t, func() {
 		if err := root.Parse([]string{
 			"subscriptions", "pricing", "prices", "set",
-			"--subscription-id", "SUB_ID",
+			"--subscription-id", "8000000003",
 			"--tier", "-1",
 			"--territory", "USA",
 		}); err != nil {

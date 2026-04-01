@@ -437,8 +437,9 @@ Examples:
 func IAPLocalizationsListCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("localizations list", flag.ExitOnError)
 
-	iapID := fs.String("iap-id", "", "In-app purchase ID")
-	legacyID := fs.String("id", "", "In-app purchase ID (deprecated)")
+	iapID := fs.String("iap-id", "", "In-app purchase ID, product ID, or exact current name")
+	legacyID := fs.String("id", "", "In-app purchase ID, product ID, or exact current name (deprecated)")
+	appID := addIAPLookupAppFlag(fs)
 	limit := fs.Int("limit", 0, "Maximum results per page (1-200)")
 	next := fs.String("next", "", "Fetch next page using a links.next URL")
 	paginate := fs.Bool("paginate", false, "Automatically fetch all pages (aggregate results)")
@@ -478,6 +479,13 @@ Examples:
 
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()
+
+			if strings.TrimSpace(*next) == "" {
+				resolvedID, err = resolveIAPLookupID(requestCtx, client, *appID, resolvedID)
+				if err != nil {
+					return err
+				}
+			}
 
 			opts := []asc.IAPLocalizationsOption{
 				asc.WithIAPLocalizationsLimit(*limit),

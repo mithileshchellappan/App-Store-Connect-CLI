@@ -44,7 +44,8 @@ Examples:
 func SubscriptionsPricePointsListCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("price-points list", flag.ExitOnError)
 
-	subscriptionID := fs.String("subscription-id", "", "Subscription ID")
+	subscriptionID := fs.String("subscription-id", "", "Subscription ID, product ID, or exact current name")
+	appID := addSubscriptionLookupAppFlag(fs)
 	territory := fs.String("territory", "", "Filter by territory (e.g., USA) to reduce results")
 	price := fs.String("price", "", "Filter by exact customer price (e.g., 4.99)")
 	minPrice := fs.String("min-price", "", "Filter by minimum customer price")
@@ -117,6 +118,13 @@ Examples:
 
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()
+
+			if strings.TrimSpace(*next) == "" {
+				id, err = resolveSubscriptionLookupID(requestCtx, client, *appID, id)
+				if err != nil {
+					return err
+				}
+			}
 
 			opts := []asc.SubscriptionPricePointsOption{
 				asc.WithSubscriptionPricePointsTerritory(*territory),

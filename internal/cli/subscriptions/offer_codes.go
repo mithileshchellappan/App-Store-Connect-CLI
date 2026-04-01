@@ -52,7 +52,8 @@ Examples:
 func SubscriptionsOfferCodesListCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("offer-codes list", flag.ExitOnError)
 
-	subscriptionID := fs.String("subscription-id", "", "Subscription ID")
+	subscriptionID := fs.String("subscription-id", "", "Subscription ID, product ID, or exact current name")
+	appID := addSubscriptionLookupAppFlag(fs)
 	limit := fs.Int("limit", 0, "Maximum results per page (1-200)")
 	next := fs.String("next", "", "Fetch next page using a links.next URL")
 	paginate := fs.Bool("paginate", false, "Automatically fetch all pages (aggregate results)")
@@ -90,6 +91,13 @@ Examples:
 
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()
+
+			if strings.TrimSpace(*next) == "" {
+				id, err = resolveSubscriptionLookupID(requestCtx, client, *appID, id)
+				if err != nil {
+					return err
+				}
+			}
 
 			opts := []asc.SubscriptionOfferCodesOption{
 				asc.WithSubscriptionOfferCodesLimit(*limit),
@@ -169,7 +177,8 @@ Examples:
 func SubscriptionsOfferCodesCreateCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("offer-codes create", flag.ExitOnError)
 
-	subscriptionID := fs.String("subscription-id", "", "Subscription ID")
+	subscriptionID := fs.String("subscription-id", "", "Subscription ID, product ID, or exact current name")
+	appID := addSubscriptionLookupAppFlag(fs)
 	name := fs.String("name", "", "Offer code name")
 	offerEligibility := fs.String("offer-eligibility", "", "Offer eligibility: "+strings.Join(subscriptionOfferEligibilityValues, ", "))
 	customerEligibilities := fs.String("customer-eligibilities", "", "Customer eligibilities: "+strings.Join(subscriptionCustomerEligibilityValues, ", "))
@@ -250,6 +259,11 @@ Examples:
 
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()
+
+			id, err = resolveSubscriptionLookupID(requestCtx, client, *appID, id)
+			if err != nil {
+				return err
+			}
 
 			attrs := asc.SubscriptionOfferCodeCreateAttributes{
 				Name:                  nameValue,

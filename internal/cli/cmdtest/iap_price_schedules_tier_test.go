@@ -17,7 +17,7 @@ func TestIAPPriceSchedulesCreate_TierAndPricesMutualExclusion(t *testing.T) {
 	_, stderr := captureOutput(t, func() {
 		if err := root.Parse([]string{
 			"iap", "pricing", "schedules", "create",
-			"--iap-id", "IAP_ID",
+			"--iap-id", "9000000003",
 			"--base-territory", "USA",
 			"--tier", "5",
 			"--prices", "PP:2026-03-01",
@@ -42,7 +42,7 @@ func TestIAPPriceSchedulesCreate_TierAndPriceMutualExclusion(t *testing.T) {
 	_, stderr := captureOutput(t, func() {
 		if err := root.Parse([]string{
 			"iap", "pricing", "schedules", "create",
-			"--iap-id", "IAP_ID",
+			"--iap-id", "9000000003",
 			"--base-territory", "USA",
 			"--tier", "5",
 			"--price", "4.99",
@@ -68,7 +68,7 @@ func TestIAPPriceSchedulesCreate_TierUsesIAPPricePoints(t *testing.T) {
 	var resolvedPricePointID string
 	http.DefaultTransport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
 		switch {
-		case req.Method == http.MethodGet && strings.Contains(req.URL.Path, "/inAppPurchases/IAP_ID/pricePoints"):
+		case req.Method == http.MethodGet && strings.Contains(req.URL.Path, "/inAppPurchases/9000000003/pricePoints"):
 			body := `{
 				"data":[
 					{"type":"inAppPurchasePricePoints","id":"iap-pp-1","attributes":{"customerPrice":"0.99","proceeds":"0.70"}},
@@ -110,7 +110,7 @@ func TestIAPPriceSchedulesCreate_TierUsesIAPPricePoints(t *testing.T) {
 	stdout, stderr := captureOutput(t, func() {
 		if err := root.Parse([]string{
 			"iap", "pricing", "schedules", "create",
-			"--iap-id", "IAP_ID",
+			"--iap-id", "9000000003",
 			"--base-territory", "USA",
 			"--tier", "2",
 			"--start-date", "2026-03-01",
@@ -141,7 +141,7 @@ func TestIAPPriceSchedulesCreate_InvalidPriceValue(t *testing.T) {
 	_, stderr := captureOutput(t, func() {
 		if err := root.Parse([]string{
 			"iap", "pricing", "schedules", "create",
-			"--iap-id", "IAP_ID",
+			"--iap-id", "9000000003",
 			"--base-territory", "USA",
 			"--price", "abc",
 		}); err != nil {
@@ -165,7 +165,7 @@ func TestIAPPriceSchedulesCreate_InvalidTierStartDate(t *testing.T) {
 	_, stderr := captureOutput(t, func() {
 		if err := root.Parse([]string{
 			"iap", "pricing", "schedules", "create",
-			"--iap-id", "IAP_ID",
+			"--iap-id", "9000000003",
 			"--base-territory", "USA",
 			"--tier", "1",
 			"--start-date", "invalid",
@@ -205,7 +205,7 @@ func TestIAPPriceSchedulesCreateUsesCanonicalErrorPrefix(t *testing.T) {
 
 	if err := root.Parse([]string{
 		"iap", "pricing", "schedules", "create",
-		"--iap-id", "IAP_ID",
+		"--iap-id", "9000000003",
 		"--base-territory", "USA",
 		"--prices", "PP1",
 	}); err != nil {

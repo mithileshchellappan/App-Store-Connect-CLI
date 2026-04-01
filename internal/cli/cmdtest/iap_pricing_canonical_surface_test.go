@@ -381,15 +381,15 @@ func TestLegacyIAPSummaryAliasWarnsAndMatchesCanonicalOutput(t *testing.T) {
 
 	http.DefaultTransport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
 		switch req.URL.Path {
-		case "/v2/inAppPurchases/iap-1":
+		case "/v2/inAppPurchases/9000000001":
 			return &http.Response{
 				StatusCode: http.StatusOK,
 				Body: io.NopCloser(strings.NewReader(`{
-					"data":{"type":"inAppPurchases","id":"iap-1","attributes":{"name":"Lifetime Unlock","productId":"com.example.lifetime","inAppPurchaseType":"NON_CONSUMABLE"}}
+					"data":{"type":"inAppPurchases","id":"9000000001","attributes":{"name":"Lifetime Unlock","productId":"com.example.lifetime","inAppPurchaseType":"NON_CONSUMABLE"}}
 				}`)),
 				Header: http.Header{"Content-Type": []string{"application/json"}},
 			}, nil
-		case "/v2/inAppPurchases/iap-1/iapPriceSchedule":
+		case "/v2/inAppPurchases/9000000001/iapPriceSchedule":
 			return &http.Response{
 				StatusCode: http.StatusOK,
 				Body: io.NopCloser(strings.NewReader(`{
@@ -413,7 +413,7 @@ func TestLegacyIAPSummaryAliasWarnsAndMatchesCanonicalOutput(t *testing.T) {
 				}`)),
 				Header: http.Header{"Content-Type": []string{"application/json"}},
 			}, nil
-		case "/v2/inAppPurchases/iap-1/pricePoints":
+		case "/v2/inAppPurchases/9000000001/pricePoints":
 			return &http.Response{
 				StatusCode: http.StatusOK,
 				Body: io.NopCloser(strings.NewReader(`{
@@ -443,8 +443,8 @@ func TestLegacyIAPSummaryAliasWarnsAndMatchesCanonicalOutput(t *testing.T) {
 		})
 	}
 
-	canonicalStdout, canonicalStderr := run([]string{"iap", "pricing", "summary", "--iap-id", "iap-1", "--output", "json"})
-	aliasStdout, aliasStderr := run([]string{"iap", "prices", "--iap-id", "iap-1", "--output", "json"})
+	canonicalStdout, canonicalStderr := run([]string{"iap", "pricing", "summary", "--iap-id", "9000000001", "--output", "json"})
+	aliasStdout, aliasStderr := run([]string{"iap", "prices", "--iap-id", "9000000001", "--output", "json"})
 
 	if canonicalStderr != "" {
 		t.Fatalf("expected canonical command to avoid warnings, got %q", canonicalStderr)

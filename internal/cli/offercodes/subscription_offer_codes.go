@@ -120,7 +120,8 @@ Examples:
 func OfferCodesCreateCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("create", flag.ExitOnError)
 
-	subscriptionID := fs.String("subscription-id", "", "Subscription ID (required)")
+	subscriptionID := fs.String("subscription-id", "", "Subscription ID, product ID, or exact current name (required)")
+	appID := fs.String("app", "", "App Store Connect app ID (or ASC_APP_ID env; required when --subscription-id uses a product ID or name)")
 	name := fs.String("name", "", "Offer code name (required)")
 	customerEligibilities := fs.String("customer-eligibilities", "", "Customer eligibilities: "+strings.Join(offerCodeCustomerEligibilityValues, ", "))
 	offerEligibility := fs.String("offer-eligibility", "", "Offer eligibility: "+strings.Join(offerCodeEligibilityValues, ", "))
@@ -225,6 +226,15 @@ Examples:
 
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()
+
+			resolvedAppID := shared.ResolveAppID(strings.TrimSpace(*appID))
+			if err := shared.RequireAppForStableSelector(resolvedAppID, subscription, "--subscription-id"); err != nil {
+				return err
+			}
+			subscription, err = shared.ResolveSubscriptionID(requestCtx, client, resolvedAppID, subscription)
+			if err != nil {
+				return err
+			}
 
 			attrs := asc.SubscriptionOfferCodeCreateAttributes{
 				Name:                  trimmedName,

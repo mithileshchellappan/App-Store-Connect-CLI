@@ -53,7 +53,7 @@ func TestRun_IntroductoryOffersImportInvalidStartDateReturnsExitUsage(t *testing
 	_, stderr := captureOutput(t, func() {
 		code := cmd.Run([]string{
 			"subscriptions", "offers", "introductory", "import",
-			"--subscription-id", "SUB_ID",
+			"--subscription-id", "8000000003",
 			"--input", csvPath,
 			"--start-date", "2026-99-99",
 		}, "1.0.0")
@@ -112,7 +112,7 @@ func TestRun_IntroductoryOffersImportPartialFailureReturnsExitError(t *testing.T
 	stdout, stderr := captureOutput(t, func() {
 		code := cmd.Run([]string{
 			"subscriptions", "offers", "introductory", "import",
-			"--subscription-id", "SUB_ID",
+			"--subscription-id", "8000000003",
 			"--input", csvPath,
 			"--offer-duration", "ONE_WEEK",
 			"--offer-mode", "FREE_TRIAL",

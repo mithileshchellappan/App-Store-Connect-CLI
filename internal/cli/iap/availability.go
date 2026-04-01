@@ -40,7 +40,8 @@ Examples:
 func IAPAvailabilityGetCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("pricing availability get", flag.ExitOnError)
 
-	iapID := fs.String("iap-id", "", "In-app purchase ID")
+	appID := addIAPLookupAppFlag(fs)
+	iapID := fs.String("iap-id", "", "In-app purchase ID, product ID, or exact current name")
 	output := shared.BindOutputFlags(fs)
 
 	return &ffcli.Command{
@@ -68,6 +69,11 @@ Examples:
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()
 
+			iapValue, err = resolveIAPLookupID(requestCtx, client, *appID, iapValue)
+			if err != nil {
+				return err
+			}
+
 			resp, err := client.GetInAppPurchaseAvailability(requestCtx, iapValue)
 			if err != nil {
 				return fmt.Errorf("iap availability get: failed to fetch: %w", err)
@@ -82,7 +88,8 @@ Examples:
 func IAPAvailabilitySetCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("pricing availability set", flag.ExitOnError)
 
-	iapID := fs.String("iap-id", "", "In-app purchase ID")
+	appID := addIAPLookupAppFlag(fs)
+	iapID := fs.String("iap-id", "", "In-app purchase ID, product ID, or exact current name")
 	territories := fs.String("territories", "", "Territory IDs (comma-separated)")
 	availableInNew := fs.Bool("available-in-new-territories", false, "Include new territories automatically")
 	output := shared.BindOutputFlags(fs)
@@ -121,6 +128,11 @@ Examples:
 
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()
+
+			iapValue, err = resolveIAPLookupID(requestCtx, client, *appID, iapValue)
+			if err != nil {
+				return err
+			}
 
 			resp, err := client.CreateInAppPurchaseAvailability(requestCtx, iapValue, *availableInNew, territoryIDs)
 			if err != nil {

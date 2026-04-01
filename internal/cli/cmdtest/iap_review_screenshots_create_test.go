@@ -58,7 +58,7 @@ func TestIAPReviewScreenshotsCreatePrintsVerifiedScreenshot(t *testing.T) {
 	stdout, stderr := captureOutput(t, func() {
 		if err := root.Parse([]string{
 			"iap", "review-screenshots", "create",
-			"--iap-id", "iap-1",
+			"--iap-id", "9000000001",
 			"--file", imagePath,
 			"--output", "json",
 		}); err != nil {

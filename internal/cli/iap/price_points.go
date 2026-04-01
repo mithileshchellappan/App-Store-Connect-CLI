@@ -42,7 +42,8 @@ Examples:
 func IAPPricePointsListCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("price-points list", flag.ExitOnError)
 
-	iapID := fs.String("iap-id", "", "In-app purchase ID")
+	iapID := fs.String("iap-id", "", "In-app purchase ID, product ID, or exact current name")
+	appID := addIAPLookupAppFlag(fs)
 	territory := fs.String("territory", "", "Territory ID (e.g., USA)")
 	price := fs.String("price", "", "Filter by exact customer price (e.g., 4.99)")
 	minPrice := fs.String("min-price", "", "Filter by minimum customer price")
@@ -98,6 +99,13 @@ Examples:
 
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()
+
+			if strings.TrimSpace(*next) == "" {
+				iapValue, err = resolveIAPLookupID(requestCtx, client, *appID, iapValue)
+				if err != nil {
+					return err
+				}
+			}
 
 			opts := []asc.IAPPricePointsOption{
 				asc.WithIAPPricePointsLimit(*limit),

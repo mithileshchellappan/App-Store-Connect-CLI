@@ -38,7 +38,8 @@ Examples:
 func IAPContentGetCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("content get", flag.ExitOnError)
 
-	iapID := fs.String("iap-id", "", "In-app purchase ID")
+	appID := addIAPLookupAppFlag(fs)
+	iapID := fs.String("iap-id", "", "In-app purchase ID, product ID, or exact current name")
 	contentID := fs.String("content-id", "", "In-app purchase content ID")
 	output := shared.BindOutputFlags(fs)
 
@@ -79,6 +80,11 @@ Examples:
 				}
 
 				return shared.PrintOutput(resp, *output.Output, *output.Pretty)
+			}
+
+			iapValue, err = resolveIAPLookupID(requestCtx, client, *appID, iapValue)
+			if err != nil {
+				return err
 			}
 
 			resp, err := client.GetInAppPurchaseContent(requestCtx, iapValue)

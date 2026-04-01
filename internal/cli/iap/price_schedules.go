@@ -47,7 +47,8 @@ Examples:
 func IAPPriceSchedulesGetCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("schedules get", flag.ExitOnError)
 
-	iapID := fs.String("iap-id", "", "In-app purchase ID")
+	iapID := fs.String("iap-id", "", "In-app purchase ID, product ID, or exact current name")
+	appID := addIAPLookupAppFlag(fs)
 	scheduleID := fs.String("schedule-id", "", "Price schedule ID")
 	include := fs.String("include", "", "Include relationships: baseTerritory,manualPrices,automaticPrices")
 	scheduleFields := fs.String("schedule-fields", "", "fields[inAppPurchasePriceSchedules] (comma-separated)")
@@ -130,6 +131,11 @@ Examples:
 				}
 
 				return shared.PrintOutput(resp, *output.Output, *output.Pretty)
+			}
+
+			iapValue, err = resolveIAPLookupID(requestCtx, client, *appID, iapValue)
+			if err != nil {
+				return err
 			}
 
 			resp, err := client.GetInAppPurchasePriceSchedule(requestCtx, iapValue, opts...)
@@ -215,8 +221,8 @@ Examples:
 func IAPPriceSchedulesCreateCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("schedules create", flag.ExitOnError)
 
-	iapID := fs.String("iap-id", "", "In-app purchase ID")
-	appID := fs.String("app", "", "App ID (optional; retained for backward compatibility)")
+	iapID := fs.String("iap-id", "", "In-app purchase ID, product ID, or exact current name")
+	appID := fs.String("app", "", iapLookupAppUsage)
 	baseTerritory := fs.String("base-territory", "", "Base territory ID (e.g., USA)")
 	prices := fs.String("prices", "", "Manual prices: PRICE_POINT_ID[:START_DATE[:END_DATE]] entries")
 	tier := fs.Int("tier", 0, "Pricing tier number (use instead of --prices for single-price schedule)")
@@ -252,7 +258,6 @@ Examples:
 			tierValue := *tier
 			priceValue := strings.TrimSpace(*price)
 			pricesValue := strings.TrimSpace(*prices)
-			_ = strings.TrimSpace(*appID)
 
 			if tierValue < 0 {
 				fmt.Fprintln(os.Stderr, "Error: --tier must be a positive integer")
@@ -271,28 +276,44 @@ Examples:
 				fmt.Fprintln(os.Stderr, "Error:", err)
 				return flag.ErrHelp
 			}
+			if !hasTierOrPrice {
+				parsedPrices, err := parsePriceSchedulePrices(pricesValue)
+				if err != nil {
+					fmt.Fprintln(os.Stderr, "Error:", err.Error())
+					return flag.ErrHelp
+				}
+				if len(parsedPrices) == 0 {
+					fmt.Fprintln(os.Stderr, "Error: --prices (or --tier/--price) is required")
+					return flag.ErrHelp
+				}
+			}
+
+			resolvedStartDate := strings.TrimSpace(*startDate)
+			if hasTierOrPrice && resolvedStartDate != "" {
+				normalizedStartDate, err := normalizeIAPDate(resolvedStartDate, "--start-date")
+				if err != nil {
+					fmt.Fprintln(os.Stderr, "Error:", err.Error())
+					return flag.ErrHelp
+				}
+				resolvedStartDate = normalizedStartDate
+			}
+
+			client, err := shared.GetASCClient()
+			if err != nil {
+				return fmt.Errorf("iap pricing schedules create: %w", err)
+			}
+
+			requestCtx, cancel := shared.ContextWithTimeout(ctx)
+			defer cancel()
+
+			iapValue, err = resolveIAPLookupID(requestCtx, client, *appID, iapValue)
+			if err != nil {
+				return err
+			}
 
 			var priceEntries []asc.InAppPurchasePriceSchedulePrice
 
 			if hasTierOrPrice {
-				resolvedStartDate := strings.TrimSpace(*startDate)
-				if resolvedStartDate != "" {
-					normalizedStartDate, err := normalizeIAPDate(resolvedStartDate, "--start-date")
-					if err != nil {
-						fmt.Fprintln(os.Stderr, "Error:", err.Error())
-						return flag.ErrHelp
-					}
-					resolvedStartDate = normalizedStartDate
-				}
-
-				client, err := shared.GetASCClient()
-				if err != nil {
-					return fmt.Errorf("iap pricing schedules create: %w", err)
-				}
-
-				requestCtx, cancel := shared.ContextWithTimeout(ctx)
-				defer cancel()
-
 				tiers, err := shared.ResolveIAPTiers(requestCtx, client, iapValue, baseTerritoryValue, *refresh)
 				if err != nil {
 					return fmt.Errorf("iap pricing schedules create: resolve tiers: %w", err)
@@ -318,19 +339,7 @@ Examples:
 					fmt.Fprintln(os.Stderr, "Error:", err.Error())
 					return flag.ErrHelp
 				}
-				if len(priceEntries) == 0 {
-					fmt.Fprintln(os.Stderr, "Error: --prices (or --tier/--price) is required")
-					return flag.ErrHelp
-				}
 			}
-
-			client, err := shared.GetASCClient()
-			if err != nil {
-				return fmt.Errorf("iap pricing schedules create: %w", err)
-			}
-
-			requestCtx, cancel := shared.ContextWithTimeout(ctx)
-			defer cancel()
 
 			resp, err := client.CreateInAppPurchasePriceSchedule(requestCtx, iapValue, asc.InAppPurchasePriceScheduleCreateAttributes{
 				BaseTerritoryID: baseTerritoryValue,

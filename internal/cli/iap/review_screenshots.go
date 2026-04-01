@@ -49,7 +49,8 @@ Examples:
 func IAPReviewScreenshotsGetCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("review-screenshots get", flag.ExitOnError)
 
-	iapID := fs.String("iap-id", "", "In-app purchase ID")
+	iapID := fs.String("iap-id", "", "In-app purchase ID, product ID, or exact current name")
+	appID := addIAPLookupAppFlag(fs)
 	screenshotID := fs.String("screenshot-id", "", "Review screenshot ID")
 	output := shared.BindOutputFlags(fs)
 
@@ -88,6 +89,11 @@ Examples:
 				return shared.PrintOutput(resp, *output.Output, *output.Pretty)
 			}
 
+			iapValue, err = resolveIAPLookupID(requestCtx, client, *appID, iapValue)
+			if err != nil {
+				return err
+			}
+
 			resp, err := client.GetInAppPurchaseAppStoreReviewScreenshotForIAP(requestCtx, iapValue)
 			if err != nil {
 				return fmt.Errorf("iap review-screenshots get: failed to fetch: %w", err)
@@ -102,7 +108,8 @@ Examples:
 func IAPReviewScreenshotsCreateCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("review-screenshots create", flag.ExitOnError)
 
-	iapID := fs.String("iap-id", "", "In-app purchase ID")
+	iapID := fs.String("iap-id", "", "In-app purchase ID, product ID, or exact current name")
+	appID := addIAPLookupAppFlag(fs)
 	filePath := fs.String("file", "", "Path to screenshot file")
 	output := shared.BindOutputFlags(fs)
 
@@ -146,6 +153,11 @@ Examples:
 
 			requestCtx, cancel := contextWithAssetUploadTimeout(ctx)
 			defer cancel()
+
+			iapValue, err = resolveIAPLookupID(requestCtx, client, *appID, iapValue)
+			if err != nil {
+				return err
+			}
 
 			resp, err := client.CreateInAppPurchaseAppStoreReviewScreenshot(requestCtx, iapValue, info.Name(), info.Size())
 			if err != nil {

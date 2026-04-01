@@ -15,7 +15,8 @@ import (
 func IAPSubmitCommand() *ffcli.Command {
 	fs := flag.NewFlagSet("submit", flag.ExitOnError)
 
-	iapID := fs.String("iap-id", "", "In-app purchase ID")
+	iapID := fs.String("iap-id", "", "In-app purchase ID, product ID, or exact current name")
+	appID := addIAPLookupAppFlag(fs)
 	confirm := fs.Bool("confirm", false, "Confirm submission")
 	output := shared.BindOutputFlags(fs)
 
@@ -47,6 +48,11 @@ Examples:
 
 			requestCtx, cancel := shared.ContextWithTimeout(ctx)
 			defer cancel()
+
+			iapValue, err = resolveIAPLookupID(requestCtx, client, *appID, iapValue)
+			if err != nil {
+				return err
+			}
 
 			resp, err := client.CreateInAppPurchaseSubmission(requestCtx, iapValue)
 			if err != nil {
