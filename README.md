@@ -201,14 +201,14 @@ asc builds list --app "123456789" --output table
 asc testflight groups list --app "123456789" --output table
 ```
 
-### Release (high-level: validate + attach + submit)
+### Release (high-level App Store publish flow)
 
 ```bash
-# Dry-run first to preview steps
-asc release run --app "123456789" --version "1.2.3" --build "BUILD_ID" --metadata-dir "./metadata/version/1.2.3" --dry-run
+# Optional: preview the staging plan before submission
+asc release stage --app "123456789" --version "1.2.3" --build "BUILD_ID" --copy-metadata-from "1.2.2" --dry-run
 
-# Run the full pipeline: ensure version, apply metadata, attach build, validate, submit
-asc release run --app "123456789" --version "1.2.3" --build "BUILD_ID" --metadata-dir "./metadata/version/1.2.3" --confirm
+# Canonical upload + attach + submit command
+asc publish appstore --app "123456789" --ipa "/path/to/MyApp.ipa" --version "1.2.3" --submit --confirm
 
 # Monitor status after submission
 asc status --app "123456789" --watch
@@ -223,6 +223,9 @@ asc submit preflight --app "123456789" --version "1.2.3"
 asc submit status --version-id "VERSION_ID"
 asc submit cancel --version-id "VERSION_ID" --confirm
 ```
+
+`asc release run` remains available as a deprecated compatibility pipeline when
+you still want the older one-command stage + submit behavior.
 
 ### Review status and blockers
 

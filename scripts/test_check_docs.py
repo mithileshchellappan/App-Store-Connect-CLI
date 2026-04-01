@@ -621,7 +621,7 @@ USAGE
             original_hidden_alias,
         )
         check_website_commands.hidden_deprecated_alias_replacement = (
-            lambda _binary_path, _example, _root_flags: "asc release run"
+            lambda _binary_path, _example, _root_flags: "asc publish appstore --submit"
         )
         original_path_help = check_website_commands.path_help
         self.addCleanup(
@@ -685,7 +685,7 @@ USAGE
             original_hidden_alias,
         )
         check_website_commands.hidden_deprecated_alias_replacement = (
-            lambda _binary_path, _example, _root_flags: "asc release run"
+            lambda _binary_path, _example, _root_flags: "asc publish appstore --submit"
         )
         original_path_help = check_website_commands.path_help
         self.addCleanup(
@@ -722,7 +722,7 @@ USAGE
 
         self.assertEqual(len(errors), 1)
         self.assertIn("deprecated alias", errors[0])
-        self.assertIn("asc release run", errors[0])
+        self.assertIn("asc publish appstore --submit", errors[0])
 
     def test_website_command_checks_allow_hidden_alias_only_flags_before_deprecation_error(self) -> None:
         index = {
@@ -748,7 +748,7 @@ USAGE
             original_hidden_alias,
         )
         check_website_commands.hidden_deprecated_alias_replacement = (
-            lambda _binary_path, _example, _root_flags: "asc release run"
+            lambda _binary_path, _example, _root_flags: "asc publish appstore --submit"
         )
         original_path_help = check_website_commands.path_help
         self.addCleanup(
@@ -811,7 +811,7 @@ USAGE
             original_hidden_alias,
         )
         check_website_commands.hidden_deprecated_alias_replacement = (
-            lambda _binary_path, _example, _root_flags: "asc release run"
+            lambda _binary_path, _example, _root_flags: "asc publish appstore --submit"
         )
         original_path_help = check_website_commands.path_help
         self.addCleanup(
@@ -823,7 +823,7 @@ USAGE
         check_website_commands.path_help = (
             lambda _binary_path, path: (
                 "DESCRIPTION\n"
-                "  DEPRECATED: use `asc release run`.\n\n"
+                "  DEPRECATED: use `asc publish appstore --submit`.\n\n"
                 "USAGE\n"
                 "  asc submit create [flags]\n"
             )
@@ -908,71 +908,6 @@ USAGE
         self.assertNotIn("unknown flag '--app'", errors[0])
         self.assertNotIn("unknown flag '--version'", errors[0])
         self.assertNotIn("unknown flag '--output'", errors[0])
-
-    def test_hidden_publish_appstore_falls_back_to_alias_flags_when_help_hides_flags(self) -> None:
-        index = {
-            (): check_website_commands.CommandSpec(
-                path=(),
-                usage="asc <subcommand> [flags]",
-                flags={},
-                subcommands={"publish"},
-            ),
-            ("publish",): check_website_commands.CommandSpec(
-                path=("publish",),
-                usage="asc publish <subcommand> [flags]",
-                flags={},
-                subcommands={"testflight"},
-            ),
-        }
-
-        original_hidden_alias = check_website_commands.hidden_deprecated_alias_replacement
-        self.addCleanup(
-            setattr,
-            check_website_commands,
-            "hidden_deprecated_alias_replacement",
-            original_hidden_alias,
-        )
-        check_website_commands.hidden_deprecated_alias_replacement = (
-            lambda _binary_path, _example, _root_flags: "asc release run"
-        )
-        original_path_help = check_website_commands.path_help
-        self.addCleanup(
-            setattr,
-            check_website_commands,
-            "path_help",
-            original_path_help,
-        )
-        check_website_commands.path_help = (
-            lambda _binary_path, path: (
-                "DESCRIPTION\n"
-                "  DEPRECATED: use `asc release run`.\n\n"
-                "USAGE\n"
-                "  asc publish appstore [flags]\n"
-            )
-            if path == ("publish", "appstore")
-            else ""
-        )
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            website = Path(tmpdir)
-            (website / "index.mdx").write_text(
-                "```bash\n"
-                'asc publish appstore --app 123456789 --ipa ./Build.ipa --version 2.0 --submit --confirm\n'
-                "```\n"
-            )
-            errors = check_website_commands.collect_errors(
-                website,
-                index,
-                Path(tmpdir) / "asc-doc-check",
-            )
-
-        self.assertEqual(len(errors), 1)
-        self.assertIn("deprecated alias", errors[0])
-        self.assertNotIn("unknown flag '--app'", errors[0])
-        self.assertNotIn("unknown flag '--ipa'", errors[0])
-        self.assertNotIn("unknown flag '--submit'", errors[0])
-        self.assertNotIn("unknown flag '--confirm'", errors[0])
-
 
 class DocLinksTest(unittest.TestCase):
     def test_normalize_target_strips_angle_brackets_before_prefix_check(self) -> None:

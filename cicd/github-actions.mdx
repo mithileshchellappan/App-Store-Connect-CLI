@@ -188,11 +188,11 @@ jobs:
           ASC_PRIVATE_KEY_B64: ${{ secrets.ASC_PRIVATE_KEY_B64 }}
           ASC_APP_ID: ${{ secrets.APP_ID }}
         run: |
-          asc release run \
+          asc publish appstore \
             --app "$ASC_APP_ID" \
+            --ipa "./build/MyApp.ipa" \
             --version "${{ inputs.version }}" \
-            --build "BUILD_ID" \
-            --metadata-dir "./metadata/version/${{ inputs.version }}" \
+            --submit \
             --confirm
       
       - name: Notify on success

@@ -17,8 +17,7 @@ import (
 )
 
 const (
-	publishDefaultTimeout             = 30 * time.Minute
-	publishAppStoreDeprecationWarning = "Warning: `asc publish appstore` is deprecated. Use `asc release run`."
+	publishDefaultTimeout = 30 * time.Minute
 )
 
 // PublishCommand returns the publish command with subcommands.
@@ -26,20 +25,21 @@ func PublishCommand() *ffcli.Command {
 	return &ffcli.Command{
 		Name:       "publish",
 		ShortUsage: "asc publish <subcommand> [flags]",
-		ShortHelp:  "High-level publish workflows; use `publish testflight` for TestFlight.",
+		ShortHelp:  "High-level publish workflows for TestFlight and App Store.",
 		LongHelp: `High-level publish workflows.
 
 Use:
   - asc publish testflight for TestFlight distribution
-  - asc release run for App Store shipping
+  - asc publish appstore for the canonical App Store upload + submit flow
+  - asc release stage to prepare an App Store version without submitting it
 
-` + "`asc publish appstore`" + ` remains available as a deprecated compatibility
-path for older IPA-first automation, but it is no longer the recommended App
-Store publishing surface.
+` + "`asc release run`" + ` remains available as a deprecated compatibility
+pipeline for older automation that still expects one command to stage and
+submit a release.
 
 Examples:
   asc publish testflight --app APP_ID --ipa app.ipa --group GROUP_ID
-  asc release run --app "APP_ID" --version "1.2.3" --build "BUILD_ID" --metadata-dir "./metadata/version/1.2.3" --confirm`,
+  asc publish appstore --app APP_ID --ipa app.ipa --version 1.2.3 --submit --confirm`,
 		UsageFunc: shared.VisibleUsageFunc,
 		Subcommands: []*ffcli.Command{
 			PublishTestFlightCommand(),
@@ -299,21 +299,22 @@ func PublishAppStoreCommand() *ffcli.Command {
 	return &ffcli.Command{
 		Name:       "appstore",
 		ShortUsage: "asc publish appstore [flags]",
-		ShortHelp:  "DEPRECATED: use `asc release run`.",
-		LongHelp: `DEPRECATED: use ` + "`asc release run`" + `.
+		ShortHelp:  "Upload an IPA and optionally submit it for App Store review.",
+		LongHelp: `Upload an IPA, attach the processed build to the matching App Store
+version, and optionally submit it for App Store review.
 
-Deprecated compatibility path for older IPA-first automation that uploads an
-IPA, attaches the resulting build, and optionally submits it for review.
+Use this as the canonical high-level App Store publish command.
 
-Use this path only when you are maintaining existing scripts that already rely
-on the IPA-first flow. For normal App Store publishing:
-  - ` + "`asc release run`" + ` is the canonical publish command
-  - ` + "`asc release stage`" + ` prepares a version without submitting it
-  - ` + "`asc publish testflight`" + ` remains the canonical TestFlight path`,
+If you need to prepare metadata or localizations before submission:
+  - ` + "`asc release stage`" + ` runs the preparation pipeline without submitting
+  - ` + "`asc validate`" + ` runs readiness checks before you add ` + "`--submit`" + `
+
+Examples:
+  asc publish appstore --app "123" --ipa app.ipa --version "1.2.3"
+  asc publish appstore --app "123" --ipa app.ipa --version "1.2.3" --submit --confirm`,
 		FlagSet:   fs,
-		UsageFunc: shared.DeprecatedUsageFunc,
+		UsageFunc: shared.DefaultUsageFunc,
 		Exec: func(ctx context.Context, args []string) error {
-			fmt.Fprintln(os.Stderr, publishAppStoreDeprecationWarning)
 			if *submit && !*confirm {
 				fmt.Fprintln(os.Stderr, "Error: --confirm is required with --submit")
 				return flag.ErrHelp

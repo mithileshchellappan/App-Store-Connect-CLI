@@ -173,8 +173,8 @@ func TestDocsShowPrintsWorkflowsGuide(t *testing.T) {
 	if !strings.Contains(stdout, "# Workflow Patterns") {
 		t.Fatalf("expected workflows guide heading, got %q", stdout)
 	}
-	if !strings.Contains(stdout, "asc release run") || !strings.Contains(stdout, "asc publish testflight") {
-		t.Fatalf("expected workflows guide to document canonical release and TestFlight paths, got %q", stdout)
+	if !strings.Contains(stdout, "asc publish appstore") || !strings.Contains(stdout, "asc publish testflight") {
+		t.Fatalf("expected workflows guide to document canonical App Store and TestFlight paths, got %q", stdout)
 	}
 }
 

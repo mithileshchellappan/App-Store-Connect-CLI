@@ -520,8 +520,8 @@ func TestDoctorMigrationHintsUsesResolvedIDsWhenLookupSucceeds(t *testing.T) {
 	if !sliceContains(report.Migration.SuggestedCommands, `asc migrate import --app "987654321" --version-id "version-id-123" --fastlane-dir ./fastlane`) {
 		t.Fatalf("expected personalized migrate import command, got %#v", report.Migration.SuggestedCommands)
 	}
-	if !sliceContains(report.Migration.SuggestedCommands, `asc release run --app "987654321" --version "4.5.6" --build "build-id-456" --metadata-dir "./metadata/version/4.5.6" --confirm`) {
-		t.Fatalf("expected personalized submit command with resolved build ID, got %#v", report.Migration.SuggestedCommands)
+	if !sliceContains(report.Migration.SuggestedCommands, `asc publish appstore --app "987654321" --ipa app.ipa --version "4.5.6" --submit --confirm`) {
+		t.Fatalf("expected personalized canonical publish command, got %#v", report.Migration.SuggestedCommands)
 	}
 }
 
@@ -572,7 +572,7 @@ func TestBuildSuggestedCommandsUploadOnlyDoesNotRequestResolvedBuildID(t *testin
 	}
 }
 
-func TestBuildSuggestedCommandsQuotesDerivedMetadataDir(t *testing.T) {
+func TestBuildSuggestedCommandsQuotesDerivedPublishVersion(t *testing.T) {
 	t.Setenv("ASC_APP_ID", "")
 	t.Setenv("ASC_CONFIG_PATH", filepath.Join(t.TempDir(), "config.json"))
 
@@ -581,8 +581,8 @@ func TestBuildSuggestedCommandsQuotesDerivedMetadataDir(t *testing.T) {
 		marketingVersion: `1.2.3 beta "1"`,
 	}, nil)
 
-	if !sliceContains(commands, `asc release run --app "APP_ID" --version "1.2.3 beta \"1\"" --build "BUILD_ID" --metadata-dir "./metadata/version/1.2.3 beta \"1\"" --confirm`) {
-		t.Fatalf("expected quoted metadata-dir derived from version string, got %#v", commands)
+	if !sliceContains(commands, `asc publish appstore --app "APP_ID" --ipa app.ipa --version "1.2.3 beta \"1\"" --submit --confirm`) {
+		t.Fatalf("expected quoted publish guidance derived from version string, got %#v", commands)
 	}
 }
 

@@ -166,12 +166,12 @@ workflows:
                 
                 VERSION="$BITRISE_GIT_TAG"
                 
-                echo "Publishing version $VERSION with the App Store release pipeline..."
-                asc release run \
+                echo "Publishing version $VERSION with the canonical App Store publish command..."
+                asc publish appstore \
                   --app "$APP_ID" \
+                  --ipa "./build/MyApp.ipa" \
                   --version "$VERSION" \
-                  --build "BUILD_ID" \
-                  --metadata-dir "./metadata/version/$VERSION" \
+                  --submit \
                   --confirm
                 
                 echo "Submission successful"
@@ -343,7 +343,7 @@ workflows:
           inputs:
             - mode: run
             - command: |
-                asc release run --app "$PROD_APP_ID" --version "$VERSION" --build "BUILD_ID" --metadata-dir "./metadata/version/$VERSION" --confirm
+                asc publish appstore --app "$PROD_APP_ID" --ipa "build/MyApp.ipa" --version "$VERSION" --submit --confirm
 
   deploy_staging:
     steps:

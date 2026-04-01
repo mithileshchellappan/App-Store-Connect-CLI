@@ -1,9 +1,9 @@
 # publish
 
-> High-level publish workflows; prefer `publish testflight` for TestFlight
+> High-level publish workflows for TestFlight and App Store
 
-The `publish` command is the high-level publishing surface for TestFlight.
-For App Store shipping, use `asc release run`.
+The `publish` command is the high-level publishing surface for TestFlight and
+the canonical App Store upload + submit flow.
 
 ## Usage
 
@@ -16,11 +16,11 @@ asc publish <workflow> [flags]
 Use these top-level workflows deliberately:
 
 * `asc publish testflight` - canonical high-level TestFlight publish path
-* `asc release run` - canonical App Store publish path
+* `asc publish appstore` - canonical high-level App Store publish path
 * `asc release stage` - prepare an App Store version without submitting it
 
-`asc publish appstore` remains available only as a deprecated compatibility path
-for older IPA-first automation.
+`asc release run` remains available as a deprecated compatibility pipeline for
+older automation that still expects one command to stage and submit a release.
 
 ## Workflows
 
@@ -43,24 +43,24 @@ This workflow:
 
 ### App Store workflow
 
-Ship to the App Store with the canonical release pipeline:
+Ship to the App Store with the canonical publish command:
 
 ```bash  theme={null}
-asc release run \
+asc publish appstore \
   --app APP_ID \
+  --ipa /path/to/MyApp.ipa \
   --version 1.2.0 \
-  --build BUILD_ID \
-  --metadata-dir ./metadata/version/1.2.0 \
+  --submit \
   --confirm
 ```
 
 This workflow:
 
-1. Ensures the App Store version exists
-2. Applies metadata and localizations
-3. Attaches the selected build
-4. Runs readiness validation
-5. Submits for review
+1. Uploads the IPA
+2. Finds or creates the matching App Store version
+3. Attaches the processed build
+4. Optionally submits for review with `--submit`
+5. Prints the resulting build/version/submission identifiers
 
 ## TestFlight flags
 
@@ -84,13 +84,14 @@ This workflow:
   Default: `true`
 </ParamField>
 
-## Deprecated App Store compatibility path
+## Deprecated release compatibility path
 
-If you still maintain an older IPA-first script, the deprecated compatibility
-path remains available through the hidden `publish appstore` alias for older
-automation.
+If you still maintain older automation that depends on the metadata-aware
+one-command release pipeline, `asc release run` remains available as a
+deprecated compatibility path.
 
-Prefer migrating that workflow to `asc release run`.
+Prefer migrating day-to-day App Store shipping to `asc publish appstore` and
+using `asc release stage` for pre-submit preparation work.
 
 ## Example workflows
 
@@ -106,11 +107,11 @@ asc publish testflight \
 ### Publish to App Store
 
 ```bash  theme={null}
-asc release run \
+asc publish appstore \
   --app 123456789 \
+  --ipa build/MyApp.ipa \
   --version 1.2.0 \
-  --build BUILD_ID \
-  --metadata-dir ./metadata/version/1.2.0 \
+  --submit \
   --confirm
 ```
 
@@ -163,7 +164,7 @@ asc builds add-groups --build-id BUILD_ID --group "External Testers"
   </Card>
 
   <Card title="Release command" icon="rocket" href="/commands/overview">
-    Canonical App Store publish workflow
+    Pre-submit release staging and deprecated compatibility pipeline
   </Card>
 
   <Card title="Automation guide" icon="robot" href="/guides/automation">

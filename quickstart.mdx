@@ -202,11 +202,11 @@ asc validate --app "123456789" --version "1.2.3"
 ### Publish to the App Store
 
 ```bash  theme={null}
-asc release run --app "123456789" --version "1.2.3" --build "BUILD_ID" --metadata-dir "./metadata/version/1.2.3" --confirm
+asc publish appstore --app "123456789" --ipa "./MyApp.ipa" --version "1.2.3" --submit --confirm
 ```
 
 <Note>
-  The canonical App Store publish path is `asc release run ... --confirm`. Use `asc submit preflight`, `asc submit status`, or `asc submit cancel` for lower-level submission lifecycle work.
+  The canonical App Store publish path is `asc publish appstore ... --submit --confirm`. Use `asc validate`, `asc submit status`, or `asc submit cancel` for readiness and submission lifecycle follow-up work. `asc release run` remains available as a deprecated compatibility pipeline.
 </Note>
 
 ## Explore commands

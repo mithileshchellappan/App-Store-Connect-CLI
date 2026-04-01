@@ -27,11 +27,11 @@ func SubmitCommand() *ffcli.Command {
 	return &ffcli.Command{
 		Name:       "submit",
 		ShortUsage: "asc submit <subcommand> [flags]",
-		ShortHelp:  "Submission lifecycle tools; use `release run` to ship.",
+		ShortHelp:  "Submission lifecycle tools; use `publish appstore --submit` to ship.",
 		LongHelp: `Submission lifecycle tools for App Store review.
 
 Use:
-  - asc release run for the canonical App Store shipping path
+  - asc publish appstore --submit for the canonical high-level App Store shipping path
   - asc validate for canonical readiness checks before submission
   - asc submit status/cancel for lower-level review submission lifecycle work
 
@@ -67,19 +67,21 @@ func SubmitCreateCommand() *ffcli.Command {
 	return &ffcli.Command{
 		Name:       "create",
 		ShortUsage: "asc submit create [flags]",
-		ShortHelp:  "DEPRECATED: use `asc release run`.",
+		ShortHelp:  "DEPRECATED: use `asc publish appstore --submit`.",
 		LongHelp: `Deprecated compatibility path for lower-level direct submission.
 
-Use ` + "`asc release run`" + ` for the canonical App Store shipping flow when
-you want version setup, metadata application, build attachment, validation, and
-submission in one command.
+Use ` + "`asc publish appstore --submit`" + ` for the canonical high-level App
+Store shipping flow.
 
 Keep ` + "`asc submit create`" + ` only for older automation that already prepared
-the version and just needs the final review-submission step.`,
+the version and just needs the final review-submission step. For newly scripted
+direct submission on an already-prepared version, prefer the
+` + "`asc review submissions-*`" + ` commands instead of extending this
+deprecated alias.`,
 		FlagSet:   fs,
 		UsageFunc: shared.DeprecatedUsageFunc,
 		Exec: func(ctx context.Context, args []string) error {
-			fmt.Fprintln(os.Stderr, "Warning: `asc submit create` is deprecated. Use `asc release run`.")
+			fmt.Fprintln(os.Stderr, "Warning: `asc submit create` is deprecated. Use `asc publish appstore --submit`.")
 			if !*confirm {
 				fmt.Fprintln(os.Stderr, "Error: --confirm is required to submit for review")
 				return flag.ErrHelp

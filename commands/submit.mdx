@@ -1,9 +1,9 @@
 # submit
 
-> Submission lifecycle tools; use `release run` to ship
+> Submission lifecycle tools; use `publish appstore --submit` to ship
 
 The `submit` command is for lower-level App Store submission lifecycle work.
-For the canonical App Store publish flow, use `asc release run`.
+For the canonical high-level App Store publish flow, use `asc publish appstore --submit`.
 
 ## Usage
 
@@ -15,7 +15,7 @@ asc submit <subcommand> [flags]
 
 Use these commands deliberately:
 
-* `asc release run` - canonical App Store publish path
+* `asc publish appstore --submit` - canonical App Store publish path
 * `asc validate` - canonical readiness check before submission
 * `asc submit status` - inspect submission or version review state
 * `asc submit cancel` - cancel an active submission
@@ -56,19 +56,19 @@ asc submit cancel --id SUBMISSION_ID --confirm
 
 ## Canonical publish workflow
 
-Ship to the App Store with the release pipeline:
+Ship to the App Store with the canonical high-level publish command:
 
 ```bash  theme={null}
-asc release run \
+asc publish appstore \
   --app APP_ID \
+  --ipa /path/to/MyApp.ipa \
   --version VERSION_STRING \
-  --build BUILD_ID \
-  --metadata-dir ./metadata/version/VERSION_STRING \
+  --submit \
   --confirm
 ```
 
-That flow ensures the version exists, applies metadata, attaches the build,
-validates readiness, and submits for review.
+That flow uploads the IPA, finds or creates the matching version, attaches the
+build, and submits for review when `--submit` is present.
 
 ## Deprecated direct submission path
 
@@ -77,7 +77,8 @@ deprecated compatibility path remains available through the hidden
 `submit create` alias for older scripts that only need the final review
 submission step.
 
-Prefer migrating that workflow to `asc release run`.
+Prefer migrating that workflow to `asc publish appstore --submit` or the
+`asc review submissions-*` commands.
 
 ## Common errors
 
@@ -87,7 +88,7 @@ Prefer migrating that workflow to `asc release run`.
 Error: Version 1.2.0 has no build attached
 ```
 
-**Solution:** Use `asc release stage` or `asc release run` to attach the build as
+**Solution:** Use `asc release stage` or `asc publish appstore` to attach the build as
 part of the release pipeline.
 
 ### Missing metadata
@@ -96,7 +97,7 @@ part of the release pipeline.
 Error: Missing required metadata for version 1.2.0
 ```
 
-**Solution:** Complete the metadata, then retry `asc release run` or re-check
+**Solution:** Complete the metadata, then retry `asc publish appstore --submit` or re-check
 with `asc validate`.
 
 ### Already in review

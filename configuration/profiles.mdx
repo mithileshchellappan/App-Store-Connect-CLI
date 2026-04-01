@@ -212,7 +212,7 @@ asc validate --app 123456789 --version 1.0.0
 
 # Release to production
 export ASC_PROFILE="production"
-asc release run --app 123456789 --version 1.0.0 --build BUILD_ID --metadata-dir "./metadata/version/1.0.0" --confirm
+asc publish appstore --app 123456789 --ipa "./MyApp.ipa" --version 1.0.0 --submit --confirm
 ```
 
 ## Troubleshooting

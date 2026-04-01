@@ -1,16 +1,16 @@
 # App Store Submission
 
-> Publish with `release run`, then use `validate` or `submit` for follow-up checks
+> Publish with `publish appstore --submit`, then use `validate` or `submit` for follow-up checks
 
-Automate the complete App Store submission process with the canonical release
-pipeline, then use the lower-level submission lifecycle commands to inspect or
-cancel review state when needed.
+Automate the complete App Store submission process with the canonical
+high-level publish command, then use the lower-level submission lifecycle
+commands to inspect or cancel review state when needed.
 
 ## Overview
 
 Use these surfaces deliberately:
 
-* `asc release run` - canonical App Store publish path
+* `asc publish appstore --submit` - canonical App Store publish path
 * `asc release stage` - prepare a version without submitting it
 * `asc validate` - canonical readiness check before submission
 * `asc submit status` - inspect submission or version review state
@@ -105,15 +105,15 @@ Before submitting, ensure you have:
     ```
   </Step>
 
-  <Step title="Run the release pipeline">
+  <Step title="Run the publish command">
     Publish with the canonical App Store flow:
 
     ```bash  theme={null}
-    asc release run \
+    asc publish appstore \
       --app "YOUR_APP_ID" \
+      --ipa "./build/MyApp.ipa" \
       --version "1.0.0" \
-      --build "BUILD_ID" \
-      --metadata-dir "./metadata/version/1.0.0" \
+      --submit \
       --confirm
     ```
 
@@ -216,11 +216,11 @@ If you need to make changes after submitting:
 
   <Step title="Resubmit">
     ```bash  theme={null}
-    asc release run \
+    asc publish appstore \
       --app "YOUR_APP_ID" \
+      --ipa "./build/MyApp.ipa" \
       --version "1.0.0" \
-      --build "NEW_BUILD_ID" \
-      --metadata-dir "./metadata/version/1.0.0" \
+      --submit \
       --confirm
     ```
   </Step>
@@ -279,13 +279,13 @@ asc localizations update \
   --keywords "productivity,tools" \
   --whats-new "Bug fixes and performance improvements"
 
-# 4. Run the canonical release pipeline
+# 4. Run the canonical publish command
 echo "Submitting for review..."
-asc release run \
+asc publish appstore \
   --app "$ASC_APP_ID" \
+  --ipa "./build/MyApp.ipa" \
   --version "$VERSION" \
-  --build "$BUILD_ID" \
-  --metadata-dir "./metadata/version/$VERSION" \
+  --submit \
   --confirm
 
 echo "Submission complete!"
@@ -312,7 +312,7 @@ If any fields are missing, the submission will fail with a detailed error:
 Submit preflight failed: submission-blocking localization fields are missing:
   - en-US: description, keywords
   - es-ES: whats-new
-Fix these with `asc apps info edit` (optionally using `--copy-from-locale`) before retrying `asc validate` or `asc release run`.
+Fix these with `asc apps info edit` (optionally using `--copy-from-locale`) before retrying `asc validate` or `asc publish appstore --submit`.
 ```
 
 ### Fixing Validation Errors
@@ -383,14 +383,14 @@ If your submission is rejected:
 1. Check rejection details in App Store Connect web interface
 2. Address the issues mentioned in the rejection
 3. Upload a new build if code changes are needed, or just update metadata
-4. Resubmit with the canonical release pipeline:
+4. Resubmit with the canonical publish command:
 
 ```bash  theme={null}
-asc release run \
+asc publish appstore \
   --app "YOUR_APP_ID" \
+  --ipa "./build/MyApp.ipa" \
   --version "1.0.0" \
-  --build "FIXED_BUILD_ID" \
-  --metadata-dir "./metadata/version/1.0.0" \
+  --submit \
   --confirm
 ```
 
@@ -401,12 +401,12 @@ asc release run \
 For macOS apps, specify the `MAC_OS` platform:
 
 ```bash  theme={null}
-asc release run \
+asc publish appstore \
   --app "YOUR_APP_ID" \
+  --ipa "./build/MyMacApp.ipa" \
   --version "1.0.0" \
-  --build "BUILD_ID" \
-  --metadata-dir "./metadata/version/1.0.0" \
   --platform MAC_OS \
+  --submit \
   --confirm
 ```
 
@@ -415,12 +415,12 @@ asc release run \
 For tvOS apps, use the `TV_OS` platform:
 
 ```bash  theme={null}
-asc release run \
+asc publish appstore \
   --app "YOUR_APP_ID" \
+  --ipa "./build/MyTVApp.ipa" \
   --version "1.0.0" \
-  --build "BUILD_ID" \
-  --metadata-dir "./metadata/version/1.0.0" \
   --platform TV_OS \
+  --submit \
   --confirm
 ```
 
@@ -429,12 +429,12 @@ asc release run \
 For visionOS apps, use the `VISION_OS` platform:
 
 ```bash  theme={null}
-asc release run \
+asc publish appstore \
   --app "YOUR_APP_ID" \
+  --ipa "./build/MyVisionApp.ipa" \
   --version "1.0.0" \
-  --build "BUILD_ID" \
-  --metadata-dir "./metadata/version/1.0.0" \
   --platform VISION_OS \
+  --submit \
   --confirm
 ```
 

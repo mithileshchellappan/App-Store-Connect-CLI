@@ -561,7 +561,7 @@ func buildSuggestedCommands(signals migrationSignals, resolver MigrationSuggesti
 	needsAppID := hasMetadataSignal || hasBuildSignal || hasTestflightSignal || hasAppStoreSignal
 	needsVersionString := hasAppStoreSignal
 	needsVersionID := hasMetadataSignal || hasAppStoreSignal
-	needsBuildID := hasAppStoreSignal && hasMetadataSignal
+	needsBuildID := false
 	values := resolveMigrationCommandValues(signals, resolver, needsAppID, needsVersionString, needsVersionID, needsBuildID)
 	hasResolvedVersionID := strings.TrimSpace(values.versionID) != ""
 	values = fallbackMigrationCommandValues(values)
@@ -582,8 +582,7 @@ func buildSuggestedCommands(signals migrationSignals, resolver MigrationSuggesti
 	}
 	if hasAppStoreSignal {
 		if hasMetadataSignal {
-			metadataDir := fmt.Sprintf("./metadata/version/%s", values.versionString)
-			add(fmt.Sprintf(`asc release run --app %q --version %q --build %q --metadata-dir %q --confirm`, values.appID, values.versionString, values.buildID, metadataDir))
+			add(fmt.Sprintf(`asc publish appstore --app %q --ipa app.ipa --version %q --submit --confirm`, values.appID, values.versionString))
 		} else {
 			add(fmt.Sprintf(`asc builds upload --app %q --ipa app.ipa --version %q --build-number "BUILD_NUMBER" --wait`, values.appID, values.versionString))
 			add(fmt.Sprintf(`asc builds info --app %q --build-number "BUILD_NUMBER" --version %q`, values.appID, values.versionString))

@@ -155,11 +155,11 @@ check:run:
       job_prefix: release
       asc_version: latest
       command: |
-        asc release run \
+        asc publish appstore \
           --app "$APP_ID" \
+          --ipa "./build/MyApp.ipa" \
           --version "$CI_COMMIT_TAG" \
-          --build "BUILD_ID" \
-          --metadata-dir "./metadata/version/$CI_COMMIT_TAG" \
+          --submit \
           --confirm
 
 release:run:
@@ -403,7 +403,7 @@ include:
       asc_version: latest
       command: |
         echo "Publishing version $VERSION"
-        asc release run --app "$APP_ID" --version "$VERSION" --build "BUILD_ID" --metadata-dir "./metadata/version/$VERSION" --confirm
+        asc publish appstore --app "$APP_ID" --ipa "./build/MyApp.ipa" --version "$VERSION" --submit --confirm
 
 release:run:
   needs:
@@ -470,11 +470,11 @@ staging:run:
       job_prefix: production
       asc_version: latest
       command: |
-        asc release run \
+        asc publish appstore \
           --app "$PRODUCTION_APP_ID" \
+          --ipa "./build/MyApp.ipa" \
           --version "$CI_COMMIT_TAG" \
-          --build "BUILD_ID" \
-          --metadata-dir "./metadata/version/$CI_COMMIT_TAG" \
+          --submit \
           --confirm
 
 production:run:
