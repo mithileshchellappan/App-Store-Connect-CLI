@@ -9,7 +9,7 @@ import (
 
 const (
 	releaseRunDeprecationWarning   = "Warning: `asc release run` is deprecated. Use `asc release stage`, then `asc review submissions-create` / `asc review items-add` / `asc review submissions-submit` for metadata workflows, or `asc publish appstore --submit` when local metadata is already synced."
-	submitCreateDeprecationWarning = "Warning: `asc submit create` is deprecated. Use `asc publish appstore --submit`."
+	submitCreateDeprecationWarning = "Warning: `asc submit create` is deprecated. Use `asc versions attach-build` + `asc review submissions-*` for already-uploaded builds, or `asc publish appstore --submit` when starting from an IPA."
 )
 
 func TestPublishHelpShowsCanonicalAppStoreAndTestFlightSurfaces(t *testing.T) {
@@ -80,13 +80,24 @@ func TestPublishAppStoreHelpShowsCanonicalWorkflowGuidance(t *testing.T) {
 func TestSubmitCreateHelpShowsDeprecatedCompatibilityGuidance(t *testing.T) {
 	usage := usageForCommand(t, "submit", "create")
 
-	if !strings.Contains(usage, "DEPRECATED: use `asc publish appstore --submit`.") {
+	if !strings.Contains(usage, "DEPRECATED: use `asc versions attach-build` + `asc review submissions-*`.") {
 		t.Fatalf("expected deprecated guidance in submit create help, got %q", usage)
 	}
 	if !strings.Contains(usage, "Deprecated compatibility path") {
 		t.Fatalf("expected compatibility guidance in submit create help, got %q", usage)
 	}
-	if strings.Contains(usage, "--build") {
+	for _, expected := range []string{
+		"asc versions attach-build",
+		"asc review submissions-create",
+		"asc review items-add",
+		"asc review submissions-submit",
+		"asc publish appstore --submit",
+	} {
+		if !strings.Contains(usage, expected) {
+			t.Fatalf("expected submit create help to mention %q, got %q", expected, usage)
+		}
+	}
+	if strings.Contains(usage, "\nFLAGS\n") {
 		t.Fatalf("expected deprecated submit create help to hide legacy flag details, got %q", usage)
 	}
 }

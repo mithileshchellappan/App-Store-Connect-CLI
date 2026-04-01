@@ -67,21 +67,26 @@ func SubmitCreateCommand() *ffcli.Command {
 	return &ffcli.Command{
 		Name:       "create",
 		ShortUsage: "asc submit create [flags]",
-		ShortHelp:  "DEPRECATED: use `asc publish appstore --submit`.",
+		ShortHelp:  "DEPRECATED: use `asc versions attach-build` + `asc review submissions-*`.",
 		LongHelp: `Deprecated compatibility path for lower-level direct submission.
 
-Use ` + "`asc publish appstore --submit`" + ` for the canonical high-level App
-Store shipping flow.
+For already-uploaded builds, use:
+  - ` + "`asc versions attach-build --version-id \"VERSION_ID\" --build \"BUILD_ID\"`" + `
+  - ` + "`asc review submissions-create --app \"APP_ID\" --platform IOS`" + `
+  - ` + "`asc review items-add --submission \"SUBMISSION_ID\" --item-type appStoreVersions --item-id \"VERSION_ID\"`" + `
+  - ` + "`asc review submissions-submit --id \"SUBMISSION_ID\" --confirm`" + `
+
+Use ` + "`asc publish appstore --submit`" + ` only when you are starting from
+an IPA upload or local build.
 
 Keep ` + "`asc submit create`" + ` only for older automation that already prepared
 the version and just needs the final review-submission step. For newly scripted
 direct submission on an already-prepared version, prefer the
-` + "`asc review submissions-*`" + ` commands instead of extending this
-deprecated alias.`,
+nondeprecated commands above instead of extending this alias.`,
 		FlagSet:   fs,
 		UsageFunc: shared.DeprecatedUsageFunc,
 		Exec: func(ctx context.Context, args []string) error {
-			fmt.Fprintln(os.Stderr, "Warning: `asc submit create` is deprecated. Use `asc publish appstore --submit`.")
+			fmt.Fprintln(os.Stderr, "Warning: `asc submit create` is deprecated. Use `asc versions attach-build` + `asc review submissions-*` for already-uploaded builds, or `asc publish appstore --submit` when starting from an IPA.")
 			if !*confirm {
 				fmt.Fprintln(os.Stderr, "Error: --confirm is required to submit for review")
 				return flag.ErrHelp
