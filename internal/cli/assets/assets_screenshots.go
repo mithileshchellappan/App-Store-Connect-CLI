@@ -101,7 +101,7 @@ func focusedScreenshotDisplayTypesForPlatform(platform string) []string {
 	if focused, ok := focusedScreenshotDisplayTypesByPlatform[normalized]; ok {
 		return append([]string(nil), focused...)
 	}
-	return append([]string(nil), focusedScreenshotDisplayTypes...)
+	return nil
 }
 
 // ExecuteScreenshotSetUpload validates flags/files and runs the shared
