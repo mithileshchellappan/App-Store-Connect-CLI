@@ -466,9 +466,6 @@ func TestRootCommand_ReleaseHelpMentionsCanonicalPathAndStatus(t *testing.T) {
 	if !strings.Contains(usage, `asc validate --app "APP_ID" --version "VERSION"`) {
 		t.Fatalf("expected release help to mention canonical readiness validation, got %q", usage)
 	}
-	if !strings.Contains(usage, "`asc submit preflight` remains available as a deprecated compatibility") {
-		t.Fatalf("expected release help to keep deprecated submit preflight guidance discoverable, got %q", usage)
-	}
 	if !strings.Contains(usage, `asc submit status --version-id "VERSION_ID"`) {
 		t.Fatalf("expected release help to mention submission status lookup, got %q", usage)
 	}

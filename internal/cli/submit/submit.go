@@ -33,19 +33,11 @@ func SubmitCommand() *ffcli.Command {
 Use:
   - asc publish appstore --submit for the canonical high-level App Store shipping path
   - asc validate for canonical readiness checks before submission
-  - asc submit status/cancel for lower-level review submission lifecycle work
-
-` + "`asc submit preflight`" + ` remains available as a deprecated compatibility
-path for older scripts that still expect preflight-style text/json output.
-
-` + "`asc submit create`" + ` remains available as a deprecated compatibility
-path for older scripts that submit an already-prepared version directly.`,
+  - asc submit status/cancel for lower-level review submission lifecycle work`,
 		UsageFunc: shared.VisibleUsageFunc,
 		Subcommands: []*ffcli.Command{
-			SubmitCreateCommand(),
 			SubmitStatusCommand(),
 			SubmitCancelCommand(),
-			SubmitPreflightCommand(),
 		},
 		Exec: func(ctx context.Context, args []string) error {
 			return flag.ErrHelp

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"flag"
-	"fmt"
 	"sort"
 	"strings"
 
@@ -37,7 +36,7 @@ func (e *textRewrittenCommandError) Unwrap() error {
 
 // NormalizeViewEditCommandTree rewrites canonical leaf verbs so user-facing read
 // commands prefer `view` over `get`, and a small allowlist of update-only
-// commands prefer `edit` over `set`. Legacy verbs remain as deprecated aliases.
+// commands prefer `edit` over `set`.
 func NormalizeViewEditCommandTree(root *ffcli.Command, editPaths map[string]struct{}) *ffcli.Command {
 	if root == nil || isDeprecatedCompatibilityAliasCommand(root) {
 		return root
@@ -48,13 +47,7 @@ func NormalizeViewEditCommandTree(root *ffcli.Command, editPaths map[string]stru
 		return root
 	}
 
-	type pendingAlias struct {
-		parent *ffcli.Command
-		alias  *ffcli.Command
-	}
-
 	replacements := make([]commandTextReplacement, 0)
-	aliases := make([]pendingAlias, 0)
 	changed := false
 
 	var walk func(parent, current *ffcli.Command, path string)
@@ -91,13 +84,12 @@ func NormalizeViewEditCommandTree(root *ffcli.Command, editPaths map[string]stru
 			return
 		}
 
-		alias, pathReplacements := renameLeafVerb(current, path, newName)
-		if alias == nil {
+		pathReplacements := renameLeafVerb(current, path, newName)
+		if len(pathReplacements) == 0 {
 			return
 		}
 
 		replacements = append(replacements, pathReplacements...)
-		aliases = append(aliases, pendingAlias{parent: parent, alias: alias})
 		changed = true
 	}
 
@@ -109,31 +101,23 @@ func NormalizeViewEditCommandTree(root *ffcli.Command, editPaths map[string]stru
 	sortCommandTextReplacements(replacements)
 	rewriteCommandStrings(root, replacements)
 	rewriteCommandErrors(root, replacements)
-	rewriteDeprecatedAliasLeafWarnings(root, func(input string) string {
-		return applyCommandTextReplacements(input, replacements)
-	})
-
-	for _, pending := range aliases {
-		pending.parent.Subcommands = append(pending.parent.Subcommands, pending.alias)
-	}
-
 	wrapUsageFuncsToHideDeprecatedAliases(root)
 	return root
 }
 
-func renameLeafVerb(cmd *ffcli.Command, oldPath, newName string) (*ffcli.Command, []commandTextReplacement) {
+func renameLeafVerb(cmd *ffcli.Command, oldPath, newName string) []commandTextReplacement {
 	if cmd == nil {
-		return nil, nil
+		return nil
 	}
 
 	oldName := strings.TrimSpace(cmd.Name)
 	if oldName == "" || oldName == newName {
-		return nil, nil
+		return nil
 	}
 
 	newPath := replaceLastPathSegment(oldPath, newName)
 	if newPath == oldPath {
-		return nil, nil
+		return nil
 	}
 
 	oldShortUsage := strings.TrimSpace(cmd.ShortUsage)
@@ -149,15 +133,7 @@ func renameLeafVerb(cmd *ffcli.Command, oldPath, newName string) (*ffcli.Command
 		shortUsage = oldPath
 	}
 
-	alias := DeprecatedAliasLeafCommand(
-		cmd,
-		oldName,
-		shortUsage,
-		newPath,
-		fmt.Sprintf("Warning: `%s` is deprecated. Use `%s`.", oldPath, newPath),
-	)
-
-	return alias, []commandTextReplacement{
+	return []commandTextReplacement{
 		{old: oldPath, new: newPath},
 		{old: oldCommandPath, new: newCommandPath},
 	}

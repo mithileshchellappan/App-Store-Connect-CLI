@@ -65,7 +65,6 @@ Examples:
 		UsageFunc: shared.DefaultUsageFunc,
 		Subcommands: []*ffcli.Command{
 			AppsListCommand(),
-			AppsCreateCommand(),
 			AppsWallCommand(),
 			AppsPublicCommand(),
 			AppsGetCommand(),

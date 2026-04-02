@@ -19,7 +19,6 @@ import (
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/apps"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/auth"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/backgroundassets"
-	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/betaapplocalizations"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/betabuildlocalizations"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/buildbundles"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/buildlocalizations"
@@ -28,13 +27,11 @@ import (
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/categories"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/certificates"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/completion"
-	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/crashes"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/devices"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/diffcmd"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/docs"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/encryption"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/eula"
-	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/feedback"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/finance"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/gamecenter"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/iap"
@@ -52,12 +49,11 @@ import (
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/passtypeids"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/performance"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/preorders"
-	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/prerelease"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/pricing"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/productpages"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/profiles"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/publish"
-	releasecmd "github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/release"
+	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/release"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/releasenotes"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/reviews"
 	"github.com/rudrankriyam/App-Store-Connect-CLI/internal/cli/routingcoverage"
@@ -116,8 +112,6 @@ func Subcommands(version string) []*ffcli.Command {
 		status.StatusCommand(),
 		insights.InsightsCommand(),
 		releasenotes.ReleaseNotesCommand(),
-		feedback.FeedbackCommand(),
-		crashes.CrashesCommand(),
 		reviews.ReviewsCommand(),
 		reviews.ReviewCommand(),
 		analytics.AnalyticsCommand(),
@@ -144,26 +138,22 @@ func Subcommands(version string) []*ffcli.Command {
 		builds.BuildsCommand(),
 		buildbundles.BuildBundlesCommand(),
 		publish.PublishCommand(),
-		releasecmd.ReleaseCommand(),
+		release.ReleaseCommand(),
 		workflow.WorkflowCommand(),
 		xcode.XcodeCommand(),
 		versions.VersionsCommand(),
 		productpages.ProductPagesCommand(),
 		routingcoverage.RoutingCoverageCommand(),
-		apps.RemovedAppInfoCommand(),
-		apps.RemovedAppInfosCommand(),
 		eula.EULACommand(),
 		agreements.AgreementsCommand(),
 		pricing.PricingCommand(),
 		preorders.PreOrdersCommand(),
-		prerelease.RemovedPreReleaseVersionsCommand(),
 		localizations.LocalizationsCommand(),
 		metadata.MetadataCommand(),
 		screenshots.ScreenshotsCommand(),
 		videopreviews.VideoPreviewsCommand(),
 		backgroundassets.BackgroundAssetsCommand(),
 		buildlocalizations.BuildLocalizationsCommand(),
-		betaapplocalizations.DeprecatedBetaAppLocalizationsCommand(),
 		betabuildlocalizations.BetaBuildLocalizationsCommand(),
 		sandbox.SandboxCommand(),
 		signing.SigningCommand(),
