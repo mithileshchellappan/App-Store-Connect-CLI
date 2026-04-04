@@ -3,6 +3,7 @@ package ascterritory
 import (
 	"strings"
 	"unicode"
+	"unicode/utf8"
 )
 
 var territoryAliases = map[string]string{
@@ -308,5 +309,30 @@ func normalizeName(value string) string {
 		}
 	}
 
-	return strings.Join(strings.Fields(builder.String()), " ")
+	fields := strings.Fields(builder.String())
+	if len(fields) == 0 {
+		return ""
+	}
+
+	collapsed := make([]string, 0, len(fields))
+	var initialism strings.Builder
+	flushInitialism := func() {
+		if initialism.Len() == 0 {
+			return
+		}
+		collapsed = append(collapsed, initialism.String())
+		initialism.Reset()
+	}
+
+	for _, field := range fields {
+		if utf8.RuneCountInString(field) == 1 {
+			initialism.WriteString(field)
+			continue
+		}
+		flushInitialism()
+		collapsed = append(collapsed, field)
+	}
+	flushInitialism()
+
+	return strings.Join(collapsed, " ")
 }

@@ -17,6 +17,8 @@ func TestNormalize(t *testing.T) {
 		{name: "alpha2 maps to alpha3", input: "US", want: "USA"},
 		{name: "exact english name", input: "France", want: "FRA"},
 		{name: "alias maps", input: "UAE", want: "ARE"},
+		{name: "punctuation-less us virgin islands maps", input: "US Virgin Islands", want: "VIR"},
+		{name: "punctuation-less us outlying islands maps", input: "US Outlying Islands", want: "UMI"},
 		{name: "whitespace and case normalize", input: "  united states  ", want: "USA"},
 		{name: "unknown rejected", input: "ZZZ", wantErr: "could not be mapped"},
 		{name: "unsupported region rejected", input: "Antarctica", wantErr: "could not be mapped"},
