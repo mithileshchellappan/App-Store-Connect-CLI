@@ -244,19 +244,19 @@ func hasAnyVersionField(p updateVersionParams) bool {
 
 func appInfoAttemptedFields(p updateAppInfoParams) []string {
 	fields := make([]string, 0, 5)
-	if strings.TrimSpace(p.name) != "" {
+	if p.name != "" {
 		fields = append(fields, "name")
 	}
-	if strings.TrimSpace(p.subtitle) != "" {
+	if p.subtitle != "" {
 		fields = append(fields, "subtitle")
 	}
-	if strings.TrimSpace(p.privacyPolicyURL) != "" {
+	if p.privacyPolicyURL != "" {
 		fields = append(fields, "privacyPolicyUrl")
 	}
-	if strings.TrimSpace(p.privacyChoicesURL) != "" {
+	if p.privacyChoicesURL != "" {
 		fields = append(fields, "privacyChoicesUrl")
 	}
-	if strings.TrimSpace(p.privacyPolicyText) != "" {
+	if p.privacyPolicyText != "" {
 		fields = append(fields, "privacyPolicyText")
 	}
 	return fields
@@ -264,22 +264,22 @@ func appInfoAttemptedFields(p updateAppInfoParams) []string {
 
 func versionAttemptedFields(p updateVersionParams) []string {
 	fields := make([]string, 0, 6)
-	if strings.TrimSpace(p.description) != "" {
+	if p.description != "" {
 		fields = append(fields, "description")
 	}
-	if strings.TrimSpace(p.keywords) != "" {
+	if p.keywords != "" {
 		fields = append(fields, "keywords")
 	}
-	if strings.TrimSpace(p.marketingURL) != "" {
+	if p.marketingURL != "" {
 		fields = append(fields, "marketingUrl")
 	}
-	if strings.TrimSpace(p.promotionalText) != "" {
+	if p.promotionalText != "" {
 		fields = append(fields, "promotionalText")
 	}
-	if strings.TrimSpace(p.supportURL) != "" {
+	if p.supportURL != "" {
 		fields = append(fields, "supportUrl")
 	}
-	if strings.TrimSpace(p.whatsNew) != "" {
+	if p.whatsNew != "" {
 		fields = append(fields, "whatsNew")
 	}
 	return fields
