@@ -16,6 +16,7 @@ type stubVersionLocalizationClient struct {
 	getResp *asc.AppStoreVersionLocalizationsResponse
 	getErr  error
 
+	createCalls []asc.AppStoreVersionLocalizationAttributes
 	updateErrs  []error
 	updateCalls []asc.AppStoreVersionLocalizationAttributes
 }
@@ -28,7 +29,7 @@ func (s *stubVersionLocalizationClient) GetAppStoreVersionLocalizations(_ contex
 }
 
 func (s *stubVersionLocalizationClient) CreateAppStoreVersionLocalization(_ context.Context, _ string, attrs asc.AppStoreVersionLocalizationAttributes) (*asc.AppStoreVersionLocalizationResponse, error) {
-	_ = attrs
+	s.createCalls = append(s.createCalls, attrs)
 	return &asc.AppStoreVersionLocalizationResponse{
 		Data: asc.Resource[asc.AppStoreVersionLocalizationAttributes]{
 			ID: "created-loc",
@@ -187,6 +188,88 @@ func TestUploadVersionLocalizations_DoesNotRetryWhenWhatsNewIsEmpty(t *testing.T
 	}
 	if len(client.updateCalls) != 1 {
 		t.Fatalf("expected a single update attempt, got %d", len(client.updateCalls))
+	}
+}
+
+func TestUploadVersionLocalizationsWithWarnings_DryRunWarnsOnlyForCreates(t *testing.T) {
+	client := &stubVersionLocalizationClient{
+		getResp: &asc.AppStoreVersionLocalizationsResponse{
+			Data: []asc.Resource[asc.AppStoreVersionLocalizationAttributes]{
+				{
+					ID: "existing-loc",
+					Attributes: asc.AppStoreVersionLocalizationAttributes{
+						Locale: "en-US",
+					},
+				},
+			},
+		},
+	}
+
+	valuesByLocale := map[string]map[string]string{
+		"en-US": {
+			"description": "Updated description",
+			"keywords":    "updated",
+			"supportUrl":  "https://example.com/en",
+		},
+		"ja": {
+			"description": "日本語説明",
+		},
+	}
+
+	results, warnings, err := UploadVersionLocalizationsWithWarnings(context.Background(), client, "version-id", valuesByLocale, true)
+	if err != nil {
+		t.Fatalf("UploadVersionLocalizationsWithWarnings() error: %v", err)
+	}
+	if len(results) != 2 {
+		t.Fatalf("expected 2 results, got %d", len(results))
+	}
+	if len(warnings) != 1 {
+		t.Fatalf("expected 1 warning, got %d (%+v)", len(warnings), warnings)
+	}
+	if warnings[0].Locale != "ja" {
+		t.Fatalf("expected warning for ja locale, got %+v", warnings[0])
+	}
+	if warnings[0].Mode != SubmitReadinessCreateModePlanned {
+		t.Fatalf("expected planned warning mode, got %+v", warnings[0])
+	}
+	if got := strings.Join(warnings[0].MissingFields, ","); got != "keywords,supportUrl" {
+		t.Fatalf("unexpected missing fields %q", got)
+	}
+	if len(client.createCalls) != 0 {
+		t.Fatalf("expected dry-run to avoid create calls, got %d", len(client.createCalls))
+	}
+	if len(client.updateCalls) != 0 {
+		t.Fatalf("expected dry-run to avoid update calls, got %d", len(client.updateCalls))
+	}
+}
+
+func TestUploadVersionLocalizationsWithWarnings_AppliedCompleteCreateDoesNotWarn(t *testing.T) {
+	client := &stubVersionLocalizationClient{
+		getResp: &asc.AppStoreVersionLocalizationsResponse{
+			Data: []asc.Resource[asc.AppStoreVersionLocalizationAttributes]{},
+		},
+	}
+
+	valuesByLocale := map[string]map[string]string{
+		"ja": {
+			"description": "日本語説明",
+			"keywords":    "一,二",
+			"supportUrl":  "https://example.com/ja",
+		},
+	}
+
+	results, warnings, err := UploadVersionLocalizationsWithWarnings(context.Background(), client, "version-id", valuesByLocale, false)
+	if err != nil {
+		t.Fatalf("UploadVersionLocalizationsWithWarnings() error: %v", err)
+	}
+	if len(results) != 1 {
+		t.Fatalf("expected 1 result, got %d", len(results))
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got %+v", warnings)
+	}
+	if len(client.createCalls) != 1 {
+		t.Fatalf("expected one create call, got %d", len(client.createCalls))
 	}
 }
 
