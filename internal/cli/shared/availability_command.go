@@ -71,7 +71,11 @@ func NewAvailabilitySetCommand(config AvailabilitySetCommandConfig) *ffcli.Comma
 
 			var territories []string
 			if !*allTerritories {
-				territories = splitCSVUpper(*territory)
+				normalizedTerritories, normalizeErr := normalizeASCTerritoryCSV(*territory)
+				if normalizeErr != nil {
+					return UsageError(normalizeErr.Error())
+				}
+				territories = normalizedTerritories
 				if len(territories) == 0 {
 					fmt.Fprintln(os.Stderr, "Error: --territory must include at least one value")
 					return flag.ErrHelp
