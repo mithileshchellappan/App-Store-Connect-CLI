@@ -142,6 +142,22 @@ func TestDefaultOutputFormat_Markdown(t *testing.T) {
 	}
 }
 
+func TestNormalizeASCTerritoryCSVSupportsCommaContainingNames(t *testing.T) {
+	got, err := NormalizeASCTerritoryCSV("Moldova, Republic of,Bolivia, Plurinational State of")
+	if err != nil {
+		t.Fatalf("unexpected normalize error: %v", err)
+	}
+	want := []string{"MDA", "BOL"}
+	if len(got) != len(want) {
+		t.Fatalf("expected %d territories, got %d (%v)", len(want), len(got), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("expected %v, got %v", want, got)
+		}
+	}
+}
+
 func TestDefaultOutputFormat_MD(t *testing.T) {
 	resetDefaultOutput(t)
 	t.Setenv("ASC_DEFAULT_OUTPUT", "md")
