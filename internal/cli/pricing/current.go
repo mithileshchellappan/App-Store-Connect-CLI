@@ -77,11 +77,15 @@ Examples:
 				return flag.ErrHelp
 			}
 
-			requestedTerritories := uniqueUpperList(shared.SplitCSVUpper(*territory))
 			if *allTerritories && strings.TrimSpace(*territory) != "" {
 				fmt.Fprintln(os.Stderr, "Error: --territory and --all-territories are mutually exclusive")
 				return flag.ErrHelp
 			}
+			requestedTerritories, err := shared.NormalizeASCTerritoryCSV(*territory)
+			if err != nil {
+				return shared.UsageError(err.Error())
+			}
+			requestedTerritories = uniqueUpperList(requestedTerritories)
 			if strings.TrimSpace(*territory) != "" && len(requestedTerritories) == 0 {
 				fmt.Fprintln(os.Stderr, "Error: --territory must include at least one territory code")
 				return flag.ErrHelp
