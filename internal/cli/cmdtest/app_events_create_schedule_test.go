@@ -378,6 +378,66 @@ func TestAppEventsCreateSucceedsWhenVerificationShowsScheduleApplied(t *testing.
 	}
 }
 
+func TestAppEventsCreateSucceedsWhenVerificationReordersTerritories(t *testing.T) {
+	client := newAppEventsTestClient(t, roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		switch req.Method {
+		case http.MethodPost:
+			return jsonResponse(http.StatusCreated, `{"data":{"type":"appEvents","id":"event-1","attributes":{"referenceName":"Launch","badge":"CHALLENGE"}}}`)
+		case http.MethodPatch:
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body:       io.NopCloser(strings.NewReader(`{"data":`)),
+				Request:    req,
+			}, nil
+		case http.MethodGet:
+			return jsonResponse(http.StatusOK, `{"data":{"type":"appEvents","id":"event-1","attributes":{"referenceName":"Launch","badge":"CHALLENGE","territorySchedules":[{"territories":["CAN","USA"],"publishStart":"2026-05-15T00:00:00Z","eventStart":"2026-06-01T00:00:00Z","eventEnd":"2026-06-30T23:59:59Z"}]}}}`)
+		case http.MethodDelete:
+			t.Fatal("did not expect delete when verification only reorders territories")
+			return nil, nil
+		default:
+			t.Fatalf("unexpected request %s %s", req.Method, req.URL.Path)
+			return nil, nil
+		}
+	}))
+
+	restore := appeventscli.SetClientFactory(func() (*asc.Client, error) {
+		return client, nil
+	})
+	defer restore()
+
+	root := RootCommand("1.2.3")
+	stdout, stderr := captureOutput(t, func() {
+		if err := root.Parse([]string{
+			"app-events", "create",
+			"--app", "app-123",
+			"--name", "Launch",
+			"--event-type", "CHALLENGE",
+			"--start", "2026-06-01T00:00:00Z",
+			"--end", "2026-06-30T23:59:59Z",
+			"--publish-start", "2026-05-15T00:00:00Z",
+			"--territories", "USA, CAN",
+		}); err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+		if err := root.Run(context.Background()); err != nil {
+			t.Fatalf("run error: %v", err)
+		}
+	})
+
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+
+	var resp asc.AppEventResponse
+	if err := json.Unmarshal([]byte(stdout), &resp); err != nil {
+		t.Fatalf("failed to parse JSON output: %v", err)
+	}
+	if !appEventResponseHasSingleSchedule(resp, "2026-06-01T00:00:00Z", "2026-06-30T23:59:59Z", "2026-05-15T00:00:00Z", []string{"CAN", "USA"}) {
+		t.Fatalf("expected verified response to preserve reordered territories, got %#v", resp.Data.Attributes.TerritorySchedules)
+	}
+}
+
 func TestAppEventsCreateLeavesEventInPlaceWhenScheduleOutcomeIsAmbiguous(t *testing.T) {
 	client := newAppEventsTestClient(t, roundTripFunc(func(req *http.Request) (*http.Response, error) {
 		switch req.Method {

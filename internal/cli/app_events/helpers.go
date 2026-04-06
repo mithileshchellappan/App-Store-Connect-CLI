@@ -166,16 +166,24 @@ func appEventHasTerritorySchedule(event *asc.AppEventResponse, expected asc.AppE
 		return false
 	}
 
+	expectedTerritories := sortedTerritories(expected.Territories)
+
 	for _, actual := range event.Data.Attributes.TerritorySchedules {
 		if actual.PublishStart == expected.PublishStart &&
 			actual.EventStart == expected.EventStart &&
 			actual.EventEnd == expected.EventEnd &&
-			slices.Equal(actual.Territories, expected.Territories) {
+			slices.Equal(sortedTerritories(actual.Territories), expectedTerritories) {
 			return true
 		}
 	}
 
 	return false
+}
+
+func sortedTerritories(territories []string) []string {
+	sorted := slices.Clone(territories)
+	slices.Sort(sorted)
+	return sorted
 }
 
 func resolveAppEventLocalizationID(ctx context.Context, client *asc.Client, eventID, localizationID, locale string) (string, error) {
