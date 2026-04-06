@@ -1750,6 +1750,169 @@ func TestMetadataKeywordsApplyCreatesLocale(t *testing.T) {
 	}
 }
 
+func TestMetadataKeywordsApplyPartialFailureReturnsReportedErrorAndArtifact(t *testing.T) {
+	setupAuth(t)
+	t.Setenv("ASC_BYPASS_KEYCHAIN", "1")
+	t.Setenv("ASC_CONFIG_PATH", filepath.Join(t.TempDir(), "nonexistent.json"))
+	t.Setenv("ASC_APP_ID", "")
+
+	workDir := t.TempDir()
+	previousDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error: %v", err)
+	}
+	if err := os.Chdir(workDir); err != nil {
+		t.Fatalf("Chdir() error: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(previousDir)
+	})
+
+	dir := filepath.Join(workDir, "metadata")
+	versionDir := filepath.Join(dir, "version", "1.2.3")
+	if err := os.MkdirAll(versionDir, 0o755); err != nil {
+		t.Fatalf("mkdir version dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(versionDir, "en-US.json"), []byte(`{"keywords":"alpha,beta"}`), 0o644); err != nil {
+		t.Fatalf("write en-US file: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(versionDir, "de-DE.json"), []byte(`{"keywords":"eins,zwei"}`), 0o644); err != nil {
+		t.Fatalf("write de-DE file: %v", err)
+	}
+
+	originalTransport := http.DefaultTransport
+	t.Cleanup(func() { http.DefaultTransport = originalTransport })
+	http.DefaultTransport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		switch req.URL.Path {
+		case "/v1/apps/app-1/appStoreVersions":
+			return metadataKeywordsJSONResponse(`{"data":[{"type":"appStoreVersions","id":"version-1","attributes":{"versionString":"1.2.3","platform":"IOS"}}],"links":{"next":""}}`)
+		case "/v1/appStoreVersions/version-1":
+			return metadataKeywordsJSONResponse(`{"data":{"type":"appStoreVersions","id":"version-1","attributes":{"versionString":"1.2.3","platform":"IOS"},"relationships":{"app":{"data":{"type":"apps","id":"app-1"}}}}}`)
+		case "/v1/appStoreVersions/version-1/appStoreVersionLocalizations":
+			if req.Method != http.MethodGet {
+				t.Fatalf("expected GET localizations, got %s", req.Method)
+			}
+			return metadataKeywordsJSONResponse(`{"data":[{"type":"appStoreVersionLocalizations","id":"loc-en","attributes":{"locale":"en-US","keywords":"old,keywords"}}],"links":{"next":""}}`)
+		case "/v1/appStoreVersionLocalizations/loc-en":
+			if req.Method != http.MethodPatch {
+				t.Fatalf("expected PATCH update, got %s", req.Method)
+			}
+			return metadataKeywordsJSONResponse(`{"data":{"type":"appStoreVersionLocalizations","id":"loc-en","attributes":{"locale":"en-US","keywords":"alpha,beta"}}}`)
+		case "/v1/appStoreVersionLocalizations":
+			if req.Method != http.MethodPost {
+				t.Fatalf("expected POST create, got %s", req.Method)
+			}
+			return &http.Response{
+				StatusCode: http.StatusUnprocessableEntity,
+				Body: io.NopCloser(strings.NewReader(`{
+					"errors":[
+						{
+							"status":"422",
+							"code":"ENTITY_ERROR.ATTRIBUTE.INVALID",
+							"title":"Invalid",
+							"detail":"de-DE failed validation"
+						}
+					]
+				}`)),
+				Header: http.Header{"Content-Type": []string{"application/json"}},
+			}, nil
+		default:
+			t.Fatalf("unexpected request: %s %s", req.Method, req.URL.Path)
+			return nil, nil
+		}
+	})
+
+	root := RootCommand("1.2.3")
+	root.FlagSet.SetOutput(io.Discard)
+
+	var runErr error
+	stdout, stderr := captureOutput(t, func() {
+		if err := root.Parse([]string{
+			"metadata", "keywords", "apply",
+			"--app", "app-1",
+			"--version", "1.2.3",
+			"--dir", dir,
+			"--confirm",
+		}); err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+		runErr = root.Run(context.Background())
+	})
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+	if _, ok := errors.AsType[ReportedError](runErr); !ok {
+		t.Fatalf("expected ReportedError, got %T: %v", runErr, runErr)
+	}
+
+	var payload struct {
+		Applied             bool   `json:"applied"`
+		Succeeded           int    `json:"succeeded"`
+		Failed              int    `json:"failed"`
+		FailureArtifactPath string `json:"failureArtifactPath"`
+		Results             []struct {
+			Locale         string `json:"locale"`
+			Action         string `json:"action"`
+			Status         string `json:"status"`
+			LocalizationID string `json:"localizationId"`
+			Error          string `json:"error"`
+		} `json:"results"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("unmarshal output: %v\nstdout=%q", err, stdout)
+	}
+	if payload.Applied {
+		t.Fatalf("expected applied=false on partial failure, got %+v", payload)
+	}
+	if payload.Succeeded != 1 || payload.Failed != 1 {
+		t.Fatalf("expected succeeded=1 failed=1, got %+v", payload)
+	}
+	if payload.FailureArtifactPath == "" {
+		t.Fatalf("expected failureArtifactPath, got %+v", payload)
+	}
+	if len(payload.Results) != 2 {
+		t.Fatalf("expected 2 results, got %+v", payload.Results)
+	}
+
+	byLocale := map[string]struct {
+		Action         string
+		Status         string
+		LocalizationID string
+		Error          string
+	}{}
+	for _, result := range payload.Results {
+		byLocale[result.Locale] = struct {
+			Action         string
+			Status         string
+			LocalizationID string
+			Error          string
+		}{
+			Action:         result.Action,
+			Status:         result.Status,
+			LocalizationID: result.LocalizationID,
+			Error:          result.Error,
+		}
+	}
+	if entry := byLocale["en-US"]; entry.Action != "update" || entry.Status != "succeeded" || entry.LocalizationID != "loc-en" {
+		t.Fatalf("expected en-US success result, got %+v", entry)
+	}
+	if entry := byLocale["de-DE"]; entry.Action != "create" || entry.Status != "failed" || !strings.Contains(entry.Error, "de-DE failed validation") {
+		t.Fatalf("expected de-DE failed result, got %+v", entry)
+	}
+
+	artifactData, err := os.ReadFile(payload.FailureArtifactPath)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error: %v", payload.FailureArtifactPath, err)
+	}
+	artifactText := string(artifactData)
+	if !strings.Contains(artifactText, `"locale": "en-US"`) && !strings.Contains(artifactText, `"locale":"en-US"`) {
+		t.Fatalf("expected artifact to include succeeded locale, got %s", artifactText)
+	}
+	if !strings.Contains(artifactText, `"locale": "de-DE"`) && !strings.Contains(artifactText, `"locale":"de-DE"`) {
+		t.Fatalf("expected artifact to include failed locale, got %s", artifactText)
+	}
+}
+
 func TestMetadataKeywordsSyncDryRunUsesImportedStateWithoutWriting(t *testing.T) {
 	setupAuth(t)
 	t.Setenv("ASC_BYPASS_KEYCHAIN", "1")
@@ -1914,6 +2077,145 @@ func TestMetadataKeywordsSyncPropagatesCreateWarnings(t *testing.T) {
 	}
 }
 
+func TestMetadataKeywordsSyncPartialFailureReturnsReportedErrorAndArtifact(t *testing.T) {
+	setupAuth(t)
+	t.Setenv("ASC_BYPASS_KEYCHAIN", "1")
+	t.Setenv("ASC_CONFIG_PATH", filepath.Join(t.TempDir(), "nonexistent.json"))
+	t.Setenv("ASC_APP_ID", "")
+
+	workDir := t.TempDir()
+	previousDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error: %v", err)
+	}
+	if err := os.Chdir(workDir); err != nil {
+		t.Fatalf("Chdir() error: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(previousDir)
+	})
+
+	dir := filepath.Join(workDir, "metadata")
+	inputPath := filepath.Join(workDir, "keywords.json")
+	if err := os.WriteFile(inputPath, []byte(`{"en-US":"alpha,beta","de-DE":"eins,zwei"}`), 0o644); err != nil {
+		t.Fatalf("write input: %v", err)
+	}
+
+	originalTransport := http.DefaultTransport
+	t.Cleanup(func() { http.DefaultTransport = originalTransport })
+	http.DefaultTransport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		switch req.URL.Path {
+		case "/v1/apps/app-1/appStoreVersions":
+			return metadataKeywordsJSONResponse(`{"data":[{"type":"appStoreVersions","id":"version-1","attributes":{"versionString":"1.2.3","platform":"IOS"}}],"links":{"next":""}}`)
+		case "/v1/appStoreVersions/version-1":
+			return metadataKeywordsJSONResponse(`{"data":{"type":"appStoreVersions","id":"version-1","attributes":{"versionString":"1.2.3","platform":"IOS"},"relationships":{"app":{"data":{"type":"apps","id":"app-1"}}}}}`)
+		case "/v1/appStoreVersions/version-1/appStoreVersionLocalizations":
+			if req.Method != http.MethodGet {
+				t.Fatalf("expected GET localizations, got %s", req.Method)
+			}
+			return metadataKeywordsJSONResponse(`{"data":[{"type":"appStoreVersionLocalizations","id":"loc-en","attributes":{"locale":"en-US","keywords":"old,keywords"}}],"links":{"next":""}}`)
+		case "/v1/appStoreVersionLocalizations/loc-en":
+			if req.Method != http.MethodPatch {
+				t.Fatalf("expected PATCH update, got %s", req.Method)
+			}
+			return metadataKeywordsJSONResponse(`{"data":{"type":"appStoreVersionLocalizations","id":"loc-en","attributes":{"locale":"en-US","keywords":"alpha,beta"}}}`)
+		case "/v1/appStoreVersionLocalizations":
+			if req.Method != http.MethodPost {
+				t.Fatalf("expected POST create, got %s", req.Method)
+			}
+			return &http.Response{
+				StatusCode: http.StatusUnprocessableEntity,
+				Body: io.NopCloser(strings.NewReader(`{
+					"errors":[
+						{
+							"status":"422",
+							"code":"ENTITY_ERROR.ATTRIBUTE.INVALID",
+							"title":"Invalid",
+							"detail":"de-DE failed validation"
+						}
+					]
+				}`)),
+				Header: http.Header{"Content-Type": []string{"application/json"}},
+			}, nil
+		default:
+			t.Fatalf("unexpected request: %s %s", req.Method, req.URL.Path)
+			return nil, nil
+		}
+	})
+
+	root := RootCommand("1.2.3")
+	root.FlagSet.SetOutput(io.Discard)
+
+	var runErr error
+	stdout, stderr := captureOutput(t, func() {
+		if err := root.Parse([]string{
+			"metadata", "keywords", "sync",
+			"--app", "app-1",
+			"--version", "1.2.3",
+			"--dir", dir,
+			"--input", inputPath,
+			"--format", "json",
+			"--confirm",
+		}); err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+		runErr = root.Run(context.Background())
+	})
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+	if _, ok := errors.AsType[ReportedError](runErr); !ok {
+		t.Fatalf("expected ReportedError, got %T: %v", runErr, runErr)
+	}
+
+	var payload struct {
+		Import struct {
+			Results []struct {
+				Locale string `json:"locale"`
+				Action string `json:"action"`
+			} `json:"results"`
+		} `json:"import"`
+		Plan struct {
+			Applied             bool   `json:"applied"`
+			Succeeded           int    `json:"succeeded"`
+			Failed              int    `json:"failed"`
+			FailureArtifactPath string `json:"failureArtifactPath"`
+			Results             []struct {
+				Locale string `json:"locale"`
+				Action string `json:"action"`
+				Status string `json:"status"`
+				Error  string `json:"error"`
+			} `json:"results"`
+		} `json:"plan"`
+	}
+	if err := json.Unmarshal([]byte(stdout), &payload); err != nil {
+		t.Fatalf("unmarshal output: %v\nstdout=%q", err, stdout)
+	}
+	if len(payload.Import.Results) != 2 {
+		t.Fatalf("expected import results for both locales, got %+v", payload.Import.Results)
+	}
+	if payload.Plan.Applied {
+		t.Fatalf("expected applied=false on partial failure, got %+v", payload.Plan)
+	}
+	if payload.Plan.Succeeded != 1 || payload.Plan.Failed != 1 {
+		t.Fatalf("expected succeeded=1 failed=1, got %+v", payload.Plan)
+	}
+	if payload.Plan.FailureArtifactPath == "" {
+		t.Fatalf("expected failureArtifactPath, got %+v", payload.Plan)
+	}
+	if len(payload.Plan.Results) != 2 {
+		t.Fatalf("expected 2 plan results, got %+v", payload.Plan.Results)
+	}
+
+	artifactData, err := os.ReadFile(payload.Plan.FailureArtifactPath)
+	if err != nil {
+		t.Fatalf("ReadFile(%q) error: %v", payload.Plan.FailureArtifactPath, err)
+	}
+	if !strings.Contains(string(artifactData), `"status": "failed"`) && !strings.Contains(string(artifactData), `"status":"failed"`) {
+		t.Fatalf("expected failure artifact to record failed status, got %s", string(artifactData))
+	}
+}
+
 func TestMetadataKeywordsSyncStopsWhenImportPreviewHasIssues(t *testing.T) {
 	setupAuth(t)
 	t.Setenv("ASC_BYPASS_KEYCHAIN", "1")
@@ -1977,6 +2279,107 @@ func TestMetadataKeywordsSyncStopsWhenImportPreviewHasIssues(t *testing.T) {
 	}
 	if valid, _ := importPayload["valid"].(bool); valid {
 		t.Fatalf("expected invalid import payload, got %+v", importPayload)
+	}
+}
+
+func TestMetadataKeywordsApplyEarlyPlanningErrorDoesNotPrintOutput(t *testing.T) {
+	setupAuth(t)
+	t.Setenv("ASC_BYPASS_KEYCHAIN", "1")
+	t.Setenv("ASC_CONFIG_PATH", filepath.Join(t.TempDir(), "nonexistent.json"))
+	t.Setenv("ASC_APP_ID", "")
+
+	dir := t.TempDir()
+	versionDir := filepath.Join(dir, "version", "1.2.3")
+	if err := os.MkdirAll(versionDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(versionDir, "en-US.json"), []byte(`{"keywords":"habit tracker,mood journal"}`), 0o644); err != nil {
+		t.Fatalf("WriteFile() error: %v", err)
+	}
+
+	originalTransport := http.DefaultTransport
+	t.Cleanup(func() { http.DefaultTransport = originalTransport })
+	http.DefaultTransport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		return nil, errors.New("dial test failure")
+	})
+
+	root := RootCommand("1.2.3")
+	root.FlagSet.SetOutput(io.Discard)
+
+	var runErr error
+	stdout, stderr := captureOutput(t, func() {
+		if err := root.Parse([]string{
+			"metadata", "keywords", "apply",
+			"--app", "app-1",
+			"--version", "1.2.3",
+			"--dir", dir,
+			"--confirm",
+		}); err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+		runErr = root.Run(context.Background())
+	})
+	if runErr == nil {
+		t.Fatal("expected planning error")
+	}
+	if stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+	if !strings.Contains(runErr.Error(), "metadata keywords apply:") || !strings.Contains(runErr.Error(), "dial test failure") {
+		t.Fatalf("expected wrapped planning error, got %v", runErr)
+	}
+}
+
+func TestMetadataKeywordsSyncEarlyPlanningErrorDoesNotPrintOutput(t *testing.T) {
+	setupAuth(t)
+	t.Setenv("ASC_BYPASS_KEYCHAIN", "1")
+	t.Setenv("ASC_CONFIG_PATH", filepath.Join(t.TempDir(), "nonexistent.json"))
+	t.Setenv("ASC_APP_ID", "")
+
+	dir := t.TempDir()
+	inputPath := filepath.Join(t.TempDir(), "keywords.txt")
+	if err := os.WriteFile(inputPath, []byte("habit tracker,mood journal"), 0o644); err != nil {
+		t.Fatalf("write input: %v", err)
+	}
+
+	originalTransport := http.DefaultTransport
+	t.Cleanup(func() { http.DefaultTransport = originalTransport })
+	http.DefaultTransport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		return nil, errors.New("dial test failure")
+	})
+
+	root := RootCommand("1.2.3")
+	root.FlagSet.SetOutput(io.Discard)
+
+	var runErr error
+	stdout, stderr := captureOutput(t, func() {
+		if err := root.Parse([]string{
+			"metadata", "keywords", "sync",
+			"--app", "app-1",
+			"--version", "1.2.3",
+			"--dir", dir,
+			"--input", inputPath,
+			"--format", "text",
+			"--locale", "en-US",
+		}); err != nil {
+			t.Fatalf("parse error: %v", err)
+		}
+		runErr = root.Run(context.Background())
+	})
+	if runErr == nil {
+		t.Fatal("expected planning error")
+	}
+	if stdout != "" {
+		t.Fatalf("expected empty stdout, got %q", stdout)
+	}
+	if stderr != "" {
+		t.Fatalf("expected empty stderr, got %q", stderr)
+	}
+	if !strings.Contains(runErr.Error(), "metadata keywords sync:") || !strings.Contains(runErr.Error(), "dial test failure") {
+		t.Fatalf("expected wrapped planning error, got %v", runErr)
 	}
 }
 
