@@ -705,25 +705,13 @@ func plannedAppStorePublishSteps(localBuildMode, wait, submit bool) []asc.Publis
 }
 
 func canPlanAppStorePublishWithoutASC(appID string, localBuildMode bool, buildNumber string) bool {
-	if !isNumericPublishAppID(strings.TrimSpace(appID)) {
+	if !shared.IsNumericAppID(strings.TrimSpace(appID)) {
 		return false
 	}
 	if !localBuildMode {
 		return true
 	}
 	return strings.TrimSpace(buildNumber) != ""
-}
-
-func isNumericPublishAppID(value string) bool {
-	if value == "" {
-		return false
-	}
-	for _, ch := range value {
-		if ch < '0' || ch > '9' {
-			return false
-		}
-	}
-	return true
 }
 
 func newPublishPlanStep(name, message string) asc.PublishPlanStep {

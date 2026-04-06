@@ -19,7 +19,7 @@ func resolveAppID(ctx context.Context, client *asc.Client, appFlag string, confi
 		return strings.TrimSpace(appFlag), nil
 	}
 	if strings.TrimSpace(config.AppIdentifier) != "" {
-		if isNumeric(config.AppIdentifier) {
+		if shared.IsNumericAppID(config.AppIdentifier) {
 			return config.AppIdentifier, nil
 		}
 		if client == nil {
@@ -444,16 +444,4 @@ func isNotFoundReviewDetail(err error) bool {
 		}
 	}
 	return false
-}
-
-func isNumeric(value string) bool {
-	if value == "" {
-		return false
-	}
-	for _, ch := range value {
-		if ch < '0' || ch > '9' {
-			return false
-		}
-	}
-	return true
 }
