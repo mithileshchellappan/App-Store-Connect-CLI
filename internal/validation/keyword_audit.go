@@ -70,6 +70,11 @@ type keywordFieldScan struct {
 	nonCanonicalSeparators bool
 }
 
+type crossLocaleKeywordAuditEntry struct {
+	locales map[string]struct{}
+	phrases map[string]struct{}
+}
+
 // AuditKeywords builds a keyword-quality report across version localizations.
 func AuditKeywords(input KeywordAuditInput, strict bool) KeywordAuditReport {
 	report := KeywordAuditReport{
@@ -77,7 +82,7 @@ func AuditKeywords(input KeywordAuditInput, strict bool) KeywordAuditReport {
 		VersionID:     strings.TrimSpace(input.VersionID),
 		VersionString: strings.TrimSpace(input.VersionString),
 		Platform:      strings.TrimSpace(input.Platform),
-		BlockedTerms:  normalizeKeywordAuditTerms(input.BlockedTerms),
+		BlockedTerms:  NormalizeKeywordAuditTerms(input.BlockedTerms),
 		Locales:       make([]KeywordAuditLocale, 0, len(input.VersionLocalizations)),
 		Checks:        make([]KeywordAuditCheck, 0),
 		Strict:        strict,
@@ -91,7 +96,7 @@ func AuditKeywords(input KeywordAuditInput, strict bool) KeywordAuditReport {
 	}
 
 	localeSummaries := make(map[string]*KeywordAuditLocale, len(input.VersionLocalizations))
-	crossLocaleKeywords := make(map[string]map[string]struct{})
+	crossLocaleKeywords := make(map[string]*crossLocaleKeywordAuditEntry)
 
 	for _, loc := range input.VersionLocalizations {
 		locale := strings.TrimSpace(loc.Locale)
@@ -220,12 +225,16 @@ func AuditKeywords(input KeywordAuditInput, strict bool) KeywordAuditReport {
 				continue
 			}
 
-			localeSet := crossLocaleKeywords[phraseText]
-			if localeSet == nil {
-				localeSet = make(map[string]struct{})
-				crossLocaleKeywords[phraseText] = localeSet
+			entry := crossLocaleKeywords[phraseText]
+			if entry == nil {
+				entry = &crossLocaleKeywordAuditEntry{
+					locales: make(map[string]struct{}),
+					phrases: make(map[string]struct{}),
+				}
+				crossLocaleKeywords[phraseText] = entry
 			}
-			localeSet[locale] = struct{}{}
+			entry.locales[locale] = struct{}{}
+			entry.phrases[phrase] = struct{}{}
 
 			for _, term := range report.BlockedTerms {
 				termText := normalizeKeywordAuditText(term)
@@ -256,22 +265,35 @@ func AuditKeywords(input KeywordAuditInput, strict bool) KeywordAuditReport {
 		})
 	}
 
-	for phrase, locales := range crossLocaleKeywords {
-		if len(locales) < 2 {
+	for _, entry := range crossLocaleKeywords {
+		if len(entry.locales) < 2 {
 			continue
 		}
-		related := make([]string, 0, len(locales))
-		for locale := range locales {
+		related := make([]string, 0, len(entry.locales))
+		for locale := range entry.locales {
 			related = append(related, locale)
 		}
 		sort.Strings(related)
+		displayPhrases := make([]string, 0, len(entry.phrases))
+		for phrase := range entry.phrases {
+			displayPhrases = append(displayPhrases, phrase)
+		}
+		sort.Slice(displayPhrases, func(i, j int) bool {
+			left := strings.ToLower(displayPhrases[i])
+			right := strings.ToLower(displayPhrases[j])
+			if left != right {
+				return left < right
+			}
+			return displayPhrases[i] < displayPhrases[j]
+		})
+		displayPhrase := displayPhrases[0]
 		report.Checks = append(report.Checks, KeywordAuditCheck{
 			ID:             "metadata.keywords.cross_locale_duplicates",
 			Severity:       SeverityInfo,
 			Field:          "keywords",
-			Keyword:        phrase,
+			Keyword:        displayPhrase,
 			RelatedLocales: related,
-			Message:        fmt.Sprintf("keyword phrase %q appears in multiple locales", phrase),
+			Message:        fmt.Sprintf("keyword phrase %q appears in multiple locales", displayPhrase),
 			Remediation:    "Confirm the repeated phrase is intentional across the listed locales",
 		})
 	}
@@ -348,7 +370,8 @@ func incrementKeywordAuditSeverity(locale *KeywordAuditLocale, severity Severity
 	}
 }
 
-func normalizeKeywordAuditTerms(terms []string) []string {
+// NormalizeKeywordAuditTerms trims, de-duplicates, and sorts user-supplied terms.
+func NormalizeKeywordAuditTerms(terms []string) []string {
 	normalized := make([]string, 0, len(terms))
 	seen := make(map[string]struct{}, len(terms))
 	for _, term := range terms {

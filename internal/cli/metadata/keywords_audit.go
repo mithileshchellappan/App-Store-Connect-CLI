@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"sort"
 	"strings"
 
 	"github.com/peterbourgon/ff/v3/ffcli"
@@ -200,32 +199,11 @@ func loadKeywordAuditBlockedTerms(flagValues []string, filePath string) ([]strin
 		}
 	}
 
-	normalized := normalizeKeywordAuditBlockedTerms(terms)
+	normalized := validation.NormalizeKeywordAuditTerms(terms)
 	if filePath != "" && len(normalized) == 0 {
 		return nil, fmt.Errorf("--blocked-terms-file must include at least one blocked term")
 	}
 	return normalized, nil
-}
-
-func normalizeKeywordAuditBlockedTerms(terms []string) []string {
-	normalized := make([]string, 0, len(terms))
-	seen := make(map[string]struct{}, len(terms))
-	for _, term := range terms {
-		trimmed := strings.Join(strings.Fields(strings.TrimSpace(term)), " ")
-		if trimmed == "" {
-			continue
-		}
-		key := strings.ToLower(trimmed)
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		normalized = append(normalized, trimmed)
-	}
-	sort.Slice(normalized, func(i, j int) bool {
-		return strings.ToLower(normalized[i]) < strings.ToLower(normalized[j])
-	})
-	return normalized
 }
 
 func mapVersionLocalizationsForAudit(items []asc.Resource[asc.AppStoreVersionLocalizationAttributes]) []validation.VersionLocalization {

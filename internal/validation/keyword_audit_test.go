@@ -13,12 +13,12 @@ func TestAuditKeywordsReportsLocaleAndCrossLocaleFindings(t *testing.T) {
 			{
 				ID:       "ver-loc-en",
 				Locale:   "en-US",
-				Keywords: "habit tracker,mood journal,Habit Tracker,free trial,,",
+				Keywords: "Habit Tracker,mood journal,free trial,free trial,,",
 			},
 			{
 				ID:       "ver-loc-fr",
 				Locale:   "fr-FR",
-				Keywords: "habit tracker,journal humeur",
+				Keywords: "habit-tracker,journal humeur",
 			},
 		},
 		AppInfoLocalizations: []AppInfoLocalization{
@@ -67,6 +67,13 @@ func TestAuditKeywordsReportsLocaleAndCrossLocaleFindings(t *testing.T) {
 	}
 	if !hasKeywordAuditCheckID(report.Checks, "metadata.keywords.cross_locale_duplicates") {
 		t.Fatalf("expected cross-locale duplicate finding, got %+v", report.Checks)
+	}
+	crossLocaleCheck, ok := findKeywordAuditCheck(report.Checks, "metadata.keywords.cross_locale_duplicates")
+	if !ok {
+		t.Fatalf("expected cross-locale duplicate check, got %+v", report.Checks)
+	}
+	if crossLocaleCheck.Keyword != "Habit Tracker" {
+		t.Fatalf("expected original display keyword for cross-locale check, got %+v", crossLocaleCheck)
 	}
 
 	if len(report.Locales) != 2 {
@@ -130,10 +137,15 @@ func TestAuditKeywordsReportsUnderfilledBudgetAsInfo(t *testing.T) {
 }
 
 func hasKeywordAuditCheckID(checks []KeywordAuditCheck, id string) bool {
+	_, ok := findKeywordAuditCheck(checks, id)
+	return ok
+}
+
+func findKeywordAuditCheck(checks []KeywordAuditCheck, id string) (KeywordAuditCheck, bool) {
 	for _, check := range checks {
 		if check.ID == id {
-			return true
+			return check, true
 		}
 	}
-	return false
+	return KeywordAuditCheck{}, false
 }
