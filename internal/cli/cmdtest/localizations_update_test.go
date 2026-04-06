@@ -166,11 +166,11 @@ func TestLocalizationsUpdate_AllowsForwardCompatibleLocaleCodes(t *testing.T) {
 	http.DefaultTransport = locUpdateRoundTripFunc(func(req *http.Request) (*http.Response, error) {
 		switch {
 		case req.Method == http.MethodGet && req.URL.Path == "/v1/appStoreVersions/ver-1/appStoreVersionLocalizations":
-			return locUpdateJSONResponse(`{"data":[{"type":"appStoreVersionLocalizations","id":"loc-forward","attributes":{"locale":"en-IN","description":"Old"}}],"links":{}}`)
+			return locUpdateJSONResponse(`{"data":[{"type":"appStoreVersionLocalizations","id":"loc-forward","attributes":{"locale":"zh-Hant-HK","description":"Old"}}],"links":{}}`)
 		case req.Method == http.MethodPatch && req.URL.Path == "/v1/appStoreVersionLocalizations/loc-forward":
 			body, _ := io.ReadAll(req.Body)
 			patchBody = string(body)
-			return locUpdateJSONResponse(`{"data":{"type":"appStoreVersionLocalizations","id":"loc-forward","attributes":{"locale":"en-IN","description":"Updated description"}}}`)
+			return locUpdateJSONResponse(`{"data":{"type":"appStoreVersionLocalizations","id":"loc-forward","attributes":{"locale":"zh-Hant-HK","description":"Updated description"}}}`)
 		default:
 			return nil, fmt.Errorf("unexpected request: %s %s", req.Method, req.URL.Path)
 		}
@@ -183,7 +183,7 @@ func TestLocalizationsUpdate_AllowsForwardCompatibleLocaleCodes(t *testing.T) {
 		if err := root.Parse([]string{
 			"localizations", "update",
 			"--version", "ver-1",
-			"--locale", "en-IN",
+			"--locale", "zh-Hant-HK",
 			"--description", "Updated description",
 		}); err != nil {
 			t.Fatalf("parse error: %v", err)
@@ -199,7 +199,7 @@ func TestLocalizationsUpdate_AllowsForwardCompatibleLocaleCodes(t *testing.T) {
 	if !strings.Contains(patchBody, "Updated description") {
 		t.Fatalf("expected patch body to contain updated description, got %s", patchBody)
 	}
-	if !strings.Contains(stdout, `"locale":"en-IN"`) {
+	if !strings.Contains(stdout, `"locale":"zh-Hant-HK"`) {
 		t.Fatalf("expected forward-compatible locale in output, got %q", stdout)
 	}
 }

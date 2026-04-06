@@ -46,6 +46,7 @@ func TestCanonicalizeAppStoreLocalizationLocale(t *testing.T) {
 		{input: "sl-si", want: "sl-SI"},
 		{input: "bn-BD", want: "bn-BD"},
 		{input: "en-IN", want: "en-IN"},
+		{input: "zh-Hant-HK", want: "zh-Hant-HK"},
 		{input: "eo", want: "eo"},
 	}
 

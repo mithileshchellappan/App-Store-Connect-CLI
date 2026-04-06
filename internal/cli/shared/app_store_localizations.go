@@ -17,7 +17,7 @@ type AppStoreLocalizationLocale struct {
 	SupportsMetadata bool   `json:"supportsMetadata"`
 }
 
-var appStoreLocalizationLocalePattern = regexp.MustCompile(`^[a-zA-Z]{2,3}(-([a-zA-Z]{2}|[a-zA-Z]{4}|[0-9]{3}))?$`)
+var appStoreLocalizationLocalePattern = regexp.MustCompile(`^[a-zA-Z]{2,3}(?:-[a-zA-Z0-9]{2,8})*$`)
 
 // Source notes:
 //   - The 39 metadata-capable locales come from Apple's locale shortcode documentation.

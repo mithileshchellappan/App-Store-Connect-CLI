@@ -608,7 +608,7 @@ func TestLocalizationsCreate_AllowsForwardCompatibleLocaleCodes(t *testing.T) {
 		}
 		seenLocale = payload.Data.Attributes.Locale
 
-		body := `{"data":{"type":"appStoreVersionLocalizations","id":"loc-forward","attributes":{"locale":"en-IN","description":"Updated app","keywords":"timer,focus","supportUrl":"https://example.com/support","whatsNew":"Bug fixes"}}}`
+		body := `{"data":{"type":"appStoreVersionLocalizations","id":"loc-forward","attributes":{"locale":"zh-Hant-HK","description":"Updated app","keywords":"timer,focus","supportUrl":"https://example.com/support","whatsNew":"Bug fixes"}}}`
 		return &http.Response{
 			StatusCode: http.StatusCreated,
 			Body:       io.NopCloser(strings.NewReader(body)),
@@ -623,7 +623,7 @@ func TestLocalizationsCreate_AllowsForwardCompatibleLocaleCodes(t *testing.T) {
 		if err := root.Parse([]string{
 			"localizations", "create",
 			"--version", "version-1",
-			"--locale", "en-IN",
+			"--locale", "zh-Hant-HK",
 			"--description", "Updated app",
 			"--keywords", "timer,focus",
 			"--support-url", "https://example.com/support",
@@ -639,11 +639,11 @@ func TestLocalizationsCreate_AllowsForwardCompatibleLocaleCodes(t *testing.T) {
 	if stderr != "" {
 		t.Fatalf("expected empty stderr, got %q", stderr)
 	}
-	if !strings.Contains(stdout, `"locale":"en-IN"`) {
+	if !strings.Contains(stdout, `"locale":"zh-Hant-HK"`) {
 		t.Fatalf("expected forward-compatible locale in output, got %q", stdout)
 	}
-	if seenLocale != "en-IN" {
-		t.Fatalf("expected request locale en-IN, got %q", seenLocale)
+	if seenLocale != "zh-Hant-HK" {
+		t.Fatalf("expected request locale zh-Hant-HK, got %q", seenLocale)
 	}
 }
 
