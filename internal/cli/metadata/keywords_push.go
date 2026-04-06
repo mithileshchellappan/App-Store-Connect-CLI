@@ -273,6 +273,10 @@ func readMetadataKeywordsPushEntries(path string) ([]metadataKeywordsPushEntry, 
 }
 
 func parseMetadataKeywordsPushKeywords(value json.RawMessage) (string, error) {
+	if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+		return "", fmt.Errorf("value must not be null")
+	}
+
 	var asString string
 	if err := json.Unmarshal(value, &asString); err == nil {
 		return asString, nil

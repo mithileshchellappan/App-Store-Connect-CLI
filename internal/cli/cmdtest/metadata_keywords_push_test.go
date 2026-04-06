@@ -381,7 +381,19 @@ func TestMetadataKeywordsPushStopsOnFirstFailureWhenContinueOnErrorFalse(t *test
 	t.Setenv("ASC_CONFIG_PATH", filepath.Join(t.TempDir(), "nonexistent.json"))
 	t.Setenv("ASC_APP_ID", "")
 
-	inputPath := filepath.Join(t.TempDir(), "keywords.json")
+	workDir := t.TempDir()
+	previousDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error: %v", err)
+	}
+	if err := os.Chdir(workDir); err != nil {
+		t.Fatalf("Chdir() error: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(previousDir)
+	})
+
+	inputPath := filepath.Join(workDir, "keywords.json")
 	if err := os.WriteFile(inputPath, []byte(`{"de-DE":"eins,zwei","ja":"nihon,go"}`), 0o600); err != nil {
 		t.Fatalf("WriteFile() error: %v", err)
 	}
@@ -429,5 +441,12 @@ func TestMetadataKeywordsPushStopsOnFirstFailureWhenContinueOnErrorFalse(t *test
 	}
 	if postCount != 1 {
 		t.Fatalf("expected one create attempt before stopping, got %d", postCount)
+	}
+	artifacts, err := filepath.Glob(filepath.Join(workDir, ".asc", "reports", "metadata-keywords-push", "failures-*.json"))
+	if err != nil {
+		t.Fatalf("Glob() error: %v", err)
+	}
+	if len(artifacts) != 1 {
+		t.Fatalf("expected one failure artifact in temp work dir, got %d (%v)", len(artifacts), artifacts)
 	}
 }

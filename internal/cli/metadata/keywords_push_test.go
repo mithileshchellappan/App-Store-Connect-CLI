@@ -46,3 +46,18 @@ func TestReadMetadataKeywordsPushEntriesRejectsInvalidEntryShape(t *testing.T) {
 		t.Fatalf("expected keywords field error, got %v", err)
 	}
 }
+
+func TestReadMetadataKeywordsPushEntriesRejectsJSONNullKeywords(t *testing.T) {
+	inputPath := filepath.Join(t.TempDir(), "keywords.json")
+	if err := os.WriteFile(inputPath, []byte(`{"en-US":null}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error: %v", err)
+	}
+
+	_, err := readMetadataKeywordsPushEntries(inputPath)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "must not be null") {
+		t.Fatalf("expected null rejection error, got %v", err)
+	}
+}
