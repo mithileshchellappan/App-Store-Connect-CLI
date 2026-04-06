@@ -183,6 +183,28 @@ func TestBuildReviewDoctorResultAddsRemovedItemsOnlyBlocker(t *testing.T) {
 	}
 }
 
+func TestBuildReviewOverviewResultsExposeReviewDetailConfiguredState(t *testing.T) {
+	snapshot := reviewSnapshot{
+		AppID: "123456789",
+		Version: &reviewVersionContext{
+			ID:       "ver-1",
+			Version:  "1.2.3",
+			Platform: "IOS",
+			State:    "PREPARE_FOR_SUBMISSION",
+		},
+	}
+
+	statusResult := buildReviewStatusResult(snapshot)
+	if statusResult.ReviewDetailConfigured {
+		t.Fatal("expected status result reviewDetailConfigured=false")
+	}
+
+	doctorResult := buildReviewDoctorResult(snapshot, validation.Report{})
+	if doctorResult.ReviewDetailConfigured {
+		t.Fatal("expected doctor result reviewDetailConfigured=false")
+	}
+}
+
 func TestAccumulateReviewSubmissionItemsIgnoresUnrelatedSubmissionItems(t *testing.T) {
 	summary := reviewSubmissionItemsContext{}
 	items := []asc.ReviewSubmissionItemResource{

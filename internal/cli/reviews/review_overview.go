@@ -48,25 +48,27 @@ type reviewSnapshot struct {
 }
 
 type reviewStatusResult struct {
-	AppID            string                   `json:"appId"`
-	Version          *reviewVersionContext    `json:"version,omitempty"`
-	ReviewDetailID   string                   `json:"reviewDetailId,omitempty"`
-	LatestSubmission *reviewSubmissionContext `json:"latestSubmission,omitempty"`
-	ReviewState      string                   `json:"reviewState"`
-	NextAction       string                   `json:"nextAction"`
-	Blockers         []string                 `json:"blockers,omitempty"`
+	AppID                  string                   `json:"appId"`
+	Version                *reviewVersionContext    `json:"version,omitempty"`
+	ReviewDetailConfigured bool                     `json:"reviewDetailConfigured"`
+	ReviewDetailID         string                   `json:"reviewDetailId,omitempty"`
+	LatestSubmission       *reviewSubmissionContext `json:"latestSubmission,omitempty"`
+	ReviewState            string                   `json:"reviewState"`
+	NextAction             string                   `json:"nextAction"`
+	Blockers               []string                 `json:"blockers,omitempty"`
 }
 
 type reviewDoctorResult struct {
-	AppID            string                   `json:"appId"`
-	Version          *reviewVersionContext    `json:"version,omitempty"`
-	ReviewDetailID   string                   `json:"reviewDetailId,omitempty"`
-	LatestSubmission *reviewSubmissionContext `json:"latestSubmission,omitempty"`
-	ReviewState      string                   `json:"reviewState"`
-	Summary          validation.Summary       `json:"summary"`
-	NextAction       string                   `json:"nextAction"`
-	BlockingChecks   []validation.CheckResult `json:"blockingChecks,omitempty"`
-	WarningChecks    []validation.CheckResult `json:"warningChecks,omitempty"`
+	AppID                  string                   `json:"appId"`
+	Version                *reviewVersionContext    `json:"version,omitempty"`
+	ReviewDetailConfigured bool                     `json:"reviewDetailConfigured"`
+	ReviewDetailID         string                   `json:"reviewDetailId,omitempty"`
+	LatestSubmission       *reviewSubmissionContext `json:"latestSubmission,omitempty"`
+	ReviewState            string                   `json:"reviewState"`
+	Summary                validation.Summary       `json:"summary"`
+	NextAction             string                   `json:"nextAction"`
+	BlockingChecks         []validation.CheckResult `json:"blockingChecks,omitempty"`
+	WarningChecks          []validation.CheckResult `json:"warningChecks,omitempty"`
 }
 
 // ReviewStatusCommand returns an app-scoped review status command.
@@ -463,13 +465,14 @@ func staleReviewSubmissionNextAction() string {
 
 func buildReviewStatusResult(snapshot reviewSnapshot) reviewStatusResult {
 	result := reviewStatusResult{
-		AppID:            snapshot.AppID,
-		Version:          snapshot.Version,
-		ReviewDetailID:   snapshot.ReviewDetailID,
-		LatestSubmission: snapshot.LatestSubmission,
-		ReviewState:      "NO_VERSION",
-		NextAction:       "Create or select an App Store version before preparing review.",
-		Blockers:         make([]string, 0),
+		AppID:                  snapshot.AppID,
+		Version:                snapshot.Version,
+		ReviewDetailConfigured: strings.TrimSpace(snapshot.ReviewDetailID) != "",
+		ReviewDetailID:         snapshot.ReviewDetailID,
+		LatestSubmission:       snapshot.LatestSubmission,
+		ReviewState:            "NO_VERSION",
+		NextAction:             "Create or select an App Store version before preparing review.",
+		Blockers:               make([]string, 0),
 	}
 
 	if snapshot.Version == nil {
@@ -484,7 +487,7 @@ func buildReviewStatusResult(snapshot reviewSnapshot) reviewStatusResult {
 	}
 
 	if strings.TrimSpace(snapshot.ReviewDetailID) == "" {
-		result.Blockers = append(result.Blockers, "No App Store review detail is configured for the current version")
+		result.Blockers = append(result.Blockers, "App Store review detail is not configured for the current version")
 	}
 	hasOnlyRemovedItems := reviewSnapshotHasOnlyRemovedItems(snapshot)
 	if hasOnlyRemovedItems {
@@ -542,14 +545,15 @@ func buildReviewStatusResult(snapshot reviewSnapshot) reviewStatusResult {
 
 func buildReviewDoctorResult(snapshot reviewSnapshot, report validation.Report) reviewDoctorResult {
 	result := reviewDoctorResult{
-		AppID:            snapshot.AppID,
-		Version:          snapshot.Version,
-		ReviewDetailID:   snapshot.ReviewDetailID,
-		LatestSubmission: snapshot.LatestSubmission,
-		ReviewState:      "NO_VERSION",
-		NextAction:       "Create or select an App Store version before diagnosing review blockers.",
-		BlockingChecks:   make([]validation.CheckResult, 0),
-		WarningChecks:    make([]validation.CheckResult, 0),
+		AppID:                  snapshot.AppID,
+		Version:                snapshot.Version,
+		ReviewDetailConfigured: strings.TrimSpace(snapshot.ReviewDetailID) != "",
+		ReviewDetailID:         snapshot.ReviewDetailID,
+		LatestSubmission:       snapshot.LatestSubmission,
+		ReviewState:            "NO_VERSION",
+		NextAction:             "Create or select an App Store version before diagnosing review blockers.",
+		BlockingChecks:         make([]validation.CheckResult, 0),
+		WarningChecks:          make([]validation.CheckResult, 0),
 	}
 
 	if snapshot.Version == nil {
@@ -653,6 +657,7 @@ func renderReviewStatus(result reviewStatusResult, markdown bool) {
 		{"version", shared.OrNA(reviewVersionField(result.Version, func(v *reviewVersionContext) string { return v.Version }))},
 		{"platform", shared.OrNA(reviewVersionField(result.Version, func(v *reviewVersionContext) string { return v.Platform }))},
 		{"versionState", shared.OrNA(reviewVersionField(result.Version, func(v *reviewVersionContext) string { return v.State }))},
+		{"reviewDetail", reviewConfiguredLabel(result.ReviewDetailConfigured)},
 		{"reviewDetailId", shared.OrNA(result.ReviewDetailID)},
 		{"latestSubmissionId", shared.OrNA(reviewSubmissionField(result.LatestSubmission, func(s *reviewSubmissionContext) string { return s.ID }))},
 		{"submissionState", shared.OrNA(reviewSubmissionField(result.LatestSubmission, func(s *reviewSubmissionContext) string { return s.State }))},
@@ -685,6 +690,7 @@ func renderReviewDoctor(result reviewDoctorResult, markdown bool) {
 		{"version", shared.OrNA(reviewVersionField(result.Version, func(v *reviewVersionContext) string { return v.Version }))},
 		{"platform", shared.OrNA(reviewVersionField(result.Version, func(v *reviewVersionContext) string { return v.Platform }))},
 		{"versionState", shared.OrNA(reviewVersionField(result.Version, func(v *reviewVersionContext) string { return v.State }))},
+		{"reviewDetail", reviewConfiguredLabel(result.ReviewDetailConfigured)},
 		{"reviewDetailId", shared.OrNA(result.ReviewDetailID)},
 		{"latestSubmissionId", shared.OrNA(reviewSubmissionField(result.LatestSubmission, func(s *reviewSubmissionContext) string { return s.ID }))},
 	}
