@@ -64,9 +64,12 @@ func finalizeAppScreenshotUploadResult(result *asc.AppScreenshotUploadResult) {
 	uploaded := 0
 	skipped := 0
 	for _, item := range result.Results {
+		state := strings.ToLower(strings.TrimSpace(item.State))
 		switch {
-		case item.Skipped || strings.EqualFold(strings.TrimSpace(item.State), "skipped"):
+		case item.Skipped || state == "skipped":
 			skipped++
+		case state == "would-delete":
+			continue
 		case strings.TrimSpace(item.AssetID) != "":
 			uploaded++
 		}
@@ -142,7 +145,7 @@ func prepareAppScreenshotUpload(ctx context.Context, cfg screenshotUploadConfig[
 	}
 
 	orderedIDs := make([]string, 0)
-	if !cfg.DryRun && !cfg.Replace && set.ID != "" {
+	if !cfg.DryRun && !cfg.Replace && set.ID != "" && len(files) > 0 {
 		orderCtx, orderCancel := cfg.UploadContext(ctx)
 		orderedIDs, err = GetOrderedAppScreenshotIDs(orderCtx, cfg.Client, set.ID)
 		orderCancel()
@@ -316,14 +319,15 @@ func resumeAppScreenshotUpload(ctx context.Context, client *asc.Client, artifact
 	if result.Pending == 0 && strings.TrimSpace(progress.FailedFile) != "" {
 		result.Pending = 1
 	}
-	result.Failed = 1
-	result.Failures = append([]asc.AssetUploadFailureItem{}, artifact.Failures...)
 	if strings.TrimSpace(progress.FailedFile) != "" {
 		result.Failures = append(result.Failures, asc.AssetUploadFailureItem{
 			FileName: filepath.Base(progress.FailedFile),
 			FilePath: progress.FailedFile,
 			Error:    uploadErr.Error(),
 		})
+	}
+	if len(result.Failures) == 0 {
+		result.Failed = 1
 	}
 	result.Total = len(result.Results) + result.Pending
 	finalizeAppScreenshotUploadResult(&result)

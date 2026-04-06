@@ -832,7 +832,6 @@ func uploadScreenshots(ctx context.Context, client *asc.Client, localizationID, 
 			return buildAppScreenshotUploadResult(localizationID, set, dryRun, results)
 		},
 	})
-	finalizeAppScreenshotUploadResult(&result)
 	return result, err
 }
 
