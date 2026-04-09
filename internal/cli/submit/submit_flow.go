@@ -153,16 +153,6 @@ func SubmitResolvedVersion(ctx context.Context, client *asc.Client, opts SubmitR
 		return result, fmt.Errorf("submit review: platform is required")
 	}
 
-	if opts.EnsureBuildAttached {
-		attachmentCtx, attachmentCancel := submitResolvedVersionPhaseContext(ctx, opts.RequestTimeout)
-		attachment, err := EnsureBuildAttached(attachmentCtx, client, versionID, opts.BuildID, opts.DryRun)
-		attachmentCancel()
-		result.BuildAttachment = &attachment
-		if err != nil {
-			return result, err
-		}
-	}
-
 	if opts.LookupExistingSubmission {
 		lookupCtx, lookupCancel := submitResolvedVersionPhaseContext(ctx, opts.RequestTimeout)
 		legacySubmission, err := client.GetAppStoreVersionSubmissionForVersion(lookupCtx, versionID)
@@ -174,6 +164,16 @@ func SubmitResolvedVersion(ctx context.Context, client *asc.Client, opts SubmitR
 			result.AlreadySubmitted = true
 			result.SubmissionID = strings.TrimSpace(legacySubmission.Data.ID)
 			return result, nil
+		}
+	}
+
+	if opts.EnsureBuildAttached {
+		attachmentCtx, attachmentCancel := submitResolvedVersionPhaseContext(ctx, opts.RequestTimeout)
+		attachment, err := EnsureBuildAttached(attachmentCtx, client, versionID, opts.BuildID, opts.DryRun)
+		attachmentCancel()
+		result.BuildAttachment = &attachment
+		if err != nil {
+			return result, err
 		}
 	}
 
